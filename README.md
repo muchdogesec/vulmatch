@@ -15,7 +15,15 @@ Vulmatch stores the following data in an ArangoDB to power the API;
 
 * CVE records stored on Cloudflare 
 * CPE records stored on Cloudflare 
-* CWE records stored on Cloudflare 
+* CWE records stored on Cloudflare
+
+The download logic can be seen in these scripts:
+
+https://github.com/muchdogesec/stix2arango/tree/main/utilities
+
+* insert_archive_cpe
+* insert_archive_cve
+* insert_archive_cwe
 
 The user can define the database in the `.env` file, however, it expects the following collection to exist in the named database:
 
@@ -284,6 +292,40 @@ GET <HOST>/api/v1/cpes/:cpe_match_string
 
 Possible errors:
 
+* 404 - Not found, or the client does not have access to the resource
+
+#### CWE Objects
+
+##### POST CWEs
+
+Will download CWEs using cloudflare
+
+```shell
+POST <HOST>/api/v1/cwe/
+```
+
+* `--last_modified_earliest` (`YYYY-MM-DD`): earliest date
+	* default is `1980-01-01`
+* `--last_modified_latest` (`YYYY-MM-DD`): latest date
+	* default is `1980-01-01`
+
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "cwe-update",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
 * 404 - Not found, or the client does not have access to the resource
 
 #### arango_cti_processor
