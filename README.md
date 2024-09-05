@@ -241,7 +241,7 @@ Possible errors:
 * 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
-#### GET CPE
+##### GET CPE
 
 ```shell
 GET <HOST>/api/v1/cpes/:cpe_match_string
@@ -263,3 +263,91 @@ Possible errors:
 
 * 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
+
+#### arango_cti_processor
+
+These endpoints will trigger the relevant arango_cti_processor mode to generate relationships.
+
+Each request generates a job.
+
+##### Run `cve-cpe`
+
+```shell
+POST <HOST>/api/v1/arango_cti_processor/cve-cpe
+```
+
+URL parameters;
+
+* `--created_min` (`YYYY-MM-DD`): will only update objects with a `created` time >= to date passed
+	* default is `1980-01-01`
+* `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
+	* default is `1980-01-01`
+
+A 201 response returns the job id
+
+##### Run `cve-cwe`
+
+```shell
+POST <HOST>/api/v1/arango_cti_processor/cve-cwe
+```
+
+URL parameters;
+
+* `--created_min` (`YYYY-MM-DD`): will only update objects with a `created` time >= to date passed
+	* default is `1980-01-01`
+* `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
+	* default is `1980-01-01`
+
+A 201 response returns the job id
+
+##### Run `cve-epss`
+
+```shell
+POST <HOST>/api/v1/arango_cti_processor/cve-epss
+```
+
+URL parameters;
+
+* `--created_min` (`YYYY-MM-DD`): will only update objects with a `created` time >= to date passed
+	* default is `1980-01-01`
+* `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
+	* default is `1980-01-01`
+
+A 201 response returns the job id
+
+##### Get Jobs
+
+```shell
+POST <HOST>/api/v1/arango_cti_processor/jobs
+```
+
+Url parameters
+
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+
+Shows job info
+
+```json
+{
+  "page_size": 50,
+  "page_number": 3,
+  "page_results_count": 50,
+  "total_results_count": 2500,
+  "jobs": [
+	  	{
+			"mode": "<e.g. cve-epss>",
+			"created_min": "<created_min>",
+			"modified_min": "<modified_min>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+##### Get Job ID
+
+```shell
+POST <HOST>/api/v1/arango_cti_processor/jobs/:job_id
+```
