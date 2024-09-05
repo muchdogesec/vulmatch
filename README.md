@@ -13,25 +13,15 @@ Vulmatch is a database of CVEs in STIX 2.1 format with a REST API. Some common r
 
 Vulmatch stores the following data in an ArangoDB to power the API;
 
-* CVE records stored on Cloudflare (created by a Github action in cxe2stix_helper) and updated automatically each day
-* CPE records stored on Cloudflare (created by a Github action in cxe2stix_helper) and updated automatically each day
-* Vulmatch also downloads and stores a copy of MITRE CWEs from Cloudflare updated on demand
+* CVE records stored on Cloudflare 
+* CPE records stored on Cloudflare 
+* CWE records stored on Cloudflare 
 
 The user can define the database in the `.env` file, however, it expects the following collection to exist in the named database:
 
 * NVD CVE: `nvd_cve_vertex_collection`/`nvd_cve_edge_collection`
 * NVD CPE: `nvd_cpe_vertex_collection`/`nvd_cpe_edge_collection`
 * MITRE CWE: `mitre_cwe_vertex_collection`/`mitre_cwe_edge_collection`
-
-## Daily jobs to get new/updated CVEs/CPEs
-
-[This code requires cxe2stix_helper to be running on github to store cves/cpes on cloudflare via a github action](https://github.com/muchdogesec/cxe2stix_helper).
-
-Every day, after the Cloudflare R2 bucket is queried (after Github action is run) to pull the daily CPE and CVE bundle.
-
-These are then added to the database by [stix2arango](https://github.com/muchdogesec/stix2arango/). This will either add new objects, or update existing CVE records if updates have happened in the last day.
-
-CWE bundles are manually added when updates happen, as these updates tend to happen only twice a year.
 
 ## A note on CPE search logic
 
@@ -61,34 +51,6 @@ Sometimes you will also see a `-` value in the CPE string, which means no value 
 
 ## API
 
-### Users / Authentication / Permissions
-
-Authentication is managed by ArangoDB.
-
-![](docs/ArangoDB-User-Overview.png)
-
-Under the `_system` database, admin users can add or remove other users from the system.
-
-![](docs/ArangoDB-User-Information.png)
-
-Each user has a username and password.
-
-These values are used to authenticate against the API, using basic auth in the header of each request;
-
-```
-Authorization: Basic <credentials>
-```
-
-Users can also be assigned permissions on a database and Collection level.
-
-![](docs/ArangoDB-User-Permissions.png)
-
-A user must have read permissions to the database you specify for them to view the collections within it.
-
-You can control wether a user can view the collections inside the database (e.g. only allow them to see some collections), although in most cases you want to grant users read permissions to all collections in the named database.
-
-There are no write actions performed via the API, so write access is not required for any user.
-
 ### Schema
 
 To make it easy for users to get up and running, we should build the API against the OpenAPI v3 spec (https://spec.openapis.org/oas/v3.1.0). We can then use Swagger (https://swagger.io/resources/open-api/) to automatically deliver a lightweight view to allow users to interact with the API in the browser.
@@ -110,6 +72,38 @@ All paginated responses should contain the header;
 ### Endpoints
 
 #### CVE Objects
+
+##### POST CVEs
+
+Will download CVEs using cloudflare
+
+```shell
+POST <HOST>/api/v1/cve/
+```
+
+* `--last_modified_earliest` (`YYYY-MM-DD`): earliest date
+	* default is `1980-01-01`
+* `--last_modified_latest` (`YYYY-MM-DD`): latest date
+	* default is `1980-01-01`
+
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "cve-update",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
 
 ##### GET CVEs
 
@@ -138,7 +132,7 @@ Accepts URL parameters:
 	* searches for minimum base scores for v2_0, v3_0, v3_1 and v4_0 Vulnerability object
 * `epss_score_min` (optional, between `0`-`1` to 2 decimal places)
 * `epss_percentile_min` (optional, between `0`-`1` to 2 decimal places)
-* `weakness_id` (optional, cwe id): list of CWEs that are linked to CWEs
+* `weakness_id` (optional, cwe id): list of CWEs that are linked to CVEs
 * `page_size` (max is 50, default is 50)
 * `page`
     * default is 0
@@ -168,7 +162,6 @@ This endpoint only returns the vulnerability object for matching CVEs, they must
 Possible errors:
 
 * 400 - The server did not understand the request
-* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### GET CVE
@@ -195,10 +188,41 @@ https://miro.com/app/board/uXjVKo1Efx0=/
 
 Possible errors:
 
-* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 #### CPE Objects
+
+##### POST CPEs
+
+Will download CPEs using cloudflare
+
+```shell
+POST <HOST>/api/v1/cpe/
+```
+
+* `--last_modified_earliest` (`YYYY-MM-DD`): earliest date
+	* default is `1980-01-01`
+* `--last_modified_latest` (`YYYY-MM-DD`): latest date
+	* default is `1980-01-01`
+
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "cpe-update",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
 
 ##### GET CPEs
 
@@ -238,7 +262,6 @@ Accepts URL parameters:
 Possible errors:
 
 * 400 - The server did not understand the request
-* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### GET CPE
@@ -261,7 +284,6 @@ GET <HOST>/api/v1/cpes/:cpe_match_string
 
 Possible errors:
 
-* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 #### arango_cti_processor
@@ -283,7 +305,24 @@ URL parameters;
 * `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
 	* default is `1980-01-01`
 
-A 201 response returns the job id
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "arango_cti_processor-cve-cpe",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
 
 ##### Run `cve-cwe`
 
@@ -298,7 +337,26 @@ URL parameters;
 * `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
 	* default is `1980-01-01`
 
-A 201 response returns the job id
+A 201 response returns the job id and job
+
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "arango_cti_processor-cve-cwe",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
 
 ##### Run `cve-epss`
 
@@ -313,12 +371,31 @@ URL parameters;
 * `--modified_min` (`YYYY-MM-DD`): will only update objects with a `modified` time >= to date passed
 	* default is `1980-01-01`
 
-A 201 response returns the job id
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "arango_cti_processor-cve-epss",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
+
+### Jobs
 
 ##### Get Jobs
 
 ```shell
-POST <HOST>/api/v1/arango_cti_processor/jobs
+POST <HOST>/api/v1/jobs
 ```
 
 Url parameters
@@ -335,19 +412,43 @@ Shows job info
   "page_number": 3,
   "page_results_count": 50,
   "total_results_count": 2500,
-  "jobs": [
-	  	{
-			"mode": "<e.g. cve-epss>",
-			"created_min": "<created_min>",
-			"modified_min": "<modified_min>",
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "arango_cti_processor-cve-epss",
+			"url_parameters": "<VALUES>",
 			"datetime_start": "<datetime job triggered>",
 			"state": "<state>"
 		}
 	]
 }
 ```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 404 - Not found, or the client does not have access to the resource
+
 ##### Get Job ID
 
 ```shell
 POST <HOST>/api/v1/arango_cti_processor/jobs/:job_id
 ```
+
+```json
+{
+	"jobs": [
+		{
+			"job_id": "<ID>",
+			"job_type": "arango_cti_processor-cve-epss",
+			"url_parameters": "<VALUES>",
+			"datetime_start": "<datetime job triggered>",
+			"state": "<state>"
+		}
+	]
+}
+```
+
+Possible errors:
+
+* 404 - Not found, or the client does not have access to the resource
