@@ -14,8 +14,9 @@ Vulmatch is a database of CVEs in STIX 2.1 format with a REST API. Some common r
 Vulmatch stores the following data in an ArangoDB to power the API;
 
 * CVE records stored on Cloudflare 
-* CPE records stored on Cloudflare 
+* CPE records stored on Cloudflare
 * CWE records stored on Cloudflare
+* ATT&CK records stored on Cloudflare
 
 The download logic can be seen in these scripts:
 
@@ -24,12 +25,18 @@ https://github.com/muchdogesec/stix2arango/tree/main/utilities
 * insert_archive_cpe
 * insert_archive_cve
 * insert_archive_cwe
+* insert_archive_attack_enterprise
+* insert_archive_attack_ics
+* insert_archive_attack_mobile
 
 The user can define the database in the `.env` file, however, it expects the following collection to exist in the named database:
 
 * NVD CVE: `nvd_cve_vertex_collection`/`nvd_cve_edge_collection`
 * NVD CPE: `nvd_cpe_vertex_collection`/`nvd_cpe_edge_collection`
 * MITRE CWE: `mitre_cwe_vertex_collection`/`mitre_cwe_edge_collection`
+* MITRE ATT&CK Enterprise: `mitre_attack_enterprise_vertex_collection`/`mitre_attack_enterprise_edge_collection`
+* MITRE ATT&CK Mobile: `mitre_attack_mobile_vertex_collection`/`mitre_attack_mobile_edge_collection`
+* MITRE ATT&CK ICS: `mitre_attack_ics_vertex_collection`/`mitre_attack_ics_edge_collection`
 
 ## A note on CPE search logic
 
@@ -111,6 +118,7 @@ POST <HOST>/api/v1/cve/
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### GET CVEs
@@ -175,6 +183,7 @@ This endpoint only returns the vulnerability object for matching CVEs, they must
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### GET CVE
@@ -183,25 +192,74 @@ Possible errors:
 GET <HOST>/api/v1/cves/:cve_id/
 ```
 
-This endpoint prints all objects that representing the vulnerability and those directly linked (Weaknesses, ATT&CK, relationships, etc)
+Accepts URL parameters
 
-You can see those here:
-
-https://miro.com/app/board/uXjVKo1Efx0=/
-
-200:
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`). Get available versions from the versions endpoint.
 
 ```json
 {
-	"objects": [
-		"<STIX OBJECT 1>"
+	"vulnerabilities": [
+		"<PRINTED STIX VULNERABILITY OBJECT 1>",
 	]
 }
 ```
 
 Possible errors:
 
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
+
+##### GET CVE Object Versions
+
+```shell
+GET <HOST>/api/v1/cves/:cve_id/versions/
+```
+
+Shows the version (`modified` times) of all the CVE vulnerability objects
+
+```json
+{
+	"versions": [
+		"2020-10-28T12:51:29.358Z",
+		"2018-01-01T00:00:00.000Z"		
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CVE Bundle
+
+```shell
+GET <HOST>/api/v1/cves/:cve_id/bundle
+```
+
+This endpoint prints all objects that representing the vulnerability and those directly linked (Weaknesses, ATT&CK, relationships, etc)
+
+Accepts URL parameters
+
+* `version`: (modified time): will return a snapshot of that vulnerability and the info held about it at the specific time. Get the versions available for a CVE from the versions endpoint.
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>",
+		"<STIX OBJECT N>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+---
 
 #### CPE Objects
 
@@ -252,7 +310,7 @@ Accepts URL parameters:
 * `product_type` (optional, uses cpe match string 2nd part): either `application`, `hardware`, `operating-system`
 * `vendor` (optional, uses cpe match string 3rd part)
 * `product` (optional, uses cpe match string 4th part)
-* `in_cve_pattern` (optional, list of CVE ids): only returns CPEs in CVE Pattern
+* `in_cve_pattern` (optional, list of CVE ids): only returns CPEs in a CVEs Pattern
 * `cve_vulnerable` (optional, list of CVE ids): only returns CPEs vulnerable to CVE
 * `page_size` (max is 50, default is 50)
 * `page`
@@ -275,6 +333,7 @@ Accepts URL parameters:
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### GET CPE
@@ -297,15 +356,12 @@ GET <HOST>/api/v1/cpes/:cpe_match_string
 
 Possible errors:
 
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
-#### Download Objects
+---
 
-These objects power the endpoints that power some of the lookups.
-
-These scripts already contian the download logic:
-
-https://github.com/muchdogesec/stix2arango/blob/main/utilities/README.md
+#### ATT&CK Objects
 
 ##### POST ATT&CK
 
@@ -336,7 +392,185 @@ Accepts URL parameters
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Matrices
+
+```shell
+GET <HOST>/api/v1/attacks/
+```
+
+Will return all the matrices in the collection
+
+200:
+
+```json
+{
+	"matrix_names": [
+		"enterprise",
+		"mobile",
+		"ics"
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Objects
+
+```shell
+GET <HOST>/api/v1/attacks/MATRIX_NAME/objects/
+```
+
+Does not return relationship type objects. Use the relationships endpoint for this data.
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted (e.g. `attack-pattern--1234`)
+* `type` (stix type): The STIX object `type`(s) of the object wanted (e.g. `attack-pattern`).
+	* available options are `attack-pattern`, `campaign`, `course-of-action`, `identity`, `intrusion-set`, `malware`, `marking-definition`, `tool`, `x-mitre-data-component`, `x-mitre-data-source`, `x-mitre-matrix`, `x-mitre-tactic`
+* `attack_id` (attack ID): The ATTACK ids of the object wanted (e.g. `T1659`)
+* `attack_version` (attack version): this uses the stix2arango_note property (e.g. `v15.1`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`). Get available versions from the versions endpoint.
+* `name` (stix name): The name if the object. Is wildcard
+* `description` (stix description): The description if the object. Is wildcard
+
+200 will return all matching objects (hiding any arangodb internal properties starting with `_`):
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>",
+		"<STIX OBJECT 2>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Object
+
+```shell
+GET <HOST>/api/v1/attacks/MATRIX_NAME/objects/:stix_id/
+```
+
+Accepts URL parameters:
+
+* `attack_version` (attack version): this uses the `_stix2arango_note` property (e.g. `v15.1`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`). Get available versions from the versions endpoint.
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Object Versions
+
+```shell
+GET <HOST>/api/v1/attacks/MATRIX_NAME/objects/:stix_id/versions/
+```
+
+Shows the version (`modified` time), and the ATT&CK versions (`_stix2arango_note`) values
+
+```json
+{
+	"versions": [
+		{
+			"2020-10-28T12:51:29.358Z": [
+				"v15.0",
+				"v15.1"
+			],
+			"2018-01-01T00:00:00.000Z": [
+				"v14.0",
+				"v14.1"
+			]
+		},
+		
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Relationships
+
+```shell
+GET <HOST>/api/v1/attacks/MATRIX_NAME/relationships/
+```
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted
+* `source_ref` (stix id): the source_ref property
+* `target_ref` (stix id): the target_ref property
+* `relationship_type`: the `relationship_type` property.
+* `target_collection`:
+	* either `attack-attack` (in collection ATT&CK relationships)
+* `source_collection`
+	* either `attack-attack` (in collection ATT&CK relationships), `sigma-attack` (generated by arango cti processor), `capec-attack` (generated by arango cti processor)
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>",
+		"<STIX REL OBJECT N>",
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET ATT&CK Relationship
+
+```shell
+GET <HOST>/api/v1/attacks/MATRIX_NAME/relationships/:stix_id/
+```
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+---
+
+#### CWE Objects
 
 ##### POST CWEs
 
@@ -367,7 +601,157 @@ Accepts URL parameters
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
+
+##### GET CWE Objects
+
+```shell
+GET <HOST>/api/v1/cwes/objects/
+```
+
+Does not return relationship type objects. Use the relationships endpoint for this data.
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted (e.g. `weakness--1234`)
+* `type` (stix type): The STIX object `type`(s) of the object wanted (e.g. `weakness`).
+	* available options are `weakness`, `grouping`, `identity`, `marking-definition`, `extension-definition`
+* `cwe_id` (cwe ID): The CAPEC ids of the object wanted (e.g. `CWE-242`)
+* `cwe_version` (cwe version): this uses the stix2arango_note property (e.g. `v4.15`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`). Get available versions from the versions endpoint.
+* `name` (stix name): The name if the object. Is wildcard
+* `description` (stix description): The description if the object. Is wildcard
+
+200 will return all matching objects (hiding any arangodb internal properties starting with `_`):
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>",
+		"<STIX OBJECT 2>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CWE Object
+
+```shell
+GET <HOST>/api/v1/cwes/objects/:stix_id/
+```
+
+Accepts URL parameters:
+
+* `cwe_version` (cwe version): this uses the stix2arango_note property (e.g. `v4.15`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`). Get available versions from the versions endpoint.
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CWE Object Versions
+
+```shell
+GET <HOST>/api/v1/cwes/objects/:stix_id/versions/
+```
+
+Shows the version (`modified` time), and the CWE versions (`_stix2arango_note`) values
+
+```json
+{
+	"versions": [
+		{
+			"2020-10-28T12:51:29.358Z": [
+				"v4.15"
+			],
+			"2018-01-01T00:00:00.000Z": [
+				"v4.14"
+			]
+		},
+		
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CWE Relationships
+
+```shell
+GET <HOST>/api/v1/cwes/relationships/
+```
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted
+* `source_ref` (stix id): the source_ref property. 
+* `target_ref` (stix id): the target_ref property
+* `relationship_type`: the `relationship_type` property.
+* `target_collection`:
+	* either `cwe-cwe` (in collection CWE relationships), `cwe-capec` (generated by arango cti processor)
+* `source_collection`
+	* either `cwe-cwe` (in collection CWE relationships), `capec-cwe` (generated by arango cti processor)
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>",
+		"<STIX REL OBJECT N>",
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CWE Relationship
+
+```shell
+GET <HOST>/api/v1/cwes/relationships/:stix_id/
+```
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+---
+
+#### CAPEC Objects
 
 ##### POST CAPECs
 
@@ -398,7 +782,156 @@ Accepts URL parameters
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
+
+##### GET CAPEC Objects
+
+```shell
+GET <HOST>/api/v1/capecsafc/objects/
+```
+
+Does not return relationship type objects. Use the relationships endpoint for this data.
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted (e.g. `attack-pattern--1234`)
+* `type` (stix type): The STIX object `type`(s) of the object wanted (e.g. `attack-pattern`).
+	* available options are `attack-pattern`, `course-of-action`, `identity`, `marking-definition`
+* `capec_id` (capec ID): The CAPEC ids of the object wanted (e.g. `CAPEC-112`)
+* `capec_version` (capec version): this uses the stix2arango_note property (e.g. `v3.9`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`).
+* `name` (stix name): The name if the object. Is wildcard
+* `description` (stix description): The description if the object. Is wildcard
+
+200 will return all matching objects (hiding any arangodb internal properties starting with `_`):
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>",
+		"<STIX OBJECT 2>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CAPEC Object
+
+```shell
+GET <HOST>/api/v1/capecsafc/objects/:stix_id/
+```
+
+Accepts URL parameters:
+
+* `capec_version` (capec version): this uses the stix2arango_note property (e.g. `v3.9`)
+* `version`: (modified time): by default the API will only return the latest version of the object. You can pass a specific version ID to return that object (e.g. `2020-10-28T12:51:29.358Z`).
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CAPEC Object Versions
+
+```shell
+GET <HOST>/api/v1/capecsafc/objects/:stix_id/versions/
+```
+
+Shows the version (`modified` time), and the CAPEC versions (`_stix2arango_note`) values
+
+```json
+{
+	"versions": [
+		{
+			"2020-10-28T12:51:29.358Z": [
+				"v3.9"
+			],
+			"2018-01-01T00:00:00.000Z": [
+				"v3.8"
+			]
+		},
+		
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CAPEC Relationships
+
+```shell
+GET <HOST>/api/v1/capecsafc/relationships/
+```
+
+Accepts URL parameters:
+
+* `id` (stix id): The STIX ID(s) of the object wanted
+* `source_ref` (stix id): the source_ref property. 
+* `target_ref` (stix id): the target_ref property
+* `relationship_type`: the `relationship_type` property.
+* `target_collection`:
+	* either `capec-capec` (in collection CAPEC relationships), `capec-attack` (generated by arango cti processor), `capec-cwe` (generated by arango cti processor)
+* `source_collection`
+	* either `capec-capec` (in collection CAPEC relationships), `cwe-capec` (generated by arango cti processor)
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>",
+		"<STIX REL OBJECT N>",
+	]
+}
+```
+
+Possible errors:
+
+* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+##### GET CAPEC Relationship
+
+```shell
+GET <HOST>/api/v1/capecsafc/relationships/:stix_id/
+```
+
+200:
+
+```json
+{
+	"objects": [
+		"<STIX REL OBJECT 1>"
+	]
+}
+```
+
+Possible errors:
+
+* 401 - The client needs to authenticate
+* 404 - Not found, or the client does not have access to the resource
+
+---
 
 #### arango_cti_processor
 
@@ -428,7 +961,7 @@ POST <HOST>/api/v1/arango_cti_processor/cwe-capec
 
 Possible errors:
 
-* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### Run `capec-attack`
@@ -453,7 +986,7 @@ POST <HOST>/api/v1/arango_cti_processor/capec-attack
 
 Possible errors:
 
-* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### Run `cve-epss`
@@ -485,7 +1018,7 @@ URL parameters;
 
 Possible errors:
 
-* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### Run `cve-cpe`
@@ -551,7 +1084,7 @@ A 201 response returns the job id and job
 
 Possible errors:
 
-* 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ### Jobs
@@ -564,6 +1097,9 @@ POST <HOST>/api/v1/jobs
 
 Url parameters
 
+* `sort`:
+    * datestime_start_ascending
+    * datestime_start_descending (default)
 * `page_size` (max is 50, default is 50)
 * `page`
     * default is 0
@@ -591,6 +1127,7 @@ Shows job info
 Possible errors:
 
 * 400 - The server did not understand the request
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
 
 ##### Get Job ID
@@ -615,4 +1152,5 @@ POST <HOST>/api/v1/arango_cti_processor/jobs/:job_id
 
 Possible errors:
 
+* 401 - The client needs to authenticate
 * 404 - Not found, or the client does not have access to the resource
