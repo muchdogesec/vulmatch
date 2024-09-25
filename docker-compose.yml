@@ -25,10 +25,10 @@ services:
                     python manage.py collectstatic --no-input &&
                     python manage.py makemigrations &&
                             python manage.py migrate &&
-                            gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8001
+                            gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
                     " 
         ports:
-            - 8001:8001
+            - 8005:8005
         depends_on:
             - celery
 
