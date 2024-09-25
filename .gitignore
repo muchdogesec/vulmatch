@@ -7,3 +7,4 @@ Pipfile*
 temp/
 media/
 www/
+vulmatch-venv/

@@ -18,13 +18,13 @@ from textwrap import dedent
         responses={201: serializers.JobSerializer
         },
         request=serializers.NVDTaskSerializer,
-        summary="Download Vulnerability data for CVEs",
-        description="Use this data to update the CVE records stored in Vulmatch.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
+        summary="Download data for CVEs",
+        description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
     ),
     list=extend_schema(
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities')}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
-        description="This endpoint only returns the vulnerability object for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it using the bundle endpoint.",
+        description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability object for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it using the bundle endpoint.",
     )
 )   
 class CveView(viewsets.ViewSet):
@@ -36,7 +36,7 @@ class CveView(viewsets.ViewSet):
 
     
     class filterset_class(FilterSet):
-        id = MultipleChoiceFilter(label='Filter the results using a STIX ID. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
+        id = MultipleChoiceFilter(label='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
         cve_id = CharFilter(label='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
         description = CharFilter(label='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         has_kev = BooleanFilter(label=dedent('''
@@ -74,14 +74,16 @@ class CveView(viewsets.ViewSet):
         responses={201: serializers.JobSerializer
         },
         request=serializers.NVDTaskSerializer,
-        summary="Will download CPEs using cloudflare",
+        summary="Download CPE data",
+        description="Use this data to update the CPE records.\n\nThe earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\nNote, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
     ),
     list=extend_schema(
         summary='Get Software Objects for CPEs',
-        description="This endpoint only returns the Software Objects for matching CPEs.",
+        description="Search and filter CVE records.",
     ),
     retrieve=extend_schema(
-        summary='Get CPE object',
+        summary='Get a CPE object by STIX ID',
+        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPE endpoint.",
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -95,17 +97,17 @@ class CpeView(viewsets.ViewSet):
     #    return models.Job.objects.all()
     
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='(stix id): The STIX ID(s) of the object wanted (e.g. `software--1234`)')
+        id = BaseCSVFilter(label='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
         type = ChoiceFilter(choices=[(f,f) for f in SOFTWARE_TYPES], label="(stix type): The STIX object `type`(s) of the object wanted (e.g. `software`).")
-        cpe_match_string = CharFilter(label='(optional): ID of CVE (e.g. `cpe:2.3:o:microsoft:windows_10`). Can use wildcards or can omit end of string (rest will be treated as wildcard values)')
-        vendor = CharFilter(label='(optional, uses cpe match string 3rd part)')
-        product = CharFilter(label='(optional, uses cpe match string 4th part)')
+        cpe_match_string = CharFilter(label='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
+        vendor = CharFilter(label='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
+        product = CharFilter(label='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
 
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
-                        label='(optional, uses cpe match string 2nd part)'
+                        label='Filters CPEs returned by product type.'
         )
-        cve_vulnerable = BaseCSVFilter(label='(optional, list of CVE ids): only returns CPEs vulnerable to CVE')
-        in_cve_pattern = BaseCSVFilter(label='(optional, list of CVE ids): only returns CPEs in a CVEs Pattern')
+        cve_vulnerable = BaseCSVFilter(label='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
+        in_cve_pattern = BaseCSVFilter(label='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)
