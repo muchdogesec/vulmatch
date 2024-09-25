@@ -34,6 +34,8 @@ To create one using the default settings:
 cp .env.example .env
 ```
 
+For the `ARANGODB_DATABASE`, on first run it is best to use an empty database in ArangoDB you've created. You can then add the CVE, CPE, etc. data by running POST request to the API. This will ensure the naming convention of the Collections will be correct.
+
 ### Build the Docker Image
 
 ```shell
@@ -73,6 +75,10 @@ sudo docker-compose run django python manage.py createsuperuser
 You can access the django admin UI at:
 
 http://127.0.0.1:8005/admin
+
+### Add data
+
+By default, the `ARANGODB_DATABASE``
 
 ### Running in production
 
