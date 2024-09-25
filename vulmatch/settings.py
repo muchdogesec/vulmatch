@@ -157,7 +157,7 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     "TITLE": "Vulmatch API",
     "DESCRIPTION": dedent(
         """
-        vulmatch description
+        Vulmatch is a database of CVEs in STIX 2.1 format with a REST API wrapper to access them.
     """
     ),
     "VERSION": "1.0.0",
@@ -166,7 +166,13 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         "url": "https://github.com/muchdogesec/vulmatch",
     },
     "TAGS": [
-        {"name": "Jobs", "description": "Search through Vulmatch jobs"},
+        {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
+        {"name": "Arango CTI Processor", "description": "Trigger the generation of relationships between objects."},
+        {"name": "ATT&CK", "description": "Trigger the download of ATT&CK objects or view existing ATT&CK objects."},
+        {"name": "CAPEC", "description": "Trigger the download of CAPEC objects or view existing CAPEC objects."},
+        {"name": "CPE", "description": "Trigger the download of CPE objects or view existing CPE objects."},
+        {"name": "CVE", "description": "Trigger the download of CVE objects or view existing CVE objects."},
+        {"name": "CWE", "description": "Trigger the download of CWE objects or view existing CWE objects."},
     ]
 }
 

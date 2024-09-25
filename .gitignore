@@ -3,3 +3,6 @@
 .env
 __pycache__
 Pipfile*
+
+temp/
+media/
