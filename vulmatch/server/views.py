@@ -184,7 +184,7 @@ class AttackView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CWE objects",
-        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `vN_N`. e.g. `v4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
+        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
     ),
     list=extend_schema(
         summary='Get CWE objects',
@@ -232,7 +232,7 @@ class CweView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CAPEC objects",
-        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `vN_N`. e.g. `v3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
+        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
     ),
     list=extend_schema(
         summary='Get CAPEC objects',

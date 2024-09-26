@@ -38,12 +38,12 @@ attack_mobile_data = {
 
 # Data for the CAPEC update
 capec_data = {
-    "version": "v3_9"
+    "version": "3_9"
 }
 
 # Data for the CWE update
 cwe_data = {
-    "version": "v4_15"
+    "version": "4_15"
 }
 
 # Function to initiate the CVE update
