@@ -10,3 +10,7 @@ pip3 install -r requirements.txt
 ````
 
 ## Run tests
+
+```shell
+python3 tests/import_all_data.py
+```
