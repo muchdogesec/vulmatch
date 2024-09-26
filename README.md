@@ -2,7 +2,7 @@
 
 ## Before you begin...
 
-We offer a fully web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
+We offer a fully hosted web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
 
 ## Overview
 

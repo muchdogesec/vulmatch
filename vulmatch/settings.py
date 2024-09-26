@@ -158,7 +158,8 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     "TITLE": "Vulmatch API",
     "DESCRIPTION": dedent(
         """
-        Vulmatch is a database of CVEs in STIX 2.1 format with a REST API wrapper to access them.
+        Vulmatch is a database of CVEs in STIX 2.1 format with a REST API wrapper to access them.\n\n
+        [DOGESEC](https://www.dogesec.com/) offer a fully hosted web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
     """
     ),
     "VERSION": "1.0.0",
