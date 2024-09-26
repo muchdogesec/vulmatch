@@ -9,6 +9,7 @@ from . import models
 from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 from arango_cti_processor.config import MODE_COLLECTION_MAP
 from textwrap import dedent
 # Create your views here.
@@ -22,10 +23,21 @@ from textwrap import dedent
         description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
     ),
     list=extend_schema(
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities')}, filters=True,
+        responses={200: serializers.StixObjectsSerializer}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
         description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
-    )
+    ),
+    retrieve=extend_schema(
+        summary='Get a Vulnerability by STIX ID',
+        description='This endpoint only returns the vulnerability object for CVE. Typically you want to use the endpoint Get all objects for a Vulnerability by STIX ID. You can identify the STIX ID of a CVE using the GET CVE endpoint if needed.',
+        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')}
+    ),
+    bundle=extend_schema(
+        summary='Get all objects for a Vulnerability by STIX ID',
+        description='This endpoint will return Vulnerability, Indicator, and Software STIX objects for the CVE ID. It will also include any STIX SROs defining the relationships between them.',
+        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+    ),
 )   
 class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
@@ -90,7 +102,7 @@ class CpeView(viewsets.ViewSet):
     openapi_tags = ["CPE"]
     pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
-    serializer_class = serializers.JobSerializer
+    serializer_class = serializers.StixObjectsSerializer
     lookup_url_kwarg = 'cpe_match_string'
 
     #def get_queryset(self):
@@ -151,7 +163,8 @@ class AttackView(viewsets.ViewSet):
     def matrix(self):
         m: re.Match = re.search(r"/attack-(\w+)/", self.request.path)
         return m.group(1)
-    serializer_class = serializers.JobSerializer
+    serializer_class = serializers.StixObjectsSerializer
+    pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
         id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--0042a9f5-f053-4769-b3ef-9ad018dfa298`, `malware--04227b24-7817-4de1-9050-b7b1b57f5866`.')
@@ -201,7 +214,8 @@ class CweView(viewsets.ViewSet):
 
     filter_backends = [DjangoFilterBackend]
 
-    serializer_class = serializers.JobSerializer
+    serializer_class = serializers.StixObjectsSerializer
+    pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
         id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `weakness--f3496f30-5625-5b6d-8297-ddc074fb26c2`.')
@@ -249,7 +263,8 @@ class CapecView(viewsets.ViewSet):
 
     filter_backends = [DjangoFilterBackend]
 
-    serializer_class = serializers.JobSerializer
+    serializer_class = serializers.StixObjectsSerializer
+    pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
         id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--00268a75-3243-477d-9166-8c78fddf6df6`, `course-of-action--0002fa37-9334-41e2-971a-cc8cab6c00c4`.')

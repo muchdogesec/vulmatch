@@ -114,26 +114,25 @@ class ArangoDBHelper:
             }
         )
     @classmethod
-    def get_paginated_response_schema(cls, container='objects'):
-        if container == 'vulnerabilities':
+    def get_paginated_response_schema(cls, container='objects', stix_type='identity'):
+        if stix_type == 'string':
             container_schema = {'type':'string'}
         else:
             container_schema = {
                             "type": "object",
-                            "prop'erties": {
+                            "properties": {
                                 "type":{
-                                    "example": "domain-name",
+                                    "example": stix_type,
                                 },
                                 "id": {
-                                    "example": "domain-name--a86627d4-285b-5358-b332-4e33f3ec1075",
+                                    "example": f"{stix_type}--a86627d4-285b-5358-b332-4e33f3ec1075",
                                 },
                             },
                             "additionalProperties": True,
                         }
         return {
-            200: {
                 "type": "object",
-                "required": ["page_results_count", "objects"],
+                "required": ["page_results_count", container],
                 "properties": {
                     "page_size": {
                         "type": "integer",
@@ -153,7 +152,6 @@ class ArangoDBHelper:
                     },
                     container: container_schema
                 }
-            }
         }
     @classmethod
     def get_schema_operation_parameters(self):

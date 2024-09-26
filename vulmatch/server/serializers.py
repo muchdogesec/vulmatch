@@ -3,6 +3,10 @@ from rest_framework import serializers
 from arango_cti_processor.config import MODE_COLLECTION_MAP
 
 
+class StixObjectsSerializer(serializers.Serializer):
+    type = serializers.CharField()
+    id = serializers.CharField()
+
 class JobSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
