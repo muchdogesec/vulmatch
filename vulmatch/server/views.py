@@ -349,8 +349,11 @@ class JobView(viewsets.ModelViewSet):
             choices.sort(key=lambda x: x[0])
             return choices
         
-        type = ChoiceFilter(choices=get_type_choices(), method='filter_type')
-        state = Filter()
+        type = ChoiceFilter(
+            label='Filter the results by the type of Job',
+            choices=get_type_choices(), method='filter_type'
+        )
+        state = ChoiceFilter(label='Filter the results by the state of the Job')
 
         def filter_type(self, qs, field_name, value: str):
             query = {field_name: value}

@@ -154,6 +154,7 @@ CELERY_RESULTS_BACKEND = os.getenv('result_backend')
 
 SPECTACULAR_SETTINGS: dict[str, Any] = {
     "COMPONENT_SPLIT_REQUEST": True,
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': False,
     "TITLE": "Vulmatch API",
     "DESCRIPTION": dedent(
         """
