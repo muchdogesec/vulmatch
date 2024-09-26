@@ -103,14 +103,13 @@ class CpeView(viewsets.ViewSet):
     pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.StixObjectsSerializer
-    lookup_url_kwarg = 'cpe_match_string'
+    lookup_url_kwarg = 'stix_id'
 
     #def get_queryset(self):
     #    return models.Job.objects.all()
     
     class filterset_class(FilterSet):
         id = BaseCSVFilter(label='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
-        type = ChoiceFilter(choices=[(f,f) for f in SOFTWARE_TYPES], label="(stix type): The STIX object `type`(s) of the object wanted (e.g. `software`).")
         cpe_match_string = CharFilter(label='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
         vendor = CharFilter(label='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
         product = CharFilter(label='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
@@ -131,8 +130,8 @@ class CpeView(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
 
-    def retrieve(self, request, *args, cpe_match_string=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_software_by_name(cpe_match_string)
+    def retrieve(self, request, *args, stix_id=None, **kwargs):
+        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_object(stix_id)
     
 
     

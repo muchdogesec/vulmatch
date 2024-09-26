@@ -350,12 +350,9 @@ RETURN KEEP(doc, KEYS(doc, true))
 
     def get_softwares(self):
         filters = []
-        types = SOFTWARE_TYPES
-        if new_types := self.query_as_array('type'):
-            types = types.intersection(new_types)
         bind_vars = {
                 "@collection": 'nvd_cpe_vertex_collection',
-                "types": list(types),
+                "types": ['software'],
         }
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
