@@ -24,7 +24,7 @@ from textwrap import dedent
     list=extend_schema(
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities')}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
-        description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability object for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it using the bundle endpoint.",
+        description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
     )
 )   
 class CveView(viewsets.ViewSet):
@@ -79,7 +79,7 @@ class CveView(viewsets.ViewSet):
     ),
     list=extend_schema(
         summary='Get Software Objects for CPEs',
-        description="Search and filter CVE records.",
+        description="Search and filter CPE records.\n\nThis endpoint only returns the software objects for matching CPEs. ",
     ),
     retrieve=extend_schema(
         summary='Get a CPE object by STIX ID',
@@ -129,7 +129,8 @@ class CpeView(viewsets.ViewSet):
         responses={201: serializers.JobSerializer
         },
         request=serializers.MitreTaskSerializer,
-        summary="Will download ATT&CK bundle using cloudflare",
+        summary="Download ATT&CK Objects",
+        description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `vN.N`. e.g. `v15.0, `v15.1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team)."
     ),
     list=extend_schema(
         summary='Search ATT&CK objects',
@@ -151,11 +152,11 @@ class AttackView(viewsets.ViewSet):
     serializer_class = serializers.JobSerializer
 
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='(stix id): The STIX ID(s) of the object wanted (e.g. `attack-pattern--1234`)')
-        attack_id = BaseCSVFilter(label='(attack ID): The ATTACK ids of the object wanted (e.g. `T1659`)')
-        description = CharFilter(label='(stix description): The description if the object. Is wildcard')
-        name = CharFilter(label='(stix name): The name if the object. Is wildcard')
-        type = ChoiceFilter(choices=[(f,f) for f in ATTACK_TYPES], label='(stix type): The STIX object `type`(s) of the object wanted (e.g. `attack-pattern`).')
+        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--0042a9f5-f053-4769-b3ef-9ad018dfa298`, `malware--04227b24-7817-4de1-9050-b7b1b57f5866`.')
+        attack_id = BaseCSVFilter(label='The ATT&CK IDs of the object wanted. e.g. `T1659`, `TA0043`, `S0066`.')
+        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        type = ChoiceFilter(choices=[(f,f) for f in ATTACK_TYPES], label='Filter the results by STIX Object type.')
 
     
     def create(self, request, *args, **kwargs):
