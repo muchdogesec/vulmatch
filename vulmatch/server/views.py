@@ -133,10 +133,12 @@ class CpeView(viewsets.ViewSet):
         description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `vN.N`. e.g. `v15.0, `v15.1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team)."
     ),
     list=extend_schema(
-        summary='Search ATT&CK objects',
+        summary='Get ATT&CK objects',
+        description="Search and filter ATT&CK results.",
     ),
     retrieve=extend_schema(
-        summary='Get ATT&CK object',
+        summary='Get an ATT&CK object',
+        description="Get an ATT&CK object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
     ),
 )  
 class AttackView(viewsets.ViewSet):
@@ -155,7 +157,7 @@ class AttackView(viewsets.ViewSet):
         id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--0042a9f5-f053-4769-b3ef-9ad018dfa298`, `malware--04227b24-7817-4de1-9050-b7b1b57f5866`.')
         attack_id = BaseCSVFilter(label='The ATT&CK IDs of the object wanted. e.g. `T1659`, `TA0043`, `S0066`.')
         description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
-        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
         type = ChoiceFilter(choices=[(f,f) for f in ATTACK_TYPES], label='Filter the results by STIX Object type.')
 
     
@@ -181,13 +183,16 @@ class AttackView(viewsets.ViewSet):
         responses={201: serializers.JobSerializer
         },
         request=serializers.MitreTaskSerializer,
-        summary="Will download CWEs using cloudflare",
+        summary="Download CWE objects",
+        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `vN.N`. e.g. `v4.15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
     ),
     list=extend_schema(
-        summary='Search CWE objects',
+        summary='Get CWE objects',
+        description='Search and filter CWE results.',
     ),
     retrieve=extend_schema(
-        summary='Get CWE object',
+        summary='Get a CWE object',
+        description='Get an CWE object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
     ),
 )  
 class CweView(viewsets.ViewSet):
@@ -199,13 +204,12 @@ class CweView(viewsets.ViewSet):
     serializer_class = serializers.JobSerializer
 
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='(stix id): The STIX ID(s) of the object wanted (e.g. `weakness--1234`)')
-        cwe_id = BaseCSVFilter(label='(cwe ID): The CWE ids of the object wanted (e.g. `CWE-242`)')
-        description = CharFilter(label='(stix description): The description if the object. Is wildcard')
-        name = CharFilter(label='(stix name): The name if the object. Is wildcard')
-        type = ChoiceFilter(choices=[(f,f) for f in CWE_TYPES], label='(stix type): The STIX object `type`(s) of the object wanted (e.g. `weakness`).')
+        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `weakness--f3496f30-5625-5b6d-8297-ddc074fb26c2`.')
+        cwe_id = BaseCSVFilter(label='Filter the results by the CWE ID of the object. e.g. `CWE-242`.')
+        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
+        type = ChoiceFilter(choices=[(f,f) for f in CWE_TYPES], label='Filter the results by STIX Object type.')
 
-    
     def create(self, request, *args, **kwargs):
         serializer = serializers.MitreTaskSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -227,13 +231,16 @@ class CweView(viewsets.ViewSet):
         responses={201: serializers.JobSerializer
         },
         request=serializers.MitreTaskSerializer,
-        summary="Will download CAPECs using cloudflare",
+        summary="Download CAPEC objects",
+        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `vN.N`. e.g. `v3.5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
     ),
     list=extend_schema(
-        summary='Search CAPEC objects',
+        summary='Get CAPEC objects',
+        description="Search and filter CAPEC results.",
     ),
     retrieve=extend_schema(
-        summary='Get CAPEC object',
+        summary='Get a CAPEC object',
+        description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
     ),
 )
 class CapecView(viewsets.ViewSet):
@@ -245,12 +252,11 @@ class CapecView(viewsets.ViewSet):
     serializer_class = serializers.JobSerializer
 
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='(stix id): The STIX ID(s) of the object wanted (e.g. `attack-pattern--1234`)')
-        capec_id = BaseCSVFilter(label='(capec ID): The CAPEC ids of the object wanted (e.g. `CAPEC-112`)')
-        
-        description = CharFilter(label='(stix description): The description if the object. Is wildcard')
-        name = CharFilter(label='(stix name): The name if the object. Is wildcard')
-        type = ChoiceFilter(choices=[(f,f) for f in CAPEC_TYPES], label='(stix type): The STIX object `type`(s) of the object wanted (e.g. `attack-pattern`).')
+        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--00268a75-3243-477d-9166-8c78fddf6df6`, `course-of-action--0002fa37-9334-41e2-971a-cc8cab6c00c4`.')
+        capec_id = BaseCSVFilter(label='Filter the results by the CAPEC ID of the object. e.g. `CAPEC-112`.')
+        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
+        type = ChoiceFilter(choices=[(f,f) for f in CAPEC_TYPES], label='Filter the results by STIX Object type.')
 
     
     def create(self, request, *args, **kwargs):
@@ -295,13 +301,13 @@ class ACPView(viewsets.ViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        description="search jobs",
-        summary="search jobs",
+        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.",
+        summary="Get Jobs",
         responses={200: serializers.JobSerializer}
     ),
     retrieve=extend_schema(
-        description="get job by ID",
-        summary="get job by ID",
+        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.",
+        summary="Get a Job by ID",
     ),
 )
 class JobView(viewsets.ModelViewSet):
