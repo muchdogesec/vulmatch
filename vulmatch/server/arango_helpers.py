@@ -237,7 +237,7 @@ FILTER doc.type == 'vulnerability' AND doc._is_latest
 LET indicator_ref = FIRST(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to RETURN d._from)
 @filters
 LIMIT @offset, @count
-RETURN doc.id
+RETURN KEEP(doc, KEYS(doc, true))
     """.replace('@filters', '\n'.join(filters))
         #return Response(query)
         return self.execute_query(query, bind_vars=binds)
