@@ -7,7 +7,6 @@ services:
         volumes:
             - .:/usr/src/app/
             - ./www:/var/www/
-            - ./temp:/tmp/
         environment:
             - DJANGO_SETTINGS_MODULE=vulmatch.settings
             - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]

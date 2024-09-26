@@ -31,7 +31,7 @@ DEBUG = os.getenv("DEBUG", False)
 
 ALLOWED_HOSTS = []
 
-MEDIA_ROOT = Path("media/uploads")
+MEDIA_ROOT = Path("/var/www/vulmatch_files/media/uploads")
 
 STATIC_ROOT = MEDIA_ROOT.with_name("staticfiles")
 MEDIA_URL = str("media/uploads/")
