@@ -45,6 +45,11 @@ class CveView(viewsets.ViewSet):
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.JobSerializer
     lookup_url_kwarg = 'stix_id'
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The CVE ID'),
+
+    ]
 
     
     class filterset_class(FilterSet):
@@ -104,6 +109,9 @@ class CpeView(viewsets.ViewSet):
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.StixObjectsSerializer
     lookup_url_kwarg = 'stix_id'
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+    ]
 
     #def get_queryset(self):
     #    return models.Job.objects.all()
@@ -155,6 +163,9 @@ class CpeView(viewsets.ViewSet):
 class AttackView(viewsets.ViewSet):
     openapi_tags = ["ATT&CK"]
     lookup_url_kwarg = 'stix_id'
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+    ]
 
     filter_backends = [DjangoFilterBackend]
     MATRIX_TYPES = ["mobile", "ics", "enterprise"]
@@ -210,6 +221,9 @@ class AttackView(viewsets.ViewSet):
 class CweView(viewsets.ViewSet):
     openapi_tags = ["CWE"]
     lookup_url_kwarg = 'stix_id'
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+    ]
 
     filter_backends = [DjangoFilterBackend]
 
@@ -259,6 +273,9 @@ class CweView(viewsets.ViewSet):
 class CapecView(viewsets.ViewSet):
     openapi_tags = ["CAPEC"]
     lookup_url_kwarg = 'stix_id'
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+    ]
 
     filter_backends = [DjangoFilterBackend]
 
@@ -293,10 +310,6 @@ class CapecView(viewsets.ViewSet):
     create=extend_schema(
         responses={201: serializers.JobSerializer
         },
-        #request=serializers.ACPSerializer
-        parameters=[
-            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH)
-        ],
         description="These endpoints will trigger the relevant arango_cti_processor mode to generate relationships.",
         summary="Trigger arango_cti_processor `mode` to generate relationships."
     ),
@@ -304,6 +317,10 @@ class CapecView(viewsets.ViewSet):
 class ACPView(viewsets.ViewSet):
     openapi_tags = ["Arango CTI Processor"]
     serializer_class = serializers.ACPSerializer
+    openapi_path_params = [
+            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='mode (`--relationship`) to run [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/tree/embedded-relationship-tests?tab=readme-ov-file#run) in')
+
+    ]
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.ACPSerializerWithMode(data={**request.data, **kwargs})
@@ -331,6 +348,9 @@ class JobView(viewsets.ModelViewSet):
     pagination_class = Pagination("jobs")
     openapi_tags = ["Jobs"]
     lookup_url_kwarg = 'job_id'
+    openapi_path_params = [
+        OpenApiParameter(lookup_url_kwarg, type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The job ID')
+    ]
 
     def get_queryset(self):
         return models.Job.objects.all()
