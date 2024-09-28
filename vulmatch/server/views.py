@@ -20,7 +20,7 @@ from textwrap import dedent
         },
         request=serializers.NVDTaskSerializer,
         summary="Download data for CVEs",
-        description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
+        description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
     ),
     list=extend_schema(
         responses={200: serializers.StixObjectsSerializer}, filters=True,
@@ -92,7 +92,7 @@ class CveView(viewsets.ViewSet):
         },
         request=serializers.NVDTaskSerializer,
         summary="Download CPE data",
-        description="Use this data to update the CPE records.\n\nThe earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\nNote, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).",
+        description="Use this data to update the CPE records.\n\nThe earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\nNote, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
     ),
     list=extend_schema(
         summary='Get Software Objects for CPEs',
@@ -110,7 +110,7 @@ class CpeView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
     ]
 
     #def get_queryset(self):
@@ -149,7 +149,7 @@ class CpeView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download ATT&CK Objects",
-        description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team)."
+        description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
     ),
     list=extend_schema(
         summary='Get ATT&CK objects',
@@ -207,7 +207,7 @@ class AttackView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CWE objects",
-        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
+        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
     ),
     list=extend_schema(
         summary='Get CWE objects',
@@ -259,7 +259,7 @@ class CweView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CAPEC objects",
-        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the DOGESEC team).',
+        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
     ),
     list=extend_schema(
         summary='Get CAPEC objects',
@@ -349,7 +349,7 @@ class JobView(viewsets.ModelViewSet):
     openapi_tags = ["Jobs"]
     lookup_url_kwarg = 'job_id'
     openapi_path_params = [
-        OpenApiParameter(lookup_url_kwarg, type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The job ID')
+        OpenApiParameter(lookup_url_kwarg, type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The Job `id`. You can find Jobs and their `id`s using the Get Jobs endpoint.')
     ]
 
     def get_queryset(self):
