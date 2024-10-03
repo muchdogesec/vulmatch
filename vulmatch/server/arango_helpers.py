@@ -62,10 +62,10 @@ ATTACK_TYPES = set([
 )
 CWE_TYPES = set([
     "weakness",
-    "grouping",
-    "identity",
-    "marking-definition",
-    "extension-definition"
+    # "grouping",
+    # "identity",
+    # "marking-definition",
+    # "extension-definition"
 ]
 )
 SOFTWARE_TYPES = set([
