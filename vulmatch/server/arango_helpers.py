@@ -1,3 +1,4 @@
+import re
 import typing
 from arango import ArangoClient
 from django.conf import settings
@@ -81,10 +82,36 @@ CAPEC_TYPES = set([
   "marking-definition"
 ]
 )
+
+CVE_SORT_FIELDS = [
+    "modified_descending",
+    "modified_ascending",
+    "created_ascending",
+    "created_descending",
+    "name_ascending",
+    "name_descending",
+    "epss_score_ascending",
+    "epss_score_descending",
+    "cvss_base_score_ascending",
+    "cvss_base_score_descending",
+]
 OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 class ArangoDBHelper:
     max_page_size = settings.MAXIMUM_PAGE_SIZE
     page_size = settings.DEFAULT_PAGE_SIZE
+
+    def get_sort_stmt(self, sort_options: list[str], customs={}):
+        finder = re.compile(r"(.+)_((a|de)sc)ending")
+        sort_field = self.query.get('sort', sort_options[0])
+        if sort_field not in sort_options:
+            return ""
+        if m := finder.match(sort_field):
+            field = m.group(1)
+            direction = m.group(2).upper()
+            if cfield := customs.get(field):
+                return f"SORT {cfield} {direction}"
+            return f"SORT doc.{field} {direction}"
+
     def query_as_array(self, key):
         query = self.query.get(key)
         if not query:
@@ -101,7 +128,7 @@ class ArangoDBHelper:
         page_number = int(kwargs.get('page', 1))
         page_limit  = min(int(kwargs.get('page_size', ArangoDBHelper.page_size)), ArangoDBHelper.max_page_size)
         return page_number, page_limit
-    
+
     @classmethod
     def get_paginated_response(cls, container,  data, page_number, page_size=page_size, full_count=0):
         return Response(
@@ -211,13 +238,13 @@ class ArangoDBHelper:
         if q := self.query.get('epss_percentile_min'):
             binds['epss_percentile_min'] = float(q)
             filters.append("FILTER doc.x_epss.percentile >= @epss_percentile_min")
-        
+
         for v in ['created', 'modified']:
             mn, mx = f'{v}_min', f'{v}_max'
             if q := self.query.get(mn):
                 binds[mn] = q
                 filters.append(f"FILTER doc.{v} >= @{mn}")
-            
+
             if q := self.query.get(mx):
                 binds[mx] = q
                 filters.append(f"FILTER doc.{v} <= @{mx}")
@@ -238,7 +265,7 @@ class ArangoDBHelper:
         if q := self.query_as_array('cve_id'):
             binds['cve_ids'] = q
             filters.append('FILTER doc.external_references[0].external_id IN @cve_ids')
-        
+
         if (q := self.query_as_bool('has_kev', None)) != None:
             binds['has_kev'] = q
             filters.append('''
@@ -257,12 +284,24 @@ FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'vulnerability' AND doc._is_latest
 LET indicator_ref = FIRST(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to RETURN d._from)
 @filters
+@sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
-    """.replace('@filters', '\n'.join(filters))
-        #return Response(query)
+    """.replace(
+            "@filters", "\n".join(filters)
+        ).replace(
+            "@sort_stmt",
+            self.get_sort_stmt(
+                CVE_SORT_FIELDS,
+                {
+                    "epss_score": "doc.x_epss.score",
+                    "cvss_base_score": "FIRST(VALUES(doc.x_cvss)).base_score",
+                },
+            ),
+        )
+        # return Response(query)
         return self.execute_query(query, bind_vars=binds)
-    
+
     def get_cve_bundle(self, cve_id):
         query = '''
 LET bundle = FIRST(FOR doc IN nvd_cve_vertex_collection
@@ -283,7 +322,7 @@ LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
 '''
         return self.execute_query(query, bind_vars=dict(id=cve_id, graph_name=settings.ARANGODB_DATABASE+"_graph"))
-    
+
     def get_attack_objects(self, matrix):
         filters = []
         types = ATTACK_TYPES
@@ -298,7 +337,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append(
                 "FILTER doc.id in @ids"
             )
-        
+
         if value := self.query_as_array('attack_id'):
             bind_vars['attack_ids'] = value
             filters.append(
@@ -307,7 +346,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         if q := self.query.get('name'):
             bind_vars['name'] = q
             filters.append('FILTER CONTAINS(doc.name, @name)')
-        
+
         if q := self.query.get('description'):
             bind_vars['description'] = q
             filters.append('FILTER CONTAINS(doc.description, @description)')
@@ -324,7 +363,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             RETURN KEEP(doc, KEYS(doc, true))
         """.replace('@filters', '\n'.join(filters))
         return self.execute_query(query, bind_vars=bind_vars)
-    
+
     def get_object(self, stix_id):
         return self.execute_query('''
         FOR doc in @@collection
@@ -332,7 +371,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         LIMIT @offset, @count
         RETURN KEEP(doc, KEYS(doc, true))
         ''', bind_vars={'@collection': self.collection, 'stix_id': stix_id})
-    
+
     def get_mitre_versions(self, stix_id=None):
         query = """
         FOR doc IN @@collection
@@ -341,7 +380,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         """
         bind_vars = {'@collection': self.collection}
         return self.execute_query(query, bind_vars=bind_vars, paginate=False)
-    
+
     def get_object_versions(self, stix_id):
         query = """
         FOR doc IN @@collection
@@ -353,7 +392,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         bind_vars = {'@collection': self.collection, "stix_id": stix_id}
         self.container = 'versions'
         return self.execute_query(query, bind_vars=bind_vars)
-    
+
     def get_weakness_or_capec_objects(self, cwe=True, types=CWE_TYPES):
         filters = []
         if new_types := self.query_as_array('type'):
@@ -369,15 +408,14 @@ RETURN KEEP(doc, KEYS(doc, true))
                 "FILTER doc.id in @ids"
             )
 
-        
         if q := self.query.get(f'cwe_version'):
             bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
             filters.append('FILTER doc._stix2arango_note == @mitre_version')
-        
+
         if q := self.query.get(f'capec_version'):
             bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
             filters.append('FILTER doc._stix2arango_note == @mitre_version')
-        
+
         if value := self.query_as_array('cwe_id'):
             bind_vars['cwe_ids'] = value
             filters.append(
@@ -391,7 +429,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         if q := self.query.get('name'):
             bind_vars['name'] = q
             filters.append('FILTER CONTAINS(doc.name, @name)')
-        
+
         if q := self.query.get('description'):
             bind_vars['description'] = q
             filters.append('FILTER CONTAINS(doc.description, @description)')
@@ -403,7 +441,6 @@ RETURN KEEP(doc, KEYS(doc, true))
             RETURN KEEP(doc, KEYS(doc, true))
         """.replace('@filters', '\n'.join(filters))
         return self.execute_query(query, bind_vars=bind_vars)
-    
 
     def get_softwares(self):
         filters = []
@@ -416,7 +453,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append(
                 "FILTER doc.id in @ids"
             )
-        
+
         if value := self.query_as_array('cpe_match_string'):
             bind_vars['cpe_match_string'] = value
             filters.append(
@@ -427,7 +464,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append(
                 "FILTER @product_type == SPLIT(doc.cpe, ':')[2]"
             )
-            
+
         if value := self.query.get('product'):
             bind_vars['product'] = value
             filters.append(
@@ -439,7 +476,6 @@ RETURN KEEP(doc, KEYS(doc, true))
                 "FILTER @vendor == SPLIT(doc.cpe, ':')[3]"
             )
 
-        
         if q := self.query_as_array('cve_vulnerable'):
             bind_vars['cve_vulnerable'] = q
             filters.append('''
@@ -450,11 +486,11 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append('''
             FILTER cve_matches[? ANY FILTER CURRENT[0]=='pattern-contains' AND CURRENT[1] IN @in_cve_pattern]
             ''')
-            
+
         if q := self.query.get('name'):
             bind_vars['name'] = q
             filters.append('FILTER CONTAINS(doc.name, @name)')
-        
+
         query = """
             FOR doc in @@collection
             FILTER CONTAINS(@types, doc.type) AND doc._is_latest
@@ -466,7 +502,6 @@ RETURN KEEP(doc, KEYS(doc, true))
         """.replace('@filters', '\n'.join(filters))
         return self.execute_query(query, bind_vars=bind_vars)
 
-
     def get_software_by_name(self, cpe_name):
         return self.execute_query('''
         FOR doc in @@collection
@@ -474,8 +509,6 @@ RETURN KEEP(doc, KEYS(doc, true))
         LIMIT @offset, @count
         RETURN KEEP(doc, KEYS(doc, true))
         ''', bind_vars={'@collection': self.collection, 'cpe_name': cpe_name})
-
-
 
     def get_reports(self, id=None):
         bind_vars = {

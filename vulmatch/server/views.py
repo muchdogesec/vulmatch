@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
-from vulmatch.server.arango_helpers import ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
+from vulmatch.server.arango_helpers import CVE_SORT_FIELDS, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
 from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
 from . import models
@@ -76,6 +76,7 @@ class CveView(viewsets.ViewSet):
         
         modified_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `modified` value user wants")
         modified_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `modified` value user wants")
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="sort by field_name")
 
 
     def create(self, request, *args, **kwargs):
