@@ -7,7 +7,7 @@ from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_ve
 from vulmatch.worker.tasks import new_task
 from . import models
 from vulmatch.server import serializers
-from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter
+from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from arango_cti_processor.config import MODE_COLLECTION_MAP
@@ -67,6 +67,9 @@ class CveView(viewsets.ViewSet):
         '''))
         weakness_id = BaseCSVFilter(label=dedent("""Filter results by weakness (CWE ID). e.g. `CWE-122`."""))
         attack_id = BaseCSVFilter(label=dedent("""Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\nNote, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs."""))
+        cvss_base_score_min = NumberFilter(label="between 0-10")
+        epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
+        epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)

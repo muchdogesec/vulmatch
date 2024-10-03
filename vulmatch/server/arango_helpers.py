@@ -199,6 +199,11 @@ class ArangoDBHelper:
     def get_vulnerabilities(self):
         binds = {}
         filters = []
+
+        if q := self.query.get('cvss_base_score_min'):
+            binds['cvss_base_score_min'] = float(q)
+            filters.append("FILTER VALUES(doc.x_cvss)[? FILTER CURRENT.base_score >= @cvss_base_score_min]")
+
         if q := self.query_as_array('cpes_vulnerable'):
             binds['cpes_vulnerable'] = q
             filters.append('''
