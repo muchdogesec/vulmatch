@@ -204,6 +204,24 @@ class ArangoDBHelper:
             binds['cvss_base_score_min'] = float(q)
             filters.append("FILTER VALUES(doc.x_cvss)[? FILTER CURRENT.base_score >= @cvss_base_score_min]")
 
+        if q := self.query.get('epss_score_min'):
+            binds['epss_score_min'] = float(q)
+            filters.append("FILTER doc.x_epss.score >= @epss_score_min")
+
+        if q := self.query.get('epss_percentile_min'):
+            binds['epss_percentile_min'] = float(q)
+            filters.append("FILTER doc.x_epss.percentile >= @epss_percentile_min")
+        
+        for v in ['created', 'modified']:
+            mn, mx = f'{v}_min', f'{v}_max'
+            if q := self.query.get(mn):
+                binds[mn] = q
+                filters.append(f"FILTER doc.{v} >= @{mn}")
+            
+            if q := self.query.get(mx):
+                binds[mx] = q
+                filters.append(f"FILTER doc.{v} <= @{mx}")
+
         if q := self.query_as_array('cpes_vulnerable'):
             binds['cpes_vulnerable'] = q
             filters.append('''

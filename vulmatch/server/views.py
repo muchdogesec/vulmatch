@@ -7,7 +7,7 @@ from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_ve
 from vulmatch.worker.tasks import new_task
 from . import models
 from vulmatch.server import serializers
-from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter
+from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter, DateTimeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from arango_cti_processor.config import MODE_COLLECTION_MAP
@@ -70,6 +70,13 @@ class CveView(viewsets.ViewSet):
         cvss_base_score_min = NumberFilter(label="between 0-10")
         epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
         epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
+
+        created_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `created` value user wants")
+        created_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `created` value user wants")
+        
+        modified_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `modified` value user wants")
+        modified_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `modified` value user wants")
+
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)
