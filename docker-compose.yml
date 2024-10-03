@@ -20,11 +20,11 @@ services:
         extends: env_django
         command: >
                 bash -c "
-                    # python vulmatch/worker/arango_view_helper.py &&
                     python manage.py collectstatic --no-input &&
-                    python manage.py makemigrations &&
+                        python manage.py makemigrations &&
                             python manage.py migrate &&
-                            gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
+                                python -m vulmatch.worker.populate_dbs &&
+                    gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
                     " 
         ports:
             - 8005:8005

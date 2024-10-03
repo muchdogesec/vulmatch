@@ -3,7 +3,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
 from vulmatch.server.arango_helpers import ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
-from vulmatch.server.utils import Pagination, Response
+from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
 from . import models
 from vulmatch.server import serializers
@@ -46,8 +46,8 @@ class CveView(viewsets.ViewSet):
     serializer_class = serializers.JobSerializer
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID'),
-        OpenApiParameter('cve_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The CVE ID'),
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID'),
 
     ]
 
@@ -85,6 +85,10 @@ class CveView(viewsets.ViewSet):
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object(stix_id)
     
+    @decorators.action(detail=True, methods=["GET"])
+    def versions(self, request, *args, stix_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object_versions(stix_id)
+    
 
 @extend_schema_view(
     create=extend_schema(
@@ -110,7 +114,7 @@ class CpeView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
     ]
 
     #def get_queryset(self):
@@ -164,7 +168,7 @@ class AttackView(viewsets.ViewSet):
     openapi_tags = ["ATT&CK"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -182,6 +186,7 @@ class AttackView(viewsets.ViewSet):
         description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
         type = ChoiceFilter(choices=[(f,f) for f in ATTACK_TYPES], label='Filter the results by STIX Object type.')
+        attack_version = CharFilter(label="Filter the results by the version of ATT&CK")
 
     
     def create(self, request, *args, **kwargs):
@@ -199,7 +204,16 @@ class AttackView(viewsets.ViewSet):
     
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
-    
+        
+    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
+    @decorators.action(detail=False, methods=["GET"])
+    def versions(self, request, *args, **kwargs):
+        versions = sorted([
+            v[14:].replace('_', ".")
+            for v in ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
+        ], key=split_mitre_version, reverse=True)
+        versions = [f"v{v}" for v in versions]
+        return Response(dict(latest=versions[0], versions=versions))
     
 @extend_schema_view(
     create=extend_schema(
@@ -222,7 +236,7 @@ class CweView(viewsets.ViewSet):
     openapi_tags = ["CWE"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -236,6 +250,7 @@ class CweView(viewsets.ViewSet):
         description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
         type = ChoiceFilter(choices=[(f,f) for f in CWE_TYPES], label='Filter the results by STIX Object type.')
+        cwe_version = CharFilter(label="Filter the results by the version of CWE")
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.MitreTaskSerializer(data=request.data)
@@ -251,6 +266,16 @@ class CweView(viewsets.ViewSet):
     
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
+        
+    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
+    @decorators.action(detail=False, methods=["GET"])
+    def versions(self, request, *args, **kwargs):
+        versions = sorted([
+            v[14:].replace('_', ".")
+            for v in ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
+        ], key=split_mitre_version, reverse=True)
+        versions = [f"v{v}" for v in versions]
+        return Response(dict(latest=versions[0], versions=versions))
     
    
 @extend_schema_view(
@@ -274,7 +299,7 @@ class CapecView(viewsets.ViewSet):
     openapi_tags = ["CAPEC"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -288,6 +313,7 @@ class CapecView(viewsets.ViewSet):
         description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
         type = ChoiceFilter(choices=[(f,f) for f in CAPEC_TYPES], label='Filter the results by STIX Object type.')
+        capec_version = CharFilter(label="Filter the results by the version of CAPEC")
 
     
     def create(self, request, *args, **kwargs):
@@ -305,6 +331,16 @@ class CapecView(viewsets.ViewSet):
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
     
+    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
+    @decorators.action(detail=False, methods=["GET"])
+    def versions(self, request, *args, **kwargs):
+        versions = sorted([
+            v[14:].replace('_', ".")
+            for v in ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
+        ], key=split_mitre_version, reverse=True)
+        versions = [f"v{v}" for v in versions]
+        return Response(dict(latest=versions[0], versions=versions))
+    
    
 @extend_schema_view(
     create=extend_schema(
@@ -319,7 +355,6 @@ class ACPView(viewsets.ViewSet):
     serializer_class = serializers.ACPSerializer
     openapi_path_params = [
             OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='mode (`--relationship`) to run [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/tree/embedded-relationship-tests?tab=readme-ov-file#run) in')
-
     ]
 
     def create(self, request, *args, **kwargs):
@@ -344,7 +379,9 @@ class ACPView(viewsets.ViewSet):
 class JobView(viewsets.ModelViewSet):
     http_method_names = ["get"]
     serializer_class = serializers.JobSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, Ordering]
+    ordering_fields = ["run_datetime", "state", "type", "id"]
+    ordering = "run_datetime_descending"
     pagination_class = Pagination("jobs")
     openapi_tags = ["Jobs"]
     lookup_url_kwarg = 'job_id'
@@ -373,7 +410,7 @@ class JobView(viewsets.ModelViewSet):
             label='Filter the results by the type of Job',
             choices=get_type_choices(), method='filter_type'
         )
-        state = ChoiceFilter(label='Filter the results by the state of the Job')
+        state = Filter(label='Filter the results by the state of the Job')
 
         def filter_type(self, qs, field_name, value: str):
             query = {field_name: value}

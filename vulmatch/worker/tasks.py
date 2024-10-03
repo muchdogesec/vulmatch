@@ -8,7 +8,7 @@ import requests
 from vulmatch.server.models import Job, JobType
 from vulmatch.server import models
 # from vulmatch.web import models
-from celery import group, shared_task, Task
+from celery import chain, group, shared_task, Task
 # from .stixifier import vulmatchProcessor, ReportProperties
 from tempfile import NamedTemporaryFile
 import tempfile
@@ -21,27 +21,37 @@ from django.conf import settings
 from .celery import app
 from stix2arango.stix2arango import Stix2Arango
 from arango_cti_processor.cti_processor import ArangoProcessor
+import logging
 
 if typing.TYPE_CHECKING:
     from ..import settings
 POLL_INTERVAL = 1
 
 
-def new_task(data, type) -> Job:
-    job = Job.objects.create(type=type, parameters=data)
+def create_celery_task_from_job(job: Job):
+    data = job.parameters
     match job.type:
         case models.JobType.ATTACK_UPDATE:
-            return run_mitre_task(data, job, f'attack-{data["matrix"]}')
+            task = run_mitre_task(data, job, f'attack-{data["matrix"]}')
         case models.JobType.CWE_UPDATE:
-            return run_mitre_task(data, job, 'cwe')
+            task = run_mitre_task(data, job, 'cwe')
         case models.JobType.CAPEC_UPDATE:
-            return run_mitre_task(data, job, 'capec')
+            task = run_mitre_task(data, job, 'capec')
         case models.JobType.CVE_UPDATE:
-            return run_nvd_task(data, job, 'cve')
+            task = run_nvd_task(data, job, 'cve')
         case models.JobType.CPE_UPDATE:
-            return run_nvd_task(data, job, 'cpe')
+            task = run_nvd_task(data, job, 'cpe')
         case models.JobType.CTI_PROCESSOR:
-            return run_acp_task(data, job)
+            task = run_acp_task(data, job)
+    task.set_immutable(True)
+    return task
+
+
+
+def new_task(data, type, job=None) -> Job:
+    job = Job.objects.create(type=type, parameters=data)
+    create_celery_task_from_job(job).apply_async()
+    return job
 
 def run_acp_task(data: dict, job: Job):
     options = data.copy()
@@ -50,8 +60,8 @@ def run_acp_task(data: dict, job: Job):
     processor = ArangoProcessor(**options)
 
     task =  acp_task.s(job.id, options)
-    (task | remove_temp_and_set_completed.si(None, job.id)).apply_async()
-    return job
+    return (task | remove_temp_and_set_completed.si(None, job.id))
+    
 
 
 
@@ -76,17 +86,15 @@ def run_mitre_task(data, job: Job, mitre_type='cve'):
         case _:
             raise NotImplementedError("Unknown type for mitre task")
     
-    temp_dir = tempfile.mkdtemp(suffix=str(job.id), prefix='vulmatch')
-    task = download_file.s(url, job.id, temp_dir) | upload_file.s(job.id, collection_name)
-    (task | remove_temp_and_set_completed.si(temp_dir, job.id)).apply_async()
-    return job
+    temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/mitre-{mitre_type}--{str(job.id)}")
+    task = download_file.s(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'mitre-version={version}', job_id=job.id)
+    return (task | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 def run_nvd_task(data, job: Job, nvd_type='cve'):
     dates = date_range(data['last_modified_earliest'], data['last_modified_latest'])
-    temp_dir = tempfile.mkdtemp(suffix=str(job.id), prefix='vulmatch')
-    tasks = group([download_file.s(urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type)), job.id, temp_dir) | upload_file.s(job.id, f'nvd_{nvd_type}') for d in dates])
-    (tasks | remove_temp_and_set_completed.si(temp_dir, job.id)).apply_async()
-    return job
+    temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/nvd-{nvd_type}--{str(job.id)}")
+    tasks = chain([download_file.si(urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type)), temp_dir, job_id=job.id) | upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id) for d in dates])
+    return (tasks | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 
 def date_range(start_date: date, end_date: date):
@@ -101,9 +109,29 @@ def daily_url(d: date, type='cve'):
     dstr = d.strftime('%Y_%m_%d')
     return f"{type}/{d.strftime('%Y-%m')}/{type}-bundle-{dstr}-00_00_00-{dstr}-23_59_59.json"
 
-@app.task
-def download_file(urlpath, job_id, tempdir):
+
+class CustomTask(Task):
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        job = Job.objects.get(pk=kwargs['job_id'])
+        job.state = models.JobState.FAILED
+        job.errors.append(f"celery task {self.name} failed with: {exc}")
+        job.save()
+        return super().on_failure(exc, task_id, args, kwargs, einfo)
+    
+    def before_start(self, task_id, args, kwargs):
+        if not kwargs.get('job_id'):
+            raise Exception("rejected: `job_id` not in kwargs")
+        return super().before_start(task_id, args, kwargs)
+    
+
+@app.task(base=CustomTask)
+def download_file(urlpath, tempdir, job_id=None):
+    Path(tempdir).mkdir(parents=True, exist_ok=True)
+    logging.info('downloading bundle at `%s`', urlpath)
     job = Job.objects.get(pk=job_id)
+    if job.state == models.JobState.PENDING:
+        job.state = models.JobState.PROCESSING
+        job.save()
     resp = requests.get(urlpath)
     if resp.status_code == 200:
         filename = Path(tempdir)/resp.url.split('/')[-1]
@@ -114,19 +142,22 @@ def download_file(urlpath, job_id, tempdir):
     else:
         job.errors.append(f'{resp.url} failed with status code: {resp.status_code}')
     job.save()
-    print('error occured: ', resp.status_code)
+    logging.info('error occured: %d', resp.status_code)
 
 
-@app.task
-def upload_file(filename, job_id, collection_name):
+@app.task(base=CustomTask)
+def upload_file(filename, collection_name, stix2arango_note=None, job_id=None):
     if not filename:
         return
-    filename = Path(filename)
+    if not stix2arango_note:
+        stix2arango_note = f"vulmatch-job--{job_id}"
+
+    logging.info('uploading %s with note: %s', filename, stix2arango_note)
     s2a = Stix2Arango(
         file=str(filename),
         database=settings.ARANGODB_DATABASE,
         collection=collection_name,
-        stix2arango_note=f"vulmatch-job--{job_id}",
+        stix2arango_note=stix2arango_note,
         ignore_embedded_relationships=False,
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
@@ -134,8 +165,8 @@ def upload_file(filename, job_id, collection_name):
     )
     s2a.run()
 
-@app.task
-def acp_task(job_id, options):
+@app.task(base=CustomTask)
+def acp_task(options, job_id=None):
     job = Job.objects.get(pk=job_id)
     try:
         processor = ArangoProcessor(**options)
@@ -144,8 +175,8 @@ def acp_task(job_id, options):
         job.errors.append(str(e))
     job.save()
 
-@app.task
-def remove_temp_and_set_completed(path: str, job_id: str):
+@app.task(base=CustomTask)
+def remove_temp_and_set_completed(path: str, job_id: str=None):
     if path:
         logging.info('removing directory: %s', path)
         shutil.rmtree(path, ignore_errors=True)
@@ -153,3 +184,12 @@ def remove_temp_and_set_completed(path: str, job_id: str):
     job.state = models.JobState.COMPLETED
     job.save()
 
+
+from celery import signals
+@signals.worker_ready.connect
+def mark_old_jobs_as_failed(**kwargs):
+    Job.objects.filter(state=models.JobState.PENDING).update(state = models.JobState.FAILED, errors=["marked as failed on startup"])
+
+@app.task
+def log(*args):
+    logging.info(*args)

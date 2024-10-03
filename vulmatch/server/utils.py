@@ -1,3 +1,4 @@
+import re
 from django.conf import settings
 from rest_framework import pagination, response, serializers
 from rest_framework.filters import OrderingFilter, BaseFilterBackend
@@ -163,3 +164,15 @@ class Response(response.Response):
 class ErrorResp(Response):
     def __init__(self, status, title, details=None):
         super().__init__({"message": title, "code": status}, status=status)
+
+
+def split_mitre_version(version):
+    version_parts = []
+    for v in re.split('_|-', version):
+        try:
+            v = int(v)
+        except:
+            pass
+        finally:
+            version_parts.append(v)
+    return tuple(version_parts)

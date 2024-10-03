@@ -248,7 +248,7 @@ LIMIT 1
 RETURN UNIQUE(FLATTEN(
 FOR v, e, p IN 0..5
   OUTBOUND doc._id
-  GRAPH "cti_graph"
+  GRAPH @graph_name
   
   PRUNE v.type IN ['identity', 'marking-definition'] OR STARTS_WITH(e.relationship_type, 'x-capec') OR (e AND NOT IS_SAME_COLLECTION('nvd_cve_edge_collection', e._id))
   OPTIONS { uniqueVertices: "path"}
@@ -259,7 +259,7 @@ FOR doc IN bundle
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
 '''
-        return self.execute_query(query, bind_vars=dict(id=cve_id))
+        return self.execute_query(query, bind_vars=dict(id=cve_id, graph_name=settings.ARANGODB_DATABASE+"_graph"))
     
     def get_attack_objects(self, matrix):
         filters = []
@@ -288,6 +288,11 @@ RETURN KEEP(doc, KEYS(doc, true))
         if q := self.query.get('description'):
             bind_vars['description'] = q
             filters.append('FILTER CONTAINS(doc.description, @description)')
+
+        if q := self.query.get(f'attack_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
+
         query = """
             FOR doc in @@collection
             FILTER CONTAINS(@types, doc.type) AND doc._is_latest
@@ -305,6 +310,26 @@ RETURN KEEP(doc, KEYS(doc, true))
         RETURN KEEP(doc, KEYS(doc, true))
         ''', bind_vars={'@collection': self.collection, 'stix_id': stix_id})
     
+    def get_mitre_versions(self, stix_id=None):
+        query = """
+        FOR doc IN @@collection
+        FILTER STARTS_WITH(doc._stix2arango_note, "mitre-version=")
+        RETURN DISTINCT doc._stix2arango_note
+        """
+        bind_vars = {'@collection': self.collection}
+        return self.execute_query(query, bind_vars=bind_vars, paginate=False)
+    
+    def get_object_versions(self, stix_id):
+        query = """
+        FOR doc IN @@collection
+        FILTER doc.id == @stix_id
+        LIMIT @offset, @count
+        SORT doc.modified DESC
+        RETURN DISTINCT doc.modified
+        """
+        bind_vars = {'@collection': self.collection, "stix_id": stix_id}
+        self.container = 'versions'
+        return self.execute_query(query, bind_vars=bind_vars)
     
     def get_weakness_or_capec_objects(self, cwe=True, types=CWE_TYPES):
         filters = []
@@ -320,6 +345,15 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append(
                 "FILTER doc.id in @ids"
             )
+
+        
+        if q := self.query.get(f'cwe_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
+        
+        if q := self.query.get(f'capec_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
         
         if value := self.query_as_array('cwe_id'):
             bind_vars['cwe_ids'] = value
