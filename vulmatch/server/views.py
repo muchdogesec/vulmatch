@@ -278,7 +278,7 @@ class CweView(viewsets.ViewSet):
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
         
-    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
+    @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"])
     def versions(self, request, *args, **kwargs):
         versions = sorted([
@@ -342,7 +342,7 @@ class CapecView(viewsets.ViewSet):
     def retrieve(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
     
-    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
+    @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"])
     def versions(self, request, *args, **kwargs):
         versions = sorted([
