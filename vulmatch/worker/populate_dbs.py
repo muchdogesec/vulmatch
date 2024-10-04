@@ -16,7 +16,7 @@ from stix2arango.stix2arango import Stix2Arango
 
 from arango_cti_processor.config import MODE_COLLECTION_MAP
 
-START_ID = 0x55
+START_ID = 0xabcd
 
 
 CXE_START_DATE = '2024-09-01'
@@ -79,7 +79,11 @@ def run_all():
     jobs: list[Job] = []
     job_counter = itertools.count(START_ID)
     def get_job(type, data):
-        return Job.objects.create(id=uuid.UUID(int=next(job_counter)), parameters=data, type=type)
+        job = Job.objects.create(id=uuid.UUID(int=next(job_counter)), parameters=data, type=type)
+        task = create_celery_task_from_job(job)
+        task |= log.si(f'finished task {task}, {job.type=}, {job.parameters=}')
+        task.set_immutable(True)
+        return task
 
     #create db/collections
     for c in collections_to_create:
@@ -89,27 +93,31 @@ def run_all():
                 get_job(JobType.CVE_UPDATE, dict(last_modified_earliest=CXE_START_DATE, last_modified_latest=CXE_END_DATE)),
                 get_job(JobType.CPE_UPDATE, dict(last_modified_earliest=CXE_START_DATE, last_modified_latest=CXE_END_DATE))
     ])
+    #run attacks
     for matrix, versions in ATTACK_MATRIXES.items():
+        mitre_task = []
         for version in versions:
-            jobs.append(
+            mitre_task.append(
                 get_job(JobType.ATTACK_UPDATE, dict(matrix=matrix, version=version))
             )
+        jobs.append(chain(mitre_task))
+    
+    #run capec and cwe
     for mitre_job_type, versions in MITRE_VERSIONS.items():
+        mitre_task = []
         for version in versions:
-            jobs.append(
+            mitre_task.append(
                 get_job(mitre_job_type, dict(version=version))
             )
+        jobs.append(chain(mitre_task))
 
-    tasks = []
+
     for job in jobs:
-        task = create_celery_task_from_job(job)
-        task |= log.si(f'finished task {task}, {job.type=}, {job.parameters=}')
-        tasks.append(task)
+        job.set_immutable(True)
     
-    final_chain = [group(tasks)]
+    final_chain = [group(jobs)]
     for acp_mode in ACP_MODES:
-        job = get_job(JobType.CTI_PROCESSOR, {'mode': acp_mode})
-        final_chain.append(create_celery_task_from_job(job))
+        final_chain.append(get_job(JobType.CTI_PROCESSOR, {'mode': acp_mode}))
 
     final_chain_result = chain(final_chain).apply_async()
     return final_chain_result.get()

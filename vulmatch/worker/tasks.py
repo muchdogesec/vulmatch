@@ -59,8 +59,8 @@ def run_acp_task(data: dict, job: Job):
     options['relationship'] = [data['mode']]
     processor = ArangoProcessor(**options)
 
-    task =  acp_task.s(job.id, options)
-    return (task | remove_temp_and_set_completed.si(None, job.id))
+    task =  acp_task.s(options, job_id=job.id)
+    return (task | remove_temp_and_set_completed.si(None, job_id=job.id))
     
 
 
@@ -87,13 +87,20 @@ def run_mitre_task(data, job: Job, mitre_type='cve'):
             raise NotImplementedError("Unknown type for mitre task")
     
     temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/mitre-{mitre_type}--{str(job.id)}")
-    task = download_file.s(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'mitre-version={version}', job_id=job.id)
+    task = download_file.si(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'mitre-version={version}', job_id=job.id)
     return (task | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 def run_nvd_task(data, job: Job, nvd_type='cve'):
     dates = date_range(data['last_modified_earliest'], data['last_modified_latest'])
     temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/nvd-{nvd_type}--{str(job.id)}")
-    tasks = chain([download_file.si(urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type)), temp_dir, job_id=job.id) | upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id) for d in dates])
+    tasks = []
+    for d in dates:
+        url = urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
+        task = download_file.si(url, temp_dir, job_id=job.id)
+        task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id)
+        task.set_immutable(True)
+        tasks.append(task)
+    tasks = chain(tasks)
     return (tasks | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 
