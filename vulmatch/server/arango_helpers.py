@@ -1,3 +1,4 @@
+from pathlib import Path
 import re
 import typing
 from arango import ArangoClient
@@ -233,6 +234,12 @@ class ArangoDBHelper:
             binds['cvss_base_score_min'] = float(q)
             filters.append("FILTER VALUES(doc.x_cvss)[? FILTER CURRENT.base_score >= @cvss_base_score_min]")
 
+        if value := self.query_as_array('stix_id'):
+            binds['stix_ids'] = value
+            filters.append(
+                "FILTER doc.id in @stix_ids"
+            )
+
         if q := self.query.get('epss_score_min'):
             binds['epss_score_min'] = float(q)
             filters.append("FILTER doc.x_epss.score >= @epss_score_min")
@@ -304,10 +311,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         # return Response(query)
         return self.execute_query(query, bind_vars=binds)
 
-    def get_cve_bundle(self, cve_id):
+    def get_cve_bundle(self, cve_id: str):
         query = '''
 LET bundle = FIRST(FOR doc IN nvd_cve_vertex_collection
-FILTER doc._is_latest AND doc.id == @id
+FILTER doc._is_latest AND doc.name == @cve_id
 LIMIT 1
 RETURN UNIQUE(FLATTEN(
 FOR v, e, p IN 0..5
@@ -323,7 +330,7 @@ FOR doc IN bundle
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
 '''
-        return self.execute_query(query, bind_vars=dict(id=cve_id, graph_name=settings.ARANGODB_DATABASE+"_graph"))
+        return self.execute_query(query, bind_vars=dict(cve_id=cve_id.upper(), graph_name=settings.ARANGODB_DATABASE+"_graph"))
 
     def get_attack_objects(self, matrix):
         filters = []
@@ -386,6 +393,17 @@ RETURN KEEP(doc, KEYS(doc, true))
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
             '''.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
+    
+    def get_cve_object(self, cve_id):
+        bind_vars={'@collection': self.collection, 'cve_id': cve_id}
+        filters = ['FILTER doc._is_latest']
+        return self.execute_query('''
+            FOR doc in @@collection
+            FILTER doc.name == @cve_id
+            @filters
+            LIMIT @offset, @count
+            RETURN KEEP(doc, KEYS(doc, true))
+            '''.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
 
     def get_mitre_versions(self, stix_id=None):
         query = """
@@ -402,14 +420,14 @@ RETURN KEEP(doc, KEYS(doc, true))
         versions = [f"v{v}" for v in versions]
         return Response(dict(latest=versions[0] if versions else None, versions=versions))
 
-    def get_object_versions(self, stix_id):
+    def get_cve_versions(self, cve_id: str):
         query = """
         FOR doc IN @@collection
-        FILTER doc.id == @stix_id
+        FILTER doc.name == @cve_id
         SORT doc.modified DESC
         RETURN DISTINCT doc.modified
         """
-        bind_vars = {'@collection': self.collection, "stix_id": stix_id}
+        bind_vars = {'@collection': self.collection, "cve_id": cve_id.upper()}
         self.container = 'versions'
         versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
         return Response(dict(latest=versions[0] if versions else None, versions=versions))

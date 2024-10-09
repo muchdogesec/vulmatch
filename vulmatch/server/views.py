@@ -23,7 +23,7 @@ from textwrap import dedent
         description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
     ),
     list_objects=extend_schema(
-        responses={200: serializers.StixObjectsSerializer}, filters=True,
+        responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
         description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
     ),
@@ -49,17 +49,17 @@ class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
     pagination_class = Pagination("vulnerabilities")
     filter_backends = [DjangoFilterBackend]
-    serializer_class = serializers.JobSerializer
-    lookup_url_kwarg = 'stix_id'
+    serializer_class = serializers.StixObjectsSerializer(many=True)
+    lookup_url_kwarg = 'cve_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
-        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID'),
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e.'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g CVE-2024-3125'),
 
     ]
 
     
     class filterset_class(FilterSet):
-        id = MultipleChoiceFilter(label='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
+        stix_id = MultipleChoiceFilter(label='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
         cve_id = CharFilter(label='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
         description = CharFilter(label='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         has_kev = BooleanFilter(label=dedent('''
@@ -96,17 +96,17 @@ class CveView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request, 'vulnerabilities').get_vulnerabilities()
     
-    @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:stix_id>/bundle")
-    def bundle(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('', request).get_cve_bundle(stix_id)
+    @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:cve_id>/bundle")
+    def bundle(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('', request).get_cve_bundle(cve_id)
     
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
+    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_object(cve_id)
     
-    @decorators.action(detail=False, url_path="objects/<str:stix_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
-    def versions(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object_versions(stix_id)
+    @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
+    def versions(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_versions(cve_id)
     
 
 @extend_schema_view(
@@ -131,7 +131,7 @@ class CpeView(viewsets.ViewSet):
     openapi_tags = ["CPE"]
     pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
-    serializer_class = serializers.StixObjectsSerializer
+    serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
         OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
@@ -198,7 +198,7 @@ class AttackView(viewsets.ViewSet):
     def matrix(self):
         m: re.Match = re.search(r"/attack-(\w+)/", self.request.path)
         return m.group(1)
-    serializer_class = serializers.StixObjectsSerializer
+    serializer_class = serializers.StixObjectsSerializer(many=True)
     pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
@@ -298,7 +298,7 @@ class CweView(viewsets.ViewSet):
 
     filter_backends = [DjangoFilterBackend]
 
-    serializer_class = serializers.StixObjectsSerializer
+    serializer_class = serializers.StixObjectsSerializer(many=True)
     pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
@@ -364,7 +364,7 @@ class CapecView(viewsets.ViewSet):
 
     filter_backends = [DjangoFilterBackend]
 
-    serializer_class = serializers.StixObjectsSerializer
+    serializer_class = serializers.StixObjectsSerializer(many=True)
     pagination_class = Pagination("objects")
 
     class filterset_class(FilterSet):
