@@ -4,6 +4,8 @@ from arango import ArangoClient
 from django.conf import settings
 from .utils import Pagination, Response
 from drf_spectacular.utils import OpenApiParameter
+
+from vulmatch.server import utils
 if typing.TYPE_CHECKING:
     from .. import settings
 SDO_TYPES = set(
@@ -379,19 +381,25 @@ RETURN KEEP(doc, KEYS(doc, true))
         RETURN DISTINCT doc._stix2arango_note
         """
         bind_vars = {'@collection': self.collection}
-        return self.execute_query(query, bind_vars=bind_vars, paginate=False)
+        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
+        versions = sorted([
+            v[14:].replace('_', ".")
+            for v in versions
+        ], key=utils.split_mitre_version, reverse=True)
+        versions = [f"v{v}" for v in versions]
+        return Response(dict(latest=versions[0] if versions else None, versions=versions))
 
     def get_object_versions(self, stix_id):
         query = """
         FOR doc IN @@collection
         FILTER doc.id == @stix_id
-        LIMIT @offset, @count
         SORT doc.modified DESC
         RETURN DISTINCT doc.modified
         """
         bind_vars = {'@collection': self.collection, "stix_id": stix_id}
         self.container = 'versions'
-        return self.execute_query(query, bind_vars=bind_vars)
+        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
+        return Response(dict(latest=versions[0] if versions else None, versions=versions))
 
     def get_weakness_or_capec_objects(self, cwe=True, types=CWE_TYPES):
         filters = []

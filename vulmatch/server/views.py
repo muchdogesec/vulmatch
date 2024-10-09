@@ -38,6 +38,12 @@ from textwrap import dedent
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
+    versions=extend_schema(
+        responses=serializers.StixVersionsSerializer,
+        summary="Track all times the Vulnerability Object has been updated",
+        description="This endpoint will return all the times Vulmatch has modified a Vulnerability over time as new information becomes available. By default the latest version will always be returned. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to select the version of the object desired using the GET Vulnerability Object by ID endpoint.",
+
+    )
 )   
 class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
@@ -98,7 +104,7 @@ class CveView(viewsets.ViewSet):
     def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object(stix_id)
     
-    @decorators.action(detail=False, url_path="objects/<str:stix_id>/versions", methods=["GET"])
+    @decorators.action(detail=False, url_path="objects/<str:stix_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object_versions(stix_id)
     
@@ -223,12 +229,7 @@ class AttackView(viewsets.ViewSet):
     @extend_schema()
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
-        versions = sorted([
-            v[14:].replace('_', ".")
-            for v in ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
-        ], key=split_mitre_version, reverse=True)
-        versions = [f"v{v}" for v in versions]
-        return Response(dict(latest=versions[0], versions=versions))
+        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
     
 
     @classmethod
@@ -319,12 +320,7 @@ class CweView(viewsets.ViewSet):
     @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
-        versions = sorted([
-            v[14:].replace('_', ".")
-            for v in ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
-        ], key=split_mitre_version, reverse=True)
-        versions = [f"v{v}" for v in versions]
-        return Response(dict(latest=versions[0], versions=versions))
+        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
     
    
 @extend_schema_view(
@@ -385,14 +381,8 @@ class CapecView(viewsets.ViewSet):
     @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
-        versions = sorted([
-            v[14:].replace('_', ".")
-            for v in ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
-        ], key=split_mitre_version, reverse=True)
-        versions = [f"v{v}" for v in versions]
-        return Response(dict(latest=versions[0], versions=versions))
-    
-   
+        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
+
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
