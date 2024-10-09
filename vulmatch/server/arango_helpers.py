@@ -334,6 +334,14 @@ RETURN KEEP(doc, KEYS(doc, true))
                 "@collection": f'mitre_attack_{matrix}_vertex_collection',
                 "types": list(types),
         }
+
+
+        if q := self.query.get(f'attack_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
+        else:
+            filters.append('FILTER doc._is_latest')
+
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
             filters.append(
@@ -353,13 +361,10 @@ RETURN KEEP(doc, KEYS(doc, true))
             bind_vars['description'] = q
             filters.append('FILTER CONTAINS(doc.description, @description)')
 
-        if q := self.query.get(f'attack_version'):
-            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
-            filters.append('FILTER doc._stix2arango_note == @mitre_version')
 
         query = """
             FOR doc in @@collection
-            FILTER CONTAINS(@types, doc.type) AND doc._is_latest
+            FILTER CONTAINS(@types, doc.type)
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
@@ -367,12 +372,20 @@ RETURN KEEP(doc, KEYS(doc, true))
         return self.execute_query(query, bind_vars=bind_vars)
 
     def get_object(self, stix_id):
+        bind_vars={'@collection': self.collection, 'stix_id': stix_id}
+        filters = ['FILTER doc._is_latest']
+        for version_param in ['attack_version', 'cwe_version', 'capec_version']:
+            if q := self.query.get(version_param):
+                bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+                filters[0] = 'FILTER doc._stix2arango_note == @mitre_version'
+                break
         return self.execute_query('''
-        FOR doc in @@collection
-        FILTER doc.id == @stix_id AND doc._is_latest
-        LIMIT @offset, @count
-        RETURN KEEP(doc, KEYS(doc, true))
-        ''', bind_vars={'@collection': self.collection, 'stix_id': stix_id})
+            FOR doc in @@collection
+            FILTER doc.id == @stix_id
+            @filters
+            LIMIT @offset, @count
+            RETURN KEEP(doc, KEYS(doc, true))
+            '''.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
 
     def get_mitre_versions(self, stix_id=None):
         query = """
@@ -410,19 +423,20 @@ RETURN KEEP(doc, KEYS(doc, true))
                 "@collection": self.collection,
                 "types": list(types),
         }
+        if q := self.query.get(f'cwe_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
+        elif q := self.query.get(f'capec_version'):
+            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
+            filters.append('FILTER doc._stix2arango_note == @mitre_version')
+        else:
+            filters.append('FILTER doc._is_latest')
+
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
             filters.append(
                 "FILTER doc.id in @ids"
             )
-
-        if q := self.query.get(f'cwe_version'):
-            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
-            filters.append('FILTER doc._stix2arango_note == @mitre_version')
-
-        if q := self.query.get(f'capec_version'):
-            bind_vars['mitre_version'] = "mitre-version="+q.replace('.', '_').strip('v')
-            filters.append('FILTER doc._stix2arango_note == @mitre_version')
 
         if value := self.query_as_array('cwe_id'):
             bind_vars['cwe_ids'] = value
@@ -443,7 +457,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             filters.append('FILTER CONTAINS(doc.description, @description)')
         query = """
             FOR doc in @@collection
-            FILTER CONTAINS(@types, doc.type) AND doc._is_latest
+            FILTER CONTAINS(@types, doc.type)
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))

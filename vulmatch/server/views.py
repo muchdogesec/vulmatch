@@ -120,6 +120,7 @@ class CveView(viewsets.ViewSet):
     list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
         description="Search and filter CPE records.\n\nThis endpoint only returns the software objects for matching CPEs. ",
+        filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
@@ -177,6 +178,7 @@ class CpeView(viewsets.ViewSet):
     list_objects=extend_schema(
         summary='Get ATT&CK objects',
         description="Search and filter ATT&CK results.",
+        filters=True
     ),
     retrieve_objects=extend_schema(
         summary='Get an ATT&CK object',
@@ -222,6 +224,11 @@ class AttackView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_attack_objects(self.matrix)
     
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('attack_version', description="Filter the results by the version of ATT&CK")
+            ],
+    )
     @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
     def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
@@ -248,6 +255,7 @@ class AttackView(viewsets.ViewSet):
             list_objects=extend_schema(
                 summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
                 description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.",
+                filters=True,
             ),
             retrieve_objects=extend_schema(
                 summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
@@ -274,6 +282,7 @@ class AttackView(viewsets.ViewSet):
     list_objects=extend_schema(
         summary='Get CWE objects',
         description='Search and filter CWE results.',
+        filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CWE object',
@@ -313,6 +322,11 @@ class CweView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_weakness_or_capec_objects()
     
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('cwe_version', description="Filter the results by the version of CWE")
+            ],
+    )
     @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
     def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
@@ -334,6 +348,7 @@ class CweView(viewsets.ViewSet):
     list_objects=extend_schema(
         summary='Get CAPEC objects',
         description="Search and filter CAPEC results.",
+        filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CAPEC object',
@@ -374,6 +389,11 @@ class CapecView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_weakness_or_capec_objects(types=CAPEC_TYPES)
     
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('capec_version', description="Filter the results by the version of CAPEC")
+            ],
+    )
     @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
     def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
