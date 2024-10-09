@@ -22,12 +22,12 @@ from textwrap import dedent
         summary="Download data for CVEs",
         description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
     ),
-    list=extend_schema(
+    list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
         description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
     ),
-    retrieve=extend_schema(
+    retrieve_objects=extend_schema(
         summary='Get a Vulnerability by STIX ID',
         description='This endpoint only returns the vulnerability object for CVE. Typically you want to use the endpoint Get all objects for a Vulnerability by STIX ID. You can identify the STIX ID of a CVE using the GET CVE endpoint if needed.',
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')}
@@ -86,17 +86,19 @@ class CveView(viewsets.ViewSet):
         job_s = serializers.JobSerializer(instance=job)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
     
-    def list(self, request, *args, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request, 'vulnerabilities').get_vulnerabilities()
     
-    @decorators.action(methods=['GET'], detail=True)
+    @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:stix_id>/bundle")
     def bundle(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('', request).get_cve_bundle(stix_id)
     
-    def retrieve(self, request, *args, stix_id=None, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
+    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object(stix_id)
     
-    @decorators.action(detail=True, methods=["GET"])
+    @decorators.action(detail=False, url_path="objects/<str:stix_id>/versions", methods=["GET"])
     def versions(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_object_versions(stix_id)
     
@@ -109,11 +111,11 @@ class CveView(viewsets.ViewSet):
         summary="Download CPE data",
         description="Use this data to update the CPE records.\n\nThe earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\nNote, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
     ),
-    list=extend_schema(
+    list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
         description="Search and filter CPE records.\n\nThis endpoint only returns the software objects for matching CPEs. ",
     ),
-    retrieve=extend_schema(
+    retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
         description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPE endpoint.",
     ),
@@ -128,8 +130,6 @@ class CpeView(viewsets.ViewSet):
         OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
     ]
 
-    #def get_queryset(self):
-    #    return models.Job.objects.all()
     
     class filterset_class(FilterSet):
         id = BaseCSVFilter(label='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
@@ -150,10 +150,12 @@ class CpeView(viewsets.ViewSet):
         job_s = serializers.JobSerializer(instance=job)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
     
-    def list(self, request, *args, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
 
-    def retrieve(self, request, *args, stix_id=None, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
+    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_object(stix_id)
     
 
@@ -166,11 +168,11 @@ class CpeView(viewsets.ViewSet):
         summary="Download ATT&CK Objects",
         description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
     ),
-    list=extend_schema(
+    list_objects=extend_schema(
         summary='Get ATT&CK objects',
         description="Search and filter ATT&CK results.",
     ),
-    retrieve=extend_schema(
+    retrieve_objects=extend_schema(
         summary='Get an ATT&CK object',
         description="Get an ATT&CK object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
     ),
@@ -210,10 +212,12 @@ class AttackView(viewsets.ViewSet):
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     
-    def list(self, request, *args, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_attack_objects(self.matrix)
     
-    def retrieve(self, request, *args, stix_id=None, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
+    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
         
     @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
@@ -225,7 +229,7 @@ class AttackView(viewsets.ViewSet):
         ], key=split_mitre_version, reverse=True)
         versions = [f"v{v}" for v in versions]
         return Response(dict(latest=versions[0], versions=versions))
-    
+
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -234,11 +238,11 @@ class AttackView(viewsets.ViewSet):
         summary="Download CWE objects",
         description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
     ),
-    list=extend_schema(
+    list_objects=extend_schema(
         summary='Get CWE objects',
         description='Search and filter CWE results.',
     ),
-    retrieve=extend_schema(
+    retrieve_objects=extend_schema(
         summary='Get a CWE object',
         description='Get an CWE object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
     ),
@@ -272,10 +276,12 @@ class CweView(viewsets.ViewSet):
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     
-    def list(self, request, *args, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_weakness_or_capec_objects()
     
-    def retrieve(self, request, *args, stix_id=None, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
+    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
         
     @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
@@ -297,11 +303,11 @@ class CweView(viewsets.ViewSet):
         summary="Download CAPEC objects",
         description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
     ),
-    list=extend_schema(
+    list_objects=extend_schema(
         summary='Get CAPEC objects',
         description="Search and filter CAPEC results.",
     ),
-    retrieve=extend_schema(
+    retrieve_objects=extend_schema(
         summary='Get a CAPEC object',
         description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
     ),
@@ -336,10 +342,12 @@ class CapecView(viewsets.ViewSet):
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     
-    def list(self, request, *args, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_weakness_or_capec_objects(types=CAPEC_TYPES)
     
-    def retrieve(self, request, *args, stix_id=None, **kwargs):
+    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
+    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
     
     @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
