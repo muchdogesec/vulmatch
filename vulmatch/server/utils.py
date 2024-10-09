@@ -166,13 +166,14 @@ class ErrorResp(Response):
         super().__init__({"message": title, "code": status}, status=status)
 
 
-def split_mitre_version(version):
+def split_mitre_version(version: str):
     version_parts = []
-    for v in re.split('_|-', version):
+    for v in re.split('_|-|\.', version.strip('v')):
         try:
             v = int(v)
         except:
             pass
         finally:
             version_parts.append(v)
+    print(version_parts)
     return tuple(version_parts)

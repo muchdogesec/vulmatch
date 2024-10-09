@@ -24,6 +24,10 @@ class NVDTaskSerializer(serializers.Serializer):
 class MitreTaskSerializer(serializers.Serializer):
     version = serializers.CharField(help_text="mitre version passed to the script")
 
+class MitreVersionsSerializer(serializers.Serializer):
+    latest = serializers.CharField()
+    versions = serializers.ListField(child=serializers.CharField())
+
 class ACPSerializer(serializers.Serializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     modified_min = serializers.DateTimeField(required=False)

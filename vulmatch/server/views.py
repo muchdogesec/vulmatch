@@ -220,8 +220,8 @@ class AttackView(viewsets.ViewSet):
     def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
         
-    @extend_schema(summary="See available versions", description="See all imported versions available to use, and which version is the default (latest)")
-    @decorators.action(detail=False, methods=["GET"])
+    @extend_schema()
+    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         versions = sorted([
             v[14:].replace('_', ".")
@@ -229,7 +229,39 @@ class AttackView(viewsets.ViewSet):
         ], key=split_mitre_version, reverse=True)
         versions = [f"v{v}" for v in versions]
         return Response(dict(latest=versions[0], versions=versions))
+    
 
+    @classmethod
+    def attack_view(cls, matrix_name: str):
+        matrix_name_human = matrix_name.title()
+        if matrix_name == 'ics':
+            matrix_name_human = "ICS"
+        @extend_schema_view(
+            create=extend_schema(
+                responses={201: serializers.JobSerializer
+                },
+                request=serializers.MitreTaskSerializer,
+                summary=f"Download MITRE ATT&CK {matrix_name_human} Objects",
+                description=f"Use this data to update MITRE ATT&CK {matrix_name_human} records.\n\nYou can specify the version of {matrix_name_human} ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
+            ),
+            list_objects=extend_schema(
+                summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
+                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.",
+            ),
+            retrieve_objects=extend_schema(
+                summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
+                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
+            ),
+            versions=extend_schema(
+                summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
+                description=f"See all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest)",
+            ),
+        )  
+        class TempAttackView(cls):
+            matrix = matrix_name
+        TempAttackView.__name__ = f'{matrix_name.title()}AttackView'
+        return TempAttackView
+    
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -285,7 +317,7 @@ class CweView(viewsets.ViewSet):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
         
     @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
-    @decorators.action(detail=False, methods=["GET"])
+    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         versions = sorted([
             v[14:].replace('_', ".")
@@ -351,7 +383,7 @@ class CapecView(viewsets.ViewSet):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
     
     @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
-    @decorators.action(detail=False, methods=["GET"])
+    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         versions = sorted([
             v[14:].replace('_', ".")

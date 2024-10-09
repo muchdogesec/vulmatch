@@ -36,9 +36,9 @@ router.register("cpe", views.CpeView, "cpe-view")
 router.register("cwe", views.CweView, "cwe-view")
 router.register("capec", views.CapecView, "capec-view")
 
-router.register("attack-mobile", views.AttackView, "attack-mobile-view")
-router.register("attack-ics", views.AttackView, "attack-ics-view")
-router.register("attack-enterprise", views.AttackView, "attack-enterprise-view")
+router.register("attack-mobile", views.AttackView.attack_view('mobile'), "attack-mobile-view")
+router.register("attack-ics", views.AttackView.attack_view('ics'), "attack-ics-view")
+router.register("attack-enterprise", views.AttackView.attack_view('enterprise'), "attack-enterprise-view")
 
 urlpatterns = [
     path(f'api/{API_VERSION}/', include(router.urls)),
