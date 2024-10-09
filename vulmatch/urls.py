@@ -21,6 +21,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from vulmatch.server import views
+from vulmatch.server.arango_based_views import arango_views
 
 
 API_VERSION = "v1"
@@ -29,16 +30,22 @@ router = routers.SimpleRouter(use_regex_path=False)
 router.register("jobs", views.JobView, "jobs-view")
 # arango-cti-processor
 router.register("arango-cti-processor/<str:mode>", views.ACPView, "acp-view")
-#nvd
+# nvd
 router.register("cve", views.CveView, "cve-view")
 router.register("cpe", views.CpeView, "cpe-view")
 # mitre
+## mitre cwe/cpe
 router.register("cwe", views.CweView, "cwe-view")
 router.register("capec", views.CapecView, "capec-view")
-
+## mitre att&ck
 router.register("attack-mobile", views.AttackView.attack_view('mobile'), "attack-mobile-view")
 router.register("attack-ics", views.AttackView.attack_view('ics'), "attack-ics-view")
 router.register("attack-enterprise", views.AttackView.attack_view('enterprise'), "attack-enterprise-view")
+## objects
+router.register('objects/smos', arango_views.SMOView, "object-view-smo")
+router.register('objects/scos', arango_views.SCOView, "object-view-sco")
+router.register('objects/sros', arango_views.SROView, "object-view-sro")
+router.register('objects/sdos', arango_views.SDOView, "object-view-sdo")
 
 urlpatterns = [
     path(f'api/{API_VERSION}/', include(router.urls)),
