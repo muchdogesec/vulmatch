@@ -14,13 +14,25 @@ from arango_cti_processor.config import MODE_COLLECTION_MAP
 from textwrap import dedent
 # Create your views here.
 
+import textwrap
+
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
         },
         request=serializers.NVDTaskSerializer,
         summary="Download data for CVEs",
-        description="Use this data to update the CVE records.\n\nThe earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\nThe easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
+        description=textwrap.dedent(
+            """
+            Use this data to update the CVE records.\n\n
+            The earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\n
+            The easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for vulnerability
+            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for vulnerability \n\n
+            The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
@@ -115,7 +127,17 @@ class CveView(viewsets.ViewSet):
         },
         request=serializers.NVDTaskSerializer,
         summary="Download CPE data",
-        description="Use this data to update the CPE records.\n\nThe earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\nNote, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n`last_modified_earliest` and `last_modified_latest` dates should be in the format `YYYY-MM-DD`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).",
+        description=textwrap.dedent(
+            """
+            Use this data to update the CPE records.\n\n
+            The earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\n
+            Note, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for CPE
+            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for CPE\n\n
+            The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
@@ -173,7 +195,13 @@ class CpeView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download ATT&CK Objects",
-        description="Use this data to update ATT&CK records.\n\nYou can specify the version of ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
+        description=textwrap.dedent(
+            """
+            Use this data to update ATT&CK records.\n\nThe following key/values are accepted in the body of the request:\n\n
+            * `version` (required): the version of ATT&CK you want to download in the format `N_N`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_attack_enterprise.py#L7).
+            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get ATT&CK objects',

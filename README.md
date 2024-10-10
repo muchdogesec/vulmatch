@@ -6,14 +6,18 @@ We offer a fully hosted web version of Vulmatch which includes many additional f
 
 ## Overview
 
+![](docs/vulmatch.png)
+
 Vulmatch is a database of CVEs in STIX 2.1 format with a REST API wrapper to access them.
 
-Some common reasons people use Vulmatch include;
-
-* filter CVEs by CVSS and/or EPSS scoring
-* get a list of CVEs being exploited (CISA KEV)
-* search for CVEs by CPEs (i.e. "what CVEs am I vulnerable to?")
-* search for CVEs by Weakness
+Some common reasons people use Vulmatch include filtering CVEs by;
+	
+* CVSS
+* EPSS
+* CWE classifcation
+* ATT&CK classification
+* Affected products
+* Know expliots
 
 ## Install
 
