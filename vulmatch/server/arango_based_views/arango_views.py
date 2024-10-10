@@ -126,13 +126,7 @@ class SingleObjectView(viewsets.ViewSet):
         )
     
 class SingleObjectReportsView(SingleObjectView):
-    @extend_schema(
-        responses=ArangoDBHelper.get_paginated_response_schema('reports', {'type': 'string'}),
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
-    )
-    @decorators.action(detail=True, methods=['GET'])
-    def reports(self, request, *args, **kwargs):
-        return ArangoDBHelper(settings.VIEW_NAME, request).get_containing_reports(kwargs.get(self.lookup_url_kwarg))
+    pass
     
    
 @extend_schema_view(
