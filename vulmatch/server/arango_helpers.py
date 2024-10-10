@@ -313,24 +313,37 @@ RETURN KEEP(doc, KEYS(doc, true))
 
     def get_cve_bundle(self, cve_id: str):
         query = '''
-LET bundle = FIRST(FOR doc IN nvd_cve_vertex_collection
-FILTER doc._is_latest AND doc.name == @cve_id
-LIMIT 1
-RETURN UNIQUE(FLATTEN(
-FOR v, e, p IN 0..5
-  OUTBOUND doc._id
-  GRAPH @graph_name
-  
-  PRUNE v.type IN ['identity', 'marking-definition'] OR STARTS_WITH(e.relationship_type, 'x-capec') OR (e AND NOT IS_SAME_COLLECTION('nvd_cve_edge_collection', e._id))
-  OPTIONS { uniqueVertices: "path"}
-RETURN APPEND(p.vertices, p.edges)
-))) OR []
+LET cve_data = (
+  FOR doc IN nvd_cve_vertex_collection
+  FILTER doc._is_latest AND doc.name == @cve_id
+  RETURN doc
+)
+LET cve_rels = FLATTEN(
+    FOR doc IN nvd_cve_edge_collection
+    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id
+    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+    )
+    
+LET cwe_capec = FLATTEN(
+    FOR doc IN mitre_cwe_edge_collection
+    FILTER [doc._from, doc._to] ANY IN cve_rels[*]._id
+    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+    )
+    
+LET capec_attack = FLATTEN(
+    FOR doc IN mitre_capec_edge_collection
+    FILTER [doc._from, doc._to] ANY IN cwe_capec[*]._id
+    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+    )
 
-FOR doc IN bundle
+    
+FOR d in UNION_DISTINCT(cve_data, cve_rels, cwe_capec, capec_attack)
+
 LIMIT @offset, @count
-RETURN KEEP(doc, KEYS(doc, true))
+//RETURN KEEP(d, 'id', '_stix2arango_note', '_arango_cti_processor_note', 'description')
+RETURN KEEP(d, KEYS(d, TRUE))
 '''
-        return self.execute_query(query, bind_vars=dict(cve_id=cve_id.upper(), graph_name=settings.ARANGODB_DATABASE+"_graph"))
+        return self.execute_query(query, bind_vars=dict(cve_id=cve_id.upper()))
 
     def get_attack_objects(self, matrix):
         filters = []
