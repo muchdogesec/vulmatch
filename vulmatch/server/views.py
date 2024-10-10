@@ -197,7 +197,8 @@ class CpeView(viewsets.ViewSet):
         summary="Download ATT&CK Objects",
         description=textwrap.dedent(
             """
-            Use this data to update ATT&CK records.\n\nThe following key/values are accepted in the body of the request:\n\n
+            Use this data to update ATT&CK records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
             * `version` (required): the version of ATT&CK you want to download in the format `N_N`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_attack_enterprise.py#L7).
             \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
@@ -278,7 +279,14 @@ class AttackView(viewsets.ViewSet):
                 },
                 request=serializers.MitreTaskSerializer,
                 summary=f"Download MITRE ATT&CK {matrix_name_human} Objects",
-                description=f"Use this data to update MITRE ATT&CK {matrix_name_human} records.\n\nYou can specify the version of {matrix_name_human} ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
+                description=textwrap.dedent(
+                    """
+                    Use this endpoint to update MITRE ATT&CK records.\n\n
+                    The following key/values are accepted in the body of the request:\n\n
+                    * `version` (required): the version of ATT&CK you want to download in the format `N_N`, e.g. `15_1` for `15.1`\n\n
+                    The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+                    """
+                ),
             ),
             list_objects=extend_schema(
                 summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
@@ -305,7 +313,14 @@ class AttackView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CWE objects",
-        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
+        description=textwrap.dedent(
+            """
+            Use this data to update CWE records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `version` (required): the version of CWE you want to download in the format `N_N`, e.g. `4_14` for `4.14`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_cwe.py#L7).
+            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get CWE objects',
@@ -371,7 +386,14 @@ class CweView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CAPEC objects",
-        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
+        description=textwrap.dedent(
+            """
+            Use this data to update CAPEC records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `version` (required): the version of CAPEC you want to download in the format `N_N`, e.g. `3_9` for `3.9`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_capec.py#L7).
+            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get CAPEC objects',
@@ -435,15 +457,23 @@ class CapecView(viewsets.ViewSet):
     create=extend_schema(
         responses={201: serializers.JobSerializer
         },
-        description="These endpoints will trigger the relevant arango_cti_processor mode to generate relationships.",
-        summary="Trigger arango_cti_processor `mode` to generate relationships."
+        summary="Trigger arango_cti_processor `mode` to generate relationships.",
+        description=textwrap.dedent(
+            """
+            This endpoint will link together knowledgebases based on the `mode` selected. For more information about how this works see [arango_cti_processor](https://github.com/muchdogesec/arango_cti_processor/), specifically the `--relationship` setting.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `ignore_embedded_relationships` (optional - default: `true`): arango_cti_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generat SROs for these embedded relationships so they can be searched. `false` will ignore them\n\n
+            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cti_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always effecient, espeically when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.\n\n
+            * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
+            """
+        ),
     ),
 )
 class ACPView(viewsets.ViewSet):
     openapi_tags = ["Arango CTI Processor"]
     serializer_class = serializers.ACPSerializer
     openapi_path_params = [
-            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='mode (`--relationship`) to run [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/tree/embedded-relationship-tests?tab=readme-ov-file#run) in')
+            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='The  [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/) `--relationship` mode.')
     ]
 
     def create(self, request, *args, **kwargs):
