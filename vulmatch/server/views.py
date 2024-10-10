@@ -78,22 +78,31 @@ class CveView(viewsets.ViewSet):
         Filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
         '''))
         cpes_vulnerable = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+        Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
+        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
         '''))
         cpes_in_pattern = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+        Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
+        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
         '''))
-        weakness_id = BaseCSVFilter(label=dedent("""Filter results by weakness (CWE ID). e.g. `CWE-122`."""))
-        attack_id = BaseCSVFilter(label=dedent("""Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\nNote, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs."""))
+        weakness_id = BaseCSVFilter(label=dedent("""
+            Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
+            `cve-cwe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
+            """))
+        attack_id = BaseCSVFilter(label=dedent(
+            """
+            Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\n
+            Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
+            """))
         cvss_base_score_min = NumberFilter(label="between 0-10")
         epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
         epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
 
-        created_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `created` value user wants")
-        created_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `created` value user wants")
+        created_min = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the minumum `created` value user wants")
+        created_max = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the maximum `created` value user wants")
         
-        modified_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `modified` value user wants")
-        modified_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `modified` value user wants")
+        modified_min = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the minumum `modified` value user wants")
+        modified_max = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the maximum `modified` value user wants")
         sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="sort by field_name")
 
 
