@@ -37,23 +37,56 @@ import textwrap
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
-        description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
+        description=textwrap.dedent(
+            """
+            Search and filter CVE records. This endpoint only returns the vulnerability objects for matching CVEs.\n\n
+            Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.\n\n
+            If you already know the CVE ID, use the Get a Vulnerability by ID endpoint
+            """
+        ),
     ),
     retrieve_objects=extend_schema(
-        summary='Get a Vulnerability by STIX ID',
-        description='This endpoint only returns the vulnerability object for CVE. Typically you want to use the endpoint Get all objects for a Vulnerability by STIX ID. You can identify the STIX ID of a CVE using the GET CVE endpoint if needed.',
+        summary='Get a Vulnerability by CVE ID',
+        description=textwrap.dedent(
+            """
+            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.\n\n
+            If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
+            """
+        ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')}
     ),
     bundle=extend_schema(
-        summary='Get all objects for a Vulnerability by STIX ID',
-        description='This endpoint will return Vulnerability, Indicator, and Software STIX objects for the CVE ID. It will also include any STIX SROs defining the relationships between them.',
+        summary='Get all objects for a Vulnerability by CVE ID',
+        description=textwrap.dedent(
+            """
+            This endpoint will return all objects related to the Vulnerability. This can include the following:\n\n
+            * `vulnerability`: Represents the CVE
+            * `indicator`: Contains a pattern identifying products affected by the CVE
+            * `relationship` (`indicator`->`vulnerability`)
+            * `note`: Represents EPSS scores
+            * `software`: Represents the products listed in the pattern
+            * `relationship` (`indicator`->`software`)
+            * `weakness` (CWE): represents CWEs linked to the Vulneability (requires `cve-cwe` mode to be run)
+            * `relationship` (`vulnerability` (CVE) ->`weakness` (CWE))
+            * `attack-pattern` (CAPEC): represents CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe` and `cwe-capec` mode to be run)
+            * `relationship` (`weakness` (CWE) ->`attack-pattern` (CAPEC))
+            * `attack-pattern` (ATT&CK Enterprise/ICS/Mobile): represents ATT&CKs in CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe`, `cwe-capec` and `capec-attack` mode to be run)
+            * `relationship` (`attack-pattern` (CAPEC) ->`attack-pattern` (ATT&CK))\n\n
+            This endpoint will also return all embedded relationships that exist from any of the CVE specific objects too (`vulnerability`, `indicator`, and `note`). These are `identity` and `marking-definition` objects (and the `relationship` representing the embedded relationship).
+            """
+        ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
     versions=extend_schema(
         responses=serializers.StixVersionsSerializer,
-        summary="Track all times the Vulnerability Object has been updated",
-        description="This endpoint will return all the times Vulmatch has modified a Vulnerability over time as new information becomes available. By default the latest version will always be returned. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to select the version of the object desired using the GET Vulnerability Object by ID endpoint.",
+        summary="Get all updates for a Vulnerability by CVE ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the times a Vulnerability has been modified over time as new information becomes available.\n\n
+            By default the latest version of objects will be returned by all endpoints. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to get an older versions of a Vulnerability.
+            """
+        ),
 
     )
 )   
@@ -64,8 +97,8 @@ class CveView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'cve_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e.'),
-        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g CVE-2024-3125'),
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2024-3125`'),
 
     ]
 
@@ -94,15 +127,15 @@ class CveView(viewsets.ViewSet):
             Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\n
             Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
             """))
-        cvss_base_score_min = NumberFilter(label="between 0-10")
-        epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places): `cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places): `cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        created_min = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the minumum `created` value user wants")
-        created_max = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the maximum `created` value user wants")
+        cvss_base_score_min = NumberFilter(label="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
+        epss_score_min = NumberFilter(label="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        epss_percentile_min = NumberFilter(label="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        created_min = DateTimeFilter(label="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        created_max = DateTimeFilter(label="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         
-        modified_min = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the minumum `modified` value user wants")
-        modified_max = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the maximum `modified` value user wants")
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="sort by field_name")
+        modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
 
 
     def create(self, request, *args, **kwargs):
@@ -149,12 +182,12 @@ class CveView(viewsets.ViewSet):
     ),
     list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
-        description="Search and filter CPE records.\n\nThis endpoint only returns the software objects for matching CPEs. ",
+        description="Search and filter CPE records.\n\nThis endpoint only returns the `software` objects for matching CPEs.\n\nThis endpoint is useful to find CPEs that can be used to filter CVEs.",
         filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
-        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPE endpoint.",
+        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.",
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -298,16 +331,16 @@ class AttackView(viewsets.ViewSet):
             ),
             list_objects=extend_schema(
                 summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
-                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.",
+                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.\n\nThis endpoint with return the entire {matrix_name_human} matrix for reference. However, Vulnerabilities are linked to ATT&CK Techniques and Sub-Techniques only. For reference, these are represented as `attack-pattern` STIX objects.",
                 filters=True,
             ),
             retrieve_objects=extend_schema(
                 summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
-                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
+                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET MITRE ATT&CK {matrix_name_human} Objects endpoint.",
             ),
             versions=extend_schema(
                 summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
-                description=f"See all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest)",
+                description=f"It is possible to import multiple versions of ATT&CK using the POST MITRE ATT&CK {matrix_name_human} endpoints. By default, all endpoints will only return the latest version of ATT&CK objects (which generally suits most use-cases).\n\nThis endpoint allows you to see all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest). Typically this endpoint is only interesting for researchers looking to retrieve older ATT&CK versions.",
             ),
         )  
         class TempAttackView(cls):
@@ -332,12 +365,12 @@ class AttackView(viewsets.ViewSet):
     ),
     list_objects=extend_schema(
         summary='Get CWE objects',
-        description='Search and filter CWE results.',
+        description='Search and filter CWE results. This endpoint will return `weakness` objects. It is most useful for finding CWE IDs that can be used to filter Vulnerability records with on the GET CVE objects endpoints.',
         filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CWE object',
-        description='Get an CWE object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
+        description='Get an CWE object by its STIX ID. To search and filter CWE objects to get an ID use the GET Objects endpoint.',
     ),
 )  
 class CweView(viewsets.ViewSet):
