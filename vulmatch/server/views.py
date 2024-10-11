@@ -95,9 +95,8 @@ class CveView(viewsets.ViewSet):
             Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
             """))
         cvss_base_score_min = NumberFilter(label="between 0-10")
-        epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
-        epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
-
+        epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places): `cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places): `cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
         created_min = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the minumum `created` value user wants")
         created_max = DateTimeFilter(label="(In format `YYYY-MM-DDThh:mm:ss.sssZ`): is the maximum `created` value user wants")
         
@@ -495,12 +494,12 @@ class ACPView(viewsets.ViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.",
+        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
         summary="Get Jobs",
         responses={200: serializers.JobSerializer}
     ),
     retrieve=extend_schema(
-        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.",
+        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
         summary="Get a Job by ID",
     ),
 )

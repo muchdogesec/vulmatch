@@ -10,13 +10,16 @@ headers = {
 }
 
 # Versions for attack and CWE updates
-attack_versions = ["15_1", "14_1"]
-cwe_versions = ["4_15", "4_14"]
-capec_versions = ["3_9", "3_8"]
+attack_versions = ["14_1","15_1"] # add these in order to avoid versioning issues
+cwe_versions = ["4_14", "4_15"] # add these in order to avoid versioning issues
+capec_versions = ["3_8", "3_9"] # add these in order to avoid versioning issues
+
+# Modes for arango-cti-processor
+arango_modes = ["capec-attack", "capec-cwe", "cve-cpe", "cve-cwe", "cwe-capec", "cve-epss"]
 
 # Data for the CPE update
 cpe_data = {
-    "last_modified_earliest": "2020-01-01",
+    "last_modified_earliest": "2023-12-01",
     "last_modified_latest": "2024-09-30"
 }
 
@@ -93,37 +96,48 @@ def initiate_cwe_update(version):
         print(f"Failed to initiate CWE update: {response.status_code} - {response.text}")
         return None
 
-# Function to check the job status with retry mechanism
-def check_job_status(job_id, retries=5):
+# Function to check the job status and wait for it to complete
+def check_job_status(job_id):
     job_url = f'{base_url}/jobs/{job_id}/'
-    for attempt in range(retries):
-        print(f"Checking job status for job ID: {job_id}, Attempt {attempt + 1}/{retries}")
+    while True:
+        print(f"Checking job status for job ID: {job_id}")
         response = requests.get(job_url, headers=headers)
         if response.status_code == 200:
             job_status = response.json()
             print(f"Job status response: {json.dumps(job_status, indent=2)}")
-            return job_status
+            state = job_status['state']
+            
+            if state == 'completed':
+                print(f"Job {job_id} completed successfully.")
+                return job_status
+            else:
+                print(f"Job {job_id} still in state: {state}. Waiting for 30 sec before retrying...")
+                time.sleep(30)  # Wait for 1 minute before checking again
         else:
             print(f"Failed to check job status: {response.status_code} - {response.text}")
-        
-        if attempt < retries - 1:
-            print(f"Retrying in 1 minute...")
-            time.sleep(60)  # Wait for 1 minute before retrying
-    return None
+            break
 
-# Function to monitor a single job status
+# Function to monitor a single job status and ensure completion before proceeding
 def monitor_job_status(job_id, job_name):
     print(f"{job_name} job initiated with ID: {job_id}")
     job_status = check_job_status(job_id)
     
-    if job_status:
-        state = job_status['state']
-        if state == 'completed':
-            print(f"{job_name} job completed successfully.")
-        else:
-            print(f"{job_name} job in state: {state}")
+    if job_status and job_status['state'] == 'completed':
+        print(f"{job_name} job completed successfully.")
     else:
-        print(f"Failed to retrieve {job_name} job status after 5 attempts.")
+        print(f"{job_name} job did not complete successfully.")
+
+# Function to initiate arango-cti-processor updates
+def initiate_arango_cti_processor_update(mode):
+    print(f"Initiating arango-cti-processor update with mode: {mode}")
+    response = requests.post(f'{base_url}/arango-cti-processor/{mode}/', headers=headers)
+    
+    if response.status_code == 201:
+        print(f"arango-cti-processor update for {mode} initiated successfully.")
+        return response.json()['id']
+    else:
+        print(f"Failed to initiate arango-cti-processor update for {mode}: {response.status_code} - {response.text}")
+        return None
 
 # Function to monitor and initiate multiple jobs
 def monitor_jobs():
@@ -164,6 +178,12 @@ def monitor_jobs():
         job_id = initiate_cwe_update(version)
         if job_id:
             monitor_job_status(job_id, f"CWE (version {version})")
+
+    # Step 7: Run arango-cti-processor for each mode
+    for mode in arango_modes:
+        job_id = initiate_arango_cti_processor_update(mode)
+        if job_id:
+            monitor_job_status(job_id, f"arango-cti-processor ({mode})")
 
 # Run the script
 if __name__ == "__main__":
