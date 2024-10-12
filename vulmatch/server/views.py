@@ -75,7 +75,7 @@ import textwrap
             This endpoint will also return all embedded relationships that exist from any of the CVE specific objects too (`vulnerability`, `indicator`, and `note`). These are `identity` and `marking-definition` objects (and the `relationship` representing the embedded relationship).
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
     versions=extend_schema(
