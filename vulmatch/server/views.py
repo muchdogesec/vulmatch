@@ -155,7 +155,7 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_object(cve_id)
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
     
     @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, cve_id=None, **kwargs):
@@ -197,7 +197,8 @@ class CpeView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`'),
+        OpenApiParameter('cpe_name', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full CPE name. e.g. `cpe:2.3:a:slicewp:affiliate_program_suite:1.0.13:*:*:*:*:wordpress:*:*`'),
     ]
 
     
@@ -224,9 +225,9 @@ class CpeView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
 
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
+    def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
+        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
     
 
     
@@ -259,7 +260,8 @@ class AttackView(viewsets.ViewSet):
     openapi_tags = ["ATT&CK"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('attack_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The ATT&CK ID, e.g `TA0006`'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -299,9 +301,9 @@ class AttackView(viewsets.ViewSet):
                 OpenApiParameter('attack_version', description="Filter the results by the version of ATT&CK")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
+    def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object_by_external_id(attack_id)
         
     @extend_schema()
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
@@ -337,6 +339,7 @@ class AttackView(viewsets.ViewSet):
             retrieve_objects=extend_schema(
                 summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
                 description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET MITRE ATT&CK {matrix_name_human} Objects endpoint.",
+                filters=False,
             ),
             versions=extend_schema(
                 summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
@@ -371,13 +374,15 @@ class AttackView(viewsets.ViewSet):
     retrieve_objects=extend_schema(
         summary='Get a CWE object',
         description='Get an CWE object by its STIX ID. To search and filter CWE objects to get an ID use the GET Objects endpoint.',
+        filters=False,
     ),
 )  
 class CweView(viewsets.ViewSet):
     openapi_tags = ["CWE"]
-    lookup_url_kwarg = 'stix_id'
+    lookup_url_kwarg = 'cwe_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('cwe_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CWE ID, e.g CWE-73'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -411,9 +416,9 @@ class CweView(viewsets.ViewSet):
                 OpenApiParameter('cwe_version', description="Filter the results by the version of CWE")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>", detail=False)
+    def retrieve_objects(self, request, *args, cwe_id=None, **kwargs):
+        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object_by_external_id(cwe_id)
         
     @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
@@ -444,13 +449,15 @@ class CweView(viewsets.ViewSet):
     retrieve_objects=extend_schema(
         summary='Get a CAPEC object',
         description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
+        filters=False,
     ),
 )
 class CapecView(viewsets.ViewSet):
     openapi_tags = ["CAPEC"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('capec_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CAPEC ID, e.g CAPEC-699'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -485,9 +492,9 @@ class CapecView(viewsets.ViewSet):
                 OpenApiParameter('capec_version', description="Filter the results by the version of CAPEC")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>", detail=False)
+    def retrieve_objects(self, request, *args, capec_id=None, **kwargs):
+        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object_by_external_id(capec_id)
     
     @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)

@@ -391,8 +391,8 @@ RETURN KEEP(d, KEYS(d, TRUE))
         """.replace('@filters', '\n'.join(filters))
         return self.execute_query(query, bind_vars=bind_vars)
 
-    def get_object(self, stix_id):
-        bind_vars={'@collection': self.collection, 'stix_id': stix_id}
+    def get_object_by_external_id(self, ext_id):
+        bind_vars={'@collection': self.collection, 'ext_id': ext_id}
         filters = ['FILTER doc._is_latest']
         for version_param in ['attack_version', 'cwe_version', 'capec_version']:
             if q := self.query.get(version_param):
@@ -401,18 +401,19 @@ RETURN KEEP(d, KEYS(d, TRUE))
                 break
         return self.execute_query('''
             FOR doc in @@collection
-            FILTER doc.id == @stix_id
+            FILTER doc.external_references[0].external_id == @ext_id
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
             '''.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
     
-    def get_cve_object(self, cve_id):
-        bind_vars={'@collection': self.collection, 'cve_id': cve_id}
+    def get_cxe_object(self, cve_id, type="vulnerability", var='name'):
+        bind_vars={'@collection': self.collection, 'obj_name': cve_id, "type":type, 'var':var}
+        #return Response(bind_vars)
         filters = ['FILTER doc._is_latest']
         return self.execute_query('''
             FOR doc in @@collection
-            FILTER doc.name == @cve_id
+            FILTER doc.type == @type AND doc[@var] == @obj_name
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
