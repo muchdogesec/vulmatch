@@ -188,6 +188,7 @@ class CveView(viewsets.ViewSet):
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
         description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.",
+        filters=False,
     ),
 ) 
 class CpeView(viewsets.ViewSet):
