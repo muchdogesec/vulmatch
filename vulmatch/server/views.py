@@ -10,7 +10,6 @@ from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter, DateTimeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from arango_cti_processor.config import MODE_COLLECTION_MAP
 from textwrap import dedent
 # Create your views here.
 
@@ -525,7 +524,7 @@ class ACPView(viewsets.ViewSet):
     openapi_tags = ["Arango CTI Processor"]
     serializer_class = serializers.ACPSerializer
     openapi_path_params = [
-            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='The  [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/) `--relationship` mode.')
+            OpenApiParameter(name='mode', enum=list(serializers.ACP_MODES), location=OpenApiParameter.PATH, description='The  [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/) `--relationship` mode.')
     ]
 
     def create(self, request, *args, **kwargs):
@@ -566,10 +565,9 @@ class JobView(viewsets.ModelViewSet):
         @staticmethod
         def get_type_choices():
             choices = list(models.JobType.choices)
-            cti_modes = list(MODE_COLLECTION_MAP)
-            for mode in cti_modes:
+            for mode, summary in serializers.ACP_MODES.items():
                 type = models.JobType.CTI_PROCESSOR
-                choices.append((f"{type}--{mode}", f"The `{mode}` mode of {type}"))
+                choices.append((f"{type}--{mode}", summary))
 
             for mode in AttackView.MATRIX_TYPES:
                 type = models.JobType.ATTACK_UPDATE
