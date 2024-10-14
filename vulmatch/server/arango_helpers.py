@@ -407,10 +407,13 @@ RETURN KEEP(d, KEYS(d, TRUE))
             RETURN KEEP(doc, KEYS(doc, true))
             '''.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
     
-    def get_cxe_object(self, cve_id, type="vulnerability", var='name'):
+    def get_cxe_object(self, cve_id, type="vulnerability", var='name', version_param='cve_version'):
         bind_vars={'@collection': self.collection, 'obj_name': cve_id, "type":type, 'var':var}
         #return Response(bind_vars)
         filters = ['FILTER doc._is_latest']
+        if q := self.query.get(version_param):
+            bind_vars['stix_modified'] = q
+            filters[0] = 'FILTER doc.modified == @stix_modified'
         return self.execute_query('''
             FOR doc in @@collection
             FILTER doc.type == @type AND doc[@var] == @obj_name

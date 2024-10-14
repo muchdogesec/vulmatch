@@ -53,7 +53,10 @@ import textwrap
             If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')}
+        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters()+[
+            OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+        ],
     ),
     bundle=extend_schema(
         summary='Get all objects for a Vulnerability by CVE ID',
