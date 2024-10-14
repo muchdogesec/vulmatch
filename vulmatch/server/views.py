@@ -64,6 +64,7 @@ import textwrap
             * `indicator`: Contains a pattern identifying products affected by the CVE
             * `relationship` (`indicator`->`vulnerability`)
             * `note`: Represents EPSS scores
+            * `sighting`: Represents CISA KEVs
             * `software`: Represents the products listed in the pattern
             * `relationship` (`indicator`->`software`)
             * `weakness` (CWE): represents CWEs linked to the Vulneability (requires `cve-cwe` mode to be run)
@@ -71,8 +72,7 @@ import textwrap
             * `attack-pattern` (CAPEC): represents CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe` and `cwe-capec` mode to be run)
             * `relationship` (`weakness` (CWE) ->`attack-pattern` (CAPEC))
             * `attack-pattern` (ATT&CK Enterprise/ICS/Mobile): represents ATT&CKs in CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe`, `cwe-capec` and `capec-attack` mode to be run)
-            * `relationship` (`attack-pattern` (CAPEC) ->`attack-pattern` (ATT&CK))\n\n
-            This endpoint will also return all embedded relationships that exist from any of the CVE specific objects too (`vulnerability`, `indicator`, and `note`). These are `identity` and `marking-definition` objects (and the `relationship` representing the embedded relationship).
+            * `relationship` (`attack-pattern` (CAPEC) ->`attack-pattern` (ATT&CK))
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},

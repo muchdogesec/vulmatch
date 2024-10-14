@@ -15,7 +15,13 @@ cwe_versions = ["4_14", "4_15"] # add these in order to avoid versioning issues
 capec_versions = ["3_8", "3_9"] # add these in order to avoid versioning issues
 
 # Modes for arango-cti-processor
-arango_modes = ["capec-attack", "capec-cwe", "cve-cpe", "cve-cwe", "cwe-capec", "cve-epss"]
+arango_modes = [
+    "capec-attack",
+    "cve-cwe",
+    "cwe-capec",
+    "cve-epss",
+    "cve-cpe"
+]
 
 # Data for the CPE update
 cpe_data = {
