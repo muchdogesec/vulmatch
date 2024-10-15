@@ -39,6 +39,11 @@ class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField()
     versions = serializers.ListField(child=serializers.DateTimeField())
 
+class MitreObjectVersions(serializers.Serializer):
+    modified = serializers.DateTimeField()
+    notes = serializers.ListField(child=serializers.CharField())
+
+
 class ACPSerializer(serializers.Serializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     modified_min = serializers.DateTimeField(required=False)

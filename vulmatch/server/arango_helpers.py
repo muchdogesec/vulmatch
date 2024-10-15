@@ -436,6 +436,27 @@ RETURN KEEP(d, KEYS(d, TRUE))
         ], key=utils.split_mitre_version, reverse=True)
         versions = [f"v{v}" for v in versions]
         return Response(dict(latest=versions[0] if versions else None, versions=versions))
+    
+    
+    def get_mitre_modified_versions(self, external_id=None, source_name='mitre-attack'):
+
+        query = """
+        FOR doc IN @@collection
+        FILTER doc.external_references[? ANY FILTER MATCHES(CURRENT, @matcher)]
+        COLLECT modified = doc.modified INTO group
+        SORT modified DESC
+        RETURN {modified, notes: UNIQUE(group[*].doc._stix2arango_note)}
+        """
+        bind_vars = {'@collection': self.collection, 'matcher': dict(external_id=external_id, source_name=source_name)}
+        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
+        for mod in versions:
+            notes = sorted([
+                'v'+v[14:].replace('_', ".")
+                for v in mod['notes']
+                ], key=utils.split_mitre_version, reverse=True)
+            mod['notes'] = notes
+        return Response(versions)
+
 
     def get_cve_versions(self, cve_id: str):
         query = """

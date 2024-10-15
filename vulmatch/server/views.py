@@ -313,6 +313,11 @@ class AttackView(viewsets.ViewSet):
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
     
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, attack_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_modified_versions(attack_id)
+    
 
     @classmethod
     def attack_view(cls, matrix_name: str):
@@ -348,6 +353,10 @@ class AttackView(viewsets.ViewSet):
                 summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
                 description=f"It is possible to import multiple versions of ATT&CK using the POST MITRE ATT&CK {matrix_name_human} endpoints. By default, all endpoints will only return the latest version of ATT&CK objects (which generally suits most use-cases).\n\nThis endpoint allows you to see all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest). Typically this endpoint is only interesting for researchers looking to retrieve older ATT&CK versions.",
             ),
+            object_versions=extend_schema(
+                summary=f"See available MITRE ATT&CK {matrix_name_human} versions for ATT&CK-ID",
+                description="See all imported versions available to use.",
+            ),
         )  
         class TempAttackView(cls):
             matrix = matrix_name
@@ -378,6 +387,10 @@ class AttackView(viewsets.ViewSet):
         summary='Get a CWE object',
         description='Get an CWE object by its STIX ID. To search and filter CWE objects to get an ID use the GET Objects endpoint.',
         filters=False,
+    ),
+    object_versions=extend_schema(
+        summary="See available CWE versions for CWE-ID",
+        description="See all imported versions available to use.",
     ),
 )  
 class CweView(viewsets.ViewSet):
@@ -427,7 +440,11 @@ class CweView(viewsets.ViewSet):
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
-    
+        
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, cwe_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_cwe_vertex_collection', request).get_mitre_modified_versions(cwe_id, source_name='cwe')
    
 @extend_schema_view(
     create=extend_schema(
@@ -453,6 +470,10 @@ class CweView(viewsets.ViewSet):
         summary='Get a CAPEC object',
         description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
         filters=False,
+    ),
+    object_versions=extend_schema(
+        summary="See available CAPEC versions for CAPEC-ID",
+        description="See all imported versions available to use.",
     ),
 )
 class CapecView(viewsets.ViewSet):
@@ -503,7 +524,12 @@ class CapecView(viewsets.ViewSet):
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
-
+    
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, capec_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_capec_vertex_collection', request).get_mitre_modified_versions(capec_id, source_name='capec')
+    
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
