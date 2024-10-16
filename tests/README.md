@@ -12,5 +12,5 @@ pip3 install -r requirements.txt
 ## Run tests
 
 ```shell
-python3 tests/import_all_data.py
+python3 tests/import_knowledge_base_test_data.py
 ```
