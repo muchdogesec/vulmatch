@@ -1,7 +1,14 @@
 from .models import Job
 from rest_framework import serializers, validators
-from arango_cti_processor.config import MODE_COLLECTION_MAP
 
+
+ACP_MODES = {
+    "capec-attack": "Relate CAPEC objects to ATT&CK objects",
+    "cwe-capec": "Relate CWE objects to CAPEC objects",
+    "cve-cpe": "Relate CVE objects to CPE objects",
+    "cve-cwe": "Relate CVE objects to CWE objects",
+    "cve-epss": "Add EPSS Note(s) for CVE objects",
+}
 
 class StixObjectsSerializer(serializers.Serializer):
     type = serializers.CharField()
@@ -32,10 +39,15 @@ class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField()
     versions = serializers.ListField(child=serializers.DateTimeField())
 
+class MitreObjectVersions(serializers.Serializer):
+    modified = serializers.DateTimeField()
+    notes = serializers.ListField(child=serializers.CharField())
+
+
 class ACPSerializer(serializers.Serializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     modified_min = serializers.DateTimeField(required=False)
     created_min = serializers.DateTimeField(required=False)
 
 class ACPSerializerWithMode(ACPSerializer):
-    mode = serializers.ChoiceField(choices=[(f, f) for f in MODE_COLLECTION_MAP])
+    mode = serializers.ChoiceField(choices=list(ACP_MODES.items()))

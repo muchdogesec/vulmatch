@@ -175,8 +175,9 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         {"name": "ATT&CK", "description": "Trigger the download of ATT&CK objects or view existing ATT&CK objects."},
         {"name": "CAPEC", "description": "Trigger the download of CAPEC objects or view existing CAPEC objects."},
         {"name": "CWE", "description": "Trigger the download of CWE objects or view existing CWE objects."},
-        {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
         {"name": "Arango CTI Processor", "description": "Trigger the generation of relationships between objects."},
+        {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
+        {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
     ]
 }
 

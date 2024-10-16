@@ -10,7 +10,6 @@ from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter, DateTimeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from arango_cti_processor.config import MODE_COLLECTION_MAP
 from textwrap import dedent
 # Create your views here.
 
@@ -37,23 +36,59 @@ import textwrap
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
         summary="Get Vulnerability Objects for CVEs",
-        description="Search and filter CVE records.\n\nThis endpoint only returns the vulnerability objects for matching CVEs. Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.",
+        description=textwrap.dedent(
+            """
+            Search and filter CVE records. This endpoint only returns the vulnerability objects for matching CVEs.\n\n
+            Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.\n\n
+            If you already know the CVE ID, use the Get a Vulnerability by ID endpoint
+            """
+        ),
     ),
     retrieve_objects=extend_schema(
-        summary='Get a Vulnerability by STIX ID',
-        description='This endpoint only returns the vulnerability object for CVE. Typically you want to use the endpoint Get all objects for a Vulnerability by STIX ID. You can identify the STIX ID of a CVE using the GET CVE endpoint if needed.',
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')}
+        summary='Get a Vulnerability by CVE ID',
+        description=textwrap.dedent(
+            """
+            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.\n\n
+            If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters()+[
+            OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+        ],
     ),
     bundle=extend_schema(
-        summary='Get all objects for a Vulnerability by STIX ID',
-        description='This endpoint will return Vulnerability, Indicator, and Software STIX objects for the CVE ID. It will also include any STIX SROs defining the relationships between them.',
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        summary='Get all objects for a Vulnerability by CVE ID',
+        description=textwrap.dedent(
+            """
+            This endpoint will return all objects related to the Vulnerability. This can include the following:\n\n
+            * `vulnerability`: Represents the CVE
+            * `indicator`: Contains a pattern identifying products affected by the CVE
+            * `relationship` (`indicator`->`vulnerability`)
+            * `note`: Represents EPSS scores
+            * `sighting`: Represents CISA KEVs
+            * `software`: Represents the products listed in the pattern
+            * `relationship` (`indicator`->`software`)
+            * `weakness` (CWE): represents CWEs linked to the Vulneability (requires `cve-cwe` mode to be run)
+            * `relationship` (`vulnerability` (CVE) ->`weakness` (CWE))
+            * `attack-pattern` (CAPEC): represents CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe` and `cwe-capec` mode to be run)
+            * `relationship` (`weakness` (CWE) ->`attack-pattern` (CAPEC))
+            * `attack-pattern` (ATT&CK Enterprise/ICS/Mobile): represents ATT&CKs in CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe`, `cwe-capec` and `capec-attack` mode to be run)
+            * `relationship` (`attack-pattern` (CAPEC) ->`attack-pattern` (ATT&CK))
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
     versions=extend_schema(
         responses=serializers.StixVersionsSerializer,
-        summary="Track all times the Vulnerability Object has been updated",
-        description="This endpoint will return all the times Vulmatch has modified a Vulnerability over time as new information becomes available. By default the latest version will always be returned. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to select the version of the object desired using the GET Vulnerability Object by ID endpoint.",
+        summary="Get all updates for a Vulnerability by CVE ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the times a Vulnerability has been modified over time as new information becomes available.\n\n
+            By default the latest version of objects will be returned by all endpoints. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to get an older versions of a Vulnerability.
+            """
+        ),
 
     )
 )   
@@ -64,8 +99,8 @@ class CveView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'cve_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e.'),
-        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g CVE-2024-3125'),
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2024-3125`'),
 
     ]
 
@@ -78,23 +113,31 @@ class CveView(viewsets.ViewSet):
         Filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
         '''))
         cpes_vulnerable = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+        Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
+        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
         '''))
         cpes_in_pattern = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+        Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
+        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
         '''))
-        weakness_id = BaseCSVFilter(label=dedent("""Filter results by weakness (CWE ID). e.g. `CWE-122`."""))
-        attack_id = BaseCSVFilter(label=dedent("""Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\nNote, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs."""))
-        cvss_base_score_min = NumberFilter(label="between 0-10")
-        epss_score_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
-        epss_percentile_min = NumberFilter(label="(optional, between 0-1 to 2 decimal places)")
-
-        created_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `created` value user wants")
-        created_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `created` value user wants")
+        weakness_id = BaseCSVFilter(label=dedent("""
+            Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
+            `cve-cwe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
+            """))
+        attack_id = BaseCSVFilter(label=dedent(
+            """
+            Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\n
+            Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
+            """))
+        cvss_base_score_min = NumberFilter(label="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
+        epss_score_min = NumberFilter(label="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        epss_percentile_min = NumberFilter(label="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        created_min = DateTimeFilter(label="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        created_max = DateTimeFilter(label="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         
-        modified_min = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the minumum `modified` value user wants")
-        modified_max = DateTimeFilter(label="(optional, in format YYYY-MM-DDThh:mm:ss.sssZ): is the maximum `modified` value user wants")
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="sort by field_name")
+        modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
 
 
     def create(self, request, *args, **kwargs):
@@ -114,7 +157,7 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_object(cve_id)
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
     
     @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, cve_id=None, **kwargs):
@@ -141,12 +184,13 @@ class CveView(viewsets.ViewSet):
     ),
     list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
-        description="Search and filter CPE records.\n\nThis endpoint only returns the software objects for matching CPEs. ",
+        description="Search and filter CPE records.\n\nThis endpoint only returns the `software` objects for matching CPEs.\n\nThis endpoint is useful to find CPEs that can be used to filter CVEs.",
         filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
-        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPE endpoint.",
+        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.",
+        filters=False,
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -156,7 +200,8 @@ class CpeView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`'),
+        OpenApiParameter('cpe_name', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full CPE name. e.g. `cpe:2.3:a:slicewp:affiliate_program_suite:1.0.13:*:*:*:*:wordpress:*:*`'),
     ]
 
     
@@ -183,9 +228,9 @@ class CpeView(viewsets.ViewSet):
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
 
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
+    def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
+        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
     
 
     
@@ -197,7 +242,8 @@ class CpeView(viewsets.ViewSet):
         summary="Download ATT&CK Objects",
         description=textwrap.dedent(
             """
-            Use this data to update ATT&CK records.\n\nThe following key/values are accepted in the body of the request:\n\n
+            Use this data to update ATT&CK records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
             * `version` (required): the version of ATT&CK you want to download in the format `N_N`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_attack_enterprise.py#L7).
             \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
@@ -217,7 +263,8 @@ class AttackView(viewsets.ViewSet):
     openapi_tags = ["ATT&CK"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('attack_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The ATT&CK ID, e.g `TA0006`'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -257,14 +304,19 @@ class AttackView(viewsets.ViewSet):
                 OpenApiParameter('attack_version', description="Filter the results by the version of ATT&CK")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
+    def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object_by_external_id(attack_id)
         
     @extend_schema()
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
+    
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, attack_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_modified_versions(attack_id)
     
 
     @classmethod
@@ -278,20 +330,32 @@ class AttackView(viewsets.ViewSet):
                 },
                 request=serializers.MitreTaskSerializer,
                 summary=f"Download MITRE ATT&CK {matrix_name_human} Objects",
-                description=f"Use this data to update MITRE ATT&CK {matrix_name_human} records.\n\nYou can specify the version of {matrix_name_human} ATT&CK you want to download in the format `N_N`. e.g. `15_0, `15_1`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team)."
+                description=textwrap.dedent(
+                    """
+                    Use this endpoint to update MITRE ATT&CK records.\n\n
+                    The following key/values are accepted in the body of the request:\n\n
+                    * `version` (required): the version of ATT&CK you want to download in the format `N_N`, e.g. `15_1` for `15.1`\n\n
+                    The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+                    """
+                ),
             ),
             list_objects=extend_schema(
                 summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
-                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.",
+                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.\n\nThis endpoint with return the entire {matrix_name_human} matrix for reference. However, Vulnerabilities are linked to ATT&CK Techniques and Sub-Techniques only. For reference, these are represented as `attack-pattern` STIX objects.",
                 filters=True,
             ),
             retrieve_objects=extend_schema(
                 summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
-                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
+                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET MITRE ATT&CK {matrix_name_human} Objects endpoint.",
+                filters=False,
             ),
             versions=extend_schema(
                 summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
-                description=f"See all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest)",
+                description=f"It is possible to import multiple versions of ATT&CK using the POST MITRE ATT&CK {matrix_name_human} endpoints. By default, all endpoints will only return the latest version of ATT&CK objects (which generally suits most use-cases).\n\nThis endpoint allows you to see all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest). Typically this endpoint is only interesting for researchers looking to retrieve older ATT&CK versions.",
+            ),
+            object_versions=extend_schema(
+                summary=f"See available MITRE ATT&CK {matrix_name_human} versions for ATT&CK-ID",
+                description="See all imported versions available to use.",
             ),
         )  
         class TempAttackView(cls):
@@ -305,23 +369,36 @@ class AttackView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CWE objects",
-        description='Use this data to update CWE records.\n\nYou can specify the version of CWE you want to download in the format `N_N`. e.g. `4_15`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
+        description=textwrap.dedent(
+            """
+            Use this data to update CWE records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `version` (required): the version of CWE you want to download in the format `N_N`, e.g. `4_14` for `4.14`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_cwe.py#L7).
+            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get CWE objects',
-        description='Search and filter CWE results.',
+        description='Search and filter CWE results. This endpoint will return `weakness` objects. It is most useful for finding CWE IDs that can be used to filter Vulnerability records with on the GET CVE objects endpoints.',
         filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CWE object',
-        description='Get an CWE object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
+        description='Get an CWE object by its STIX ID. To search and filter CWE objects to get an ID use the GET Objects endpoint.',
+        filters=False,
+    ),
+    object_versions=extend_schema(
+        summary="See available CWE versions for CWE-ID",
+        description="See all imported versions available to use.",
     ),
 )  
 class CweView(viewsets.ViewSet):
     openapi_tags = ["CWE"]
-    lookup_url_kwarg = 'stix_id'
+    lookup_url_kwarg = 'cwe_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('cwe_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CWE ID, e.g CWE-73'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -355,15 +432,19 @@ class CweView(viewsets.ViewSet):
                 OpenApiParameter('cwe_version', description="Filter the results by the version of CWE")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>", detail=False)
+    def retrieve_objects(self, request, *args, cwe_id=None, **kwargs):
+        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object_by_external_id(cwe_id)
         
     @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
-    
+        
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, cwe_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_cwe_vertex_collection', request).get_mitre_modified_versions(cwe_id, source_name='cwe')
    
 @extend_schema_view(
     create=extend_schema(
@@ -371,7 +452,14 @@ class CweView(viewsets.ViewSet):
         },
         request=serializers.MitreTaskSerializer,
         summary="Download CAPEC objects",
-        description='Use this data to update CAPEC records.\n\nYou can specify the version of CAPEC you want to download in the format `N_N`. e.g. `3_5`.\n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).',
+        description=textwrap.dedent(
+            """
+            Use this data to update CAPEC records.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `version` (required): the version of CAPEC you want to download in the format `N_N`, e.g. `3_9` for `3.9`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_capec.py#L7).
+            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            """
+        ),
     ),
     list_objects=extend_schema(
         summary='Get CAPEC objects',
@@ -381,13 +469,19 @@ class CweView(viewsets.ViewSet):
     retrieve_objects=extend_schema(
         summary='Get a CAPEC object',
         description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
+        filters=False,
+    ),
+    object_versions=extend_schema(
+        summary="See available CAPEC versions for CAPEC-ID",
+        description="See all imported versions available to use.",
     ),
 )
 class CapecView(viewsets.ViewSet):
     openapi_tags = ["CAPEC"]
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID')
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
+        OpenApiParameter('capec_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CAPEC ID, e.g CAPEC-699'),
     ]
 
     filter_backends = [DjangoFilterBackend]
@@ -422,28 +516,41 @@ class CapecView(viewsets.ViewSet):
                 OpenApiParameter('capec_version', description="Filter the results by the version of CAPEC")
             ],
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:stix_id>", detail=False)
-    def retrieve_objects(self, request, *args, stix_id=None, **kwargs):
-        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object(stix_id)
+    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>", detail=False)
+    def retrieve_objects(self, request, *args, capec_id=None, **kwargs):
+        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object_by_external_id(capec_id)
     
     @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
     @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
     def versions(self, request, *args, **kwargs):
         return ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
-
+    
+    @extend_schema(filters=False)
+    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
+    def object_versions(self, request, *args, capec_id=None, **kwargs):
+        return ArangoDBHelper(f'mitre_capec_vertex_collection', request).get_mitre_modified_versions(capec_id, source_name='capec')
+    
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
         },
-        description="These endpoints will trigger the relevant arango_cti_processor mode to generate relationships.",
-        summary="Trigger arango_cti_processor `mode` to generate relationships."
+        summary="Trigger arango_cti_processor `mode` to generate relationships.",
+        description=textwrap.dedent(
+            """
+            This endpoint will link together knowledgebases based on the `mode` selected. For more information about how this works see [arango_cti_processor](https://github.com/muchdogesec/arango_cti_processor/), specifically the `--relationship` setting.\n\n
+            The following key/values are accepted in the body of the request:\n\n
+            * `ignore_embedded_relationships` (optional - default: `true`): arango_cti_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generat SROs for these embedded relationships so they can be searched. `false` will ignore them\n\n
+            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cti_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always effecient, espeically when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.\n\n
+            * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
+            """
+        ),
     ),
 )
 class ACPView(viewsets.ViewSet):
     openapi_tags = ["Arango CTI Processor"]
     serializer_class = serializers.ACPSerializer
     openapi_path_params = [
-            OpenApiParameter(name='mode', enum=list(MODE_COLLECTION_MAP), location=OpenApiParameter.PATH, description='mode (`--relationship`) to run [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/tree/embedded-relationship-tests?tab=readme-ov-file#run) in')
+            OpenApiParameter(name='mode', enum=list(serializers.ACP_MODES), location=OpenApiParameter.PATH, description='The  [`arango_cti_processor`](https://github.com/muchdogesec/arango_cti_processor/) `--relationship` mode.')
     ]
 
     def create(self, request, *args, **kwargs):
@@ -456,12 +563,12 @@ class ACPView(viewsets.ViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.",
+        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
         summary="Get Jobs",
         responses={200: serializers.JobSerializer}
     ),
     retrieve=extend_schema(
-        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.",
+        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
         summary="Get a Job by ID",
     ),
 )
@@ -484,10 +591,9 @@ class JobView(viewsets.ModelViewSet):
         @staticmethod
         def get_type_choices():
             choices = list(models.JobType.choices)
-            cti_modes = list(MODE_COLLECTION_MAP)
-            for mode in cti_modes:
+            for mode, summary in serializers.ACP_MODES.items():
                 type = models.JobType.CTI_PROCESSOR
-                choices.append((f"{type}--{mode}", f"The `{mode}` mode of {type}"))
+                choices.append((f"{type}--{mode}", summary))
 
             for mode in AttackView.MATRIX_TYPES:
                 type = models.JobType.ATTACK_UPDATE
