@@ -80,13 +80,13 @@ You can access the django admin UI at:
 
 http://127.0.0.1:8005/admin
 
-### Add data
-
-By default, the `ARANGODB_DATABASE``
-
 ### Running in production
 
 Note, if you intend on using this in production, you should also modify the variables in the `.env` file for `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASS`, `DJANGO_SECRET` and `DEBUG` (to `False`)
+
+## Quickstart
+
+To get up and running quickly head to `/utilities/README.md` for some scripts that will automate the backfill of data.
 
 ## Support
 
