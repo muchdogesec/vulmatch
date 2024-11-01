@@ -33,14 +33,7 @@ router.register("arango-cti-processor/<str:mode>", views.ACPView, "acp-view")
 # nvd
 router.register("cve", views.CveView, "cve-view")
 router.register("cpe", views.CpeView, "cpe-view")
-# mitre
-## mitre cwe/cpe
-router.register("cwe", views.CweView, "cwe-view")
-router.register("capec", views.CapecView, "capec-view")
-## mitre att&ck
-router.register("attack-mobile", views.AttackView.attack_view('mobile'), "attack-mobile-view")
-router.register("attack-ics", views.AttackView.attack_view('ics'), "attack-ics-view")
-router.register("attack-enterprise", views.AttackView.attack_view('enterprise'), "attack-enterprise-view")
+
 ## objects
 router.register('objects/smos', arango_views.SMOView, "object-view-smo")
 router.register('objects/scos', arango_views.SCOView, "object-view-sco")
