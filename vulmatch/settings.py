@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'dogesec_commons.objects.app.ArangoObjectsViewApp',
     'drf_spectacular',
     'django.contrib.postgres',
     'vulmatch.server',
@@ -142,7 +143,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    "DEFAULT_SCHEMA_CLASS": "vulmatch.server.autoschema.CustomAutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "vulmatch.server.autoschema.VulmatchAutoSchema",
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [],
 }
