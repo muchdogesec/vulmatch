@@ -129,12 +129,7 @@ class CveView(viewsets.ViewSet):
         '''))
         weakness_id = BaseCSVFilter(label=dedent("""
             Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
-            `cve-cwe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
-            """))
-        attack_id = BaseCSVFilter(label=dedent(
-            """
-            Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\n
-            Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
+            filters using the `external_references` property of `vulnerability` object
             """))
         cvss_base_score_min = NumberFilter(label="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
         epss_score_min = NumberFilter(label="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
