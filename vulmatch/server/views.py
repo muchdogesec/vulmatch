@@ -15,6 +15,13 @@ from textwrap import dedent
 
 import textwrap
 
+class VulnerabilityStatus(models.models.TextChoices):
+    RECEIVED = "Received"
+    REJECTED = "Rejected"
+    ANALYZED = "Analyzed"
+    AWAITING_ANALYSIS = "Awaiting Analysis"
+    MODIFIED = "Modified"
+
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -138,6 +145,7 @@ class CveView(viewsets.ViewSet):
         modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
+        vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text="filter by vulnerability status")
 
 
     def create(self, request, *args, **kwargs):
