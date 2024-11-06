@@ -21,7 +21,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from vulmatch.server import views
-from vulmatch.server.arango_based_views import arango_views
+import dogesec_commons.objects.views as arango_views
 
 
 API_VERSION = "v1"
@@ -39,6 +39,7 @@ router.register('objects/smos', arango_views.SMOView, "object-view-smo")
 router.register('objects/scos', arango_views.SCOView, "object-view-sco")
 router.register('objects/sros', arango_views.SROView, "object-view-sro")
 router.register('objects/sdos', arango_views.SDOView, "object-view-sdo")
+router.register("object", arango_views.SingleObjectView, "object-view-orig")
 
 urlpatterns = [
     path(f'api/{API_VERSION}/', include(router.urls)),

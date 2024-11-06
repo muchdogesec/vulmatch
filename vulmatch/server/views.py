@@ -22,7 +22,6 @@ class VulnerabilityStatus(models.models.TextChoices):
     AWAITING_ANALYSIS = "Awaiting Analysis"
     MODIFIED = "Modified"
 
-
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -124,9 +123,9 @@ class CveView(viewsets.ViewSet):
 
     
     class filterset_class(FilterSet):
-        stix_id = MultipleChoiceFilter(label='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
-        cve_id = CharFilter(label='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
-        description = CharFilter(label='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        stix_id = MultipleChoiceFilter(help_text='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
+        cve_id = CharFilter(help_text='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
+        description = CharFilter(help_text='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         has_kev = BooleanFilter(label=dedent('''
         Filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
         '''))
@@ -142,15 +141,16 @@ class CveView(viewsets.ViewSet):
             Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
             filters using the `external_references` property of `vulnerability` object
             """))
-        cvss_base_score_min = NumberFilter(label="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
-        epss_score_min = NumberFilter(label="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        epss_percentile_min = NumberFilter(label="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        created_min = DateTimeFilter(label="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        created_max = DateTimeFilter(label="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        cvss_base_score_min = NumberFilter(help_text="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
+        epss_score_min = NumberFilter(help_text="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        epss_percentile_min = NumberFilter(help_text="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        created_min = DateTimeFilter(help_text="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        created_max = DateTimeFilter(help_text="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         
         modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
+
         vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text="filter by vulnerability status")
 
 
@@ -244,16 +244,16 @@ class CpeView(viewsets.ViewSet):
 
     
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
-        cpe_match_string = CharFilter(label='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
-        vendor = CharFilter(label='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
-        product = CharFilter(label='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
+        id = BaseCSVFilter(help_text='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
+        cpe_match_string = CharFilter(help_text='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
+        vendor = CharFilter(help_text='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
+        product = CharFilter(help_text='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
 
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
-                        label='Filters CPEs returned by product type.'
+                        help_text='Filters CPEs returned by product type.'
         )
-        cve_vulnerable = BaseCSVFilter(label='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
-        in_cve_pattern = BaseCSVFilter(label='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
+        cve_vulnerable = BaseCSVFilter(help_text='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
+        in_cve_pattern = BaseCSVFilter(help_text='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)
@@ -350,10 +350,10 @@ class JobView(viewsets.ModelViewSet):
             return choices
         
         type = ChoiceFilter(
-            label='Filter the results by the type of Job',
+            help_text='Filter the results by the type of Job',
             choices=get_type_choices(), method='filter_type'
         )
-        state = Filter(label='Filter the results by the state of the Job')
+        state = Filter(help_text='Filter the results by the state of the Job')
 
         def filter_type(self, qs, field_name, value: str):
             query = {field_name: value}
