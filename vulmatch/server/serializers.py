@@ -3,10 +3,7 @@ from rest_framework import serializers, validators
 
 
 ACP_MODES = {
-    "capec-attack": "Relate CAPEC objects to ATT&CK objects",
-    "cwe-capec": "Relate CWE objects to CAPEC objects",
     "cve-cpe": "Relate CVE objects to CPE objects",
-    "cve-cwe": "Relate CVE objects to CWE objects",
     "cve-epss": "Add EPSS Note(s) for CVE objects",
 }
 

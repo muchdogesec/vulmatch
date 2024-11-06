@@ -230,6 +230,10 @@ class ArangoDBHelper:
         binds = {}
         filters = []
 
+        if q := self.query.get('vuln_status'):
+            binds['vuln_status'] = dict(source_name='vulnStatus', description=q)
+            filters.append("FILTER doc.external_references[? ANY FILTER MATCHES(CURRENT, @vuln_status)]")
+
         if q := self.query.get('cvss_base_score_min'):
             binds['cvss_base_score_min'] = float(q)
             filters.append("FILTER VALUES(doc.x_cvss)[? FILTER CURRENT.base_score >= @cvss_base_score_min]")
@@ -247,6 +251,7 @@ class ArangoDBHelper:
         if q := self.query.get('epss_percentile_min'):
             binds['epss_percentile_min'] = float(q)
             filters.append("FILTER doc.x_epss.percentile >= @epss_percentile_min")
+
 
         for v in ['created', 'modified']:
             mn, mx = f'{v}_min', f'{v}_max'

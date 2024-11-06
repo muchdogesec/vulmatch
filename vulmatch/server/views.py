@@ -15,6 +15,13 @@ from textwrap import dedent
 
 import textwrap
 
+class VulnerabilityStatus(models.models.TextChoices):
+    RECEIVED = "Received"
+    REJECTED = "Rejected"
+    ANALYZED = "Analyzed"
+    AWAITING_ANALYSIS = "Awaiting Analysis"
+    MODIFIED = "Modified"
+
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -106,9 +113,9 @@ class CveView(viewsets.ViewSet):
 
     
     class filterset_class(FilterSet):
-        stix_id = MultipleChoiceFilter(label='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
-        cve_id = CharFilter(label='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
-        description = CharFilter(label='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
+        stix_id = MultipleChoiceFilter(help_text='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
+        cve_id = CharFilter(help_text='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
+        description = CharFilter(help_text='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         has_kev = BooleanFilter(label=dedent('''
         Filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
         '''))
@@ -122,22 +129,18 @@ class CveView(viewsets.ViewSet):
         '''))
         weakness_id = BaseCSVFilter(label=dedent("""
             Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
-            `cve-cwe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
+            filters using the `external_references` property of `vulnerability` object
             """))
-        attack_id = BaseCSVFilter(label=dedent(
-            """
-            Filter results by an ATT&CK technique or sub-technique ID linked to CVE. e.g `T1587`, `T1587.001`.\n\n
-            Note, CVEs are not directly linked to ATT&CK techniques. To do this, we follow the path `cve->cwe->capec->attack` to link ATT&CK objects to CVEs. As such, `cve-cwe`, `cwe-capec`, `capec-attack` modes must have been triggered on the Arango CTI Processor endpoint for this to work.
-            """))
-        cvss_base_score_min = NumberFilter(label="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
-        epss_score_min = NumberFilter(label="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        epss_percentile_min = NumberFilter(label="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        created_min = DateTimeFilter(label="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        created_max = DateTimeFilter(label="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        cvss_base_score_min = NumberFilter(help_text="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
+        epss_score_min = NumberFilter(help_text="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        epss_percentile_min = NumberFilter(help_text="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
+        created_min = DateTimeFilter(help_text="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        created_max = DateTimeFilter(help_text="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         
-        modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
+        modified_min = DateTimeFilter(help_text="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        modified_max = DateTimeFilter(help_text="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], help_text="Sort results by")
+        vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text="filter by vulnerability status")
 
 
     def create(self, request, *args, **kwargs):
@@ -206,16 +209,16 @@ class CpeView(viewsets.ViewSet):
 
     
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
-        cpe_match_string = CharFilter(label='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
-        vendor = CharFilter(label='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
-        product = CharFilter(label='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
+        id = BaseCSVFilter(help_text='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
+        cpe_match_string = CharFilter(help_text='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
+        vendor = CharFilter(help_text='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
+        product = CharFilter(help_text='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
 
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
-                        label='Filters CPEs returned by product type.'
+                        help_text='Filters CPEs returned by product type.'
         )
-        cve_vulnerable = BaseCSVFilter(label='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
-        in_cve_pattern = BaseCSVFilter(label='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
+        cve_vulnerable = BaseCSVFilter(help_text='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
+        in_cve_pattern = BaseCSVFilter(help_text='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)
@@ -231,305 +234,7 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
-    
-
-    
-@extend_schema_view(
-    create=extend_schema(
-        responses={201: serializers.JobSerializer
-        },
-        request=serializers.MitreTaskSerializer,
-        summary="Download ATT&CK Objects",
-        description=textwrap.dedent(
-            """
-            Use this data to update ATT&CK records.\n\n
-            The following key/values are accepted in the body of the request:\n\n
-            * `version` (required): the version of ATT&CK you want to download in the format `N_N`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_attack_enterprise.py#L7).
-            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
-            """
-        ),
-    ),
-    list_objects=extend_schema(
-        summary='Get ATT&CK objects',
-        description="Search and filter ATT&CK results.",
-        filters=True
-    ),
-    retrieve_objects=extend_schema(
-        summary='Get an ATT&CK object',
-        description="Get an ATT&CK object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.",
-    ),
-)  
-class AttackView(viewsets.ViewSet):
-    openapi_tags = ["ATT&CK"]
-    lookup_url_kwarg = 'stix_id'
-    openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
-        OpenApiParameter('attack_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The ATT&CK ID, e.g `TA0006`'),
-    ]
-
-    filter_backends = [DjangoFilterBackend]
-    MATRIX_TYPES = ["mobile", "ics", "enterprise"]
-    @property
-    def matrix(self):
-        m: re.Match = re.search(r"/attack-(\w+)/", self.request.path)
-        return m.group(1)
-    serializer_class = serializers.StixObjectsSerializer(many=True)
-    pagination_class = Pagination("objects")
-
-    class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--0042a9f5-f053-4769-b3ef-9ad018dfa298`, `malware--04227b24-7817-4de1-9050-b7b1b57f5866`.')
-        attack_id = BaseCSVFilter(label='The ATT&CK IDs of the object wanted. e.g. `T1659`, `TA0043`, `S0066`.')
-        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
-        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
-        type = ChoiceFilter(choices=[(f,f) for f in ATTACK_TYPES], label='Filter the results by STIX Object type.')
-        attack_version = CharFilter(label="Filter the results by the version of ATT&CK")
-
-    
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.MitreTaskSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.data.copy()
-        data['matrix'] = self.matrix
-        job = new_task(data, models.JobType.ATTACK_UPDATE)
-        job_s = serializers.JobSerializer(instance=job)
-        return Response(job_s.data, status=status.HTTP_201_CREATED)
-
-    
-    @decorators.action(methods=['GET'], url_path="objects", detail=False)
-    def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request).get_attack_objects(self.matrix)
-    
-    @extend_schema(
-            parameters=[
-                OpenApiParameter('attack_version', description="Filter the results by the version of ATT&CK")
-            ],
-    )
-    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
-    def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_object_by_external_id(attack_id)
-        
-    @extend_schema()
-    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
-    def versions(self, request, *args, **kwargs):
-        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_versions()
-    
-    @extend_schema(filters=False)
-    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
-    def object_versions(self, request, *args, attack_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_attack_{self.matrix}_vertex_collection', request).get_mitre_modified_versions(attack_id)
-    
-
-    @classmethod
-    def attack_view(cls, matrix_name: str):
-        matrix_name_human = matrix_name.title()
-        if matrix_name == 'ics':
-            matrix_name_human = "ICS"
-        @extend_schema_view(
-            create=extend_schema(
-                responses={201: serializers.JobSerializer
-                },
-                request=serializers.MitreTaskSerializer,
-                summary=f"Download MITRE ATT&CK {matrix_name_human} Objects",
-                description=textwrap.dedent(
-                    """
-                    Use this endpoint to update MITRE ATT&CK records.\n\n
-                    The following key/values are accepted in the body of the request:\n\n
-                    * `version` (required): the version of ATT&CK you want to download in the format `N_N`, e.g. `15_1` for `15.1`\n\n
-                    The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
-                    """
-                ),
-            ),
-            list_objects=extend_schema(
-                summary=f'Get MITRE ATT&CK {matrix_name_human} objects',
-                description=f"Search and filter MITRE ATT&CK {matrix_name_human} results.\n\nThis endpoint with return the entire {matrix_name_human} matrix for reference. However, Vulnerabilities are linked to ATT&CK Techniques and Sub-Techniques only. For reference, these are represented as `attack-pattern` STIX objects.",
-                filters=True,
-            ),
-            retrieve_objects=extend_schema(
-                summary=f'Get an MITRE ATT&CK {matrix_name_human} object',
-                description=f"Get an MITRE ATT&CK {matrix_name_human} object by its STIX ID. To search and filter objects to get an ID use the GET MITRE ATT&CK {matrix_name_human} Objects endpoint.",
-                filters=False,
-            ),
-            versions=extend_schema(
-                summary=f"See available MITRE ATT&CK {matrix_name_human} versions",
-                description=f"It is possible to import multiple versions of ATT&CK using the POST MITRE ATT&CK {matrix_name_human} endpoints. By default, all endpoints will only return the latest version of ATT&CK objects (which generally suits most use-cases).\n\nThis endpoint allows you to see all imported versions of MITRE ATT&CK {matrix_name_human} available to use, and which version is the default (latest). Typically this endpoint is only interesting for researchers looking to retrieve older ATT&CK versions.",
-            ),
-            object_versions=extend_schema(
-                summary=f"See available MITRE ATT&CK {matrix_name_human} versions for ATT&CK-ID",
-                description="See all imported versions available to use.",
-            ),
-        )  
-        class TempAttackView(cls):
-            matrix = matrix_name
-        TempAttackView.__name__ = f'{matrix_name.title()}AttackView'
-        return TempAttackView
-    
-@extend_schema_view(
-    create=extend_schema(
-        responses={201: serializers.JobSerializer
-        },
-        request=serializers.MitreTaskSerializer,
-        summary="Download CWE objects",
-        description=textwrap.dedent(
-            """
-            Use this data to update CWE records.\n\n
-            The following key/values are accepted in the body of the request:\n\n
-            * `version` (required): the version of CWE you want to download in the format `N_N`, e.g. `4_14` for `4.14`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_cwe.py#L7).
-            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
-            """
-        ),
-    ),
-    list_objects=extend_schema(
-        summary='Get CWE objects',
-        description='Search and filter CWE results. This endpoint will return `weakness` objects. It is most useful for finding CWE IDs that can be used to filter Vulnerability records with on the GET CVE objects endpoints.',
-        filters=True,
-    ),
-    retrieve_objects=extend_schema(
-        summary='Get a CWE object',
-        description='Get an CWE object by its STIX ID. To search and filter CWE objects to get an ID use the GET Objects endpoint.',
-        filters=False,
-    ),
-    object_versions=extend_schema(
-        summary="See available CWE versions for CWE-ID",
-        description="See all imported versions available to use.",
-    ),
-)  
-class CweView(viewsets.ViewSet):
-    openapi_tags = ["CWE"]
-    lookup_url_kwarg = 'cwe_id'
-    openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
-        OpenApiParameter('cwe_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CWE ID, e.g CWE-73'),
-    ]
-
-    filter_backends = [DjangoFilterBackend]
-
-    serializer_class = serializers.StixObjectsSerializer(many=True)
-    pagination_class = Pagination("objects")
-
-    class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `weakness--f3496f30-5625-5b6d-8297-ddc074fb26c2`.')
-        cwe_id = BaseCSVFilter(label='Filter the results by the CWE ID of the object. e.g. `CWE-242`.')
-        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
-        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
-        # type = ChoiceFilter(choices=[(f,f) for f in CWE_TYPES], label='Filter the results by STIX Object type.')
-        cwe_version = CharFilter(label="Filter the results by the version of CWE")
-
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.MitreTaskSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.data.copy()
-        job = new_task(data, models.JobType.CWE_UPDATE)
-        job_s = serializers.JobSerializer(instance=job)
-        return Response(job_s.data, status=status.HTTP_201_CREATED)
-
-    
-    @decorators.action(methods=['GET'], url_path="objects", detail=False)
-    def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_weakness_or_capec_objects()
-    
-    @extend_schema(
-            parameters=[
-                OpenApiParameter('cwe_version', description="Filter the results by the version of CWE")
-            ],
-    )
-    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>", detail=False)
-    def retrieve_objects(self, request, *args, cwe_id=None, **kwargs):
-        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_object_by_external_id(cwe_id)
-        
-    @extend_schema(summary="See available CWE versions", description="See all imported versions available to use, and which version is the default (latest)")
-    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
-    def versions(self, request, *args, **kwargs):
-        return ArangoDBHelper('mitre_cwe_vertex_collection', request).get_mitre_versions()
-        
-    @extend_schema(filters=False)
-    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
-    def object_versions(self, request, *args, cwe_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_cwe_vertex_collection', request).get_mitre_modified_versions(cwe_id, source_name='cwe')
-   
-@extend_schema_view(
-    create=extend_schema(
-        responses={201: serializers.JobSerializer
-        },
-        request=serializers.MitreTaskSerializer,
-        summary="Download CAPEC objects",
-        description=textwrap.dedent(
-            """
-            Use this data to update CAPEC records.\n\n
-            The following key/values are accepted in the body of the request:\n\n
-            * `version` (required): the version of CAPEC you want to download in the format `N_N`, e.g. `3_9` for `3.9`. [Currently available versions can be viewed here](https://github.com/muchdogesec/stix2arango/blob/main/utilities/arango_cti_processor/insert_archive_capec.py#L7).
-            \n\nThe data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
-            """
-        ),
-    ),
-    list_objects=extend_schema(
-        summary='Get CAPEC objects',
-        description="Search and filter CAPEC results.",
-        filters=True,
-    ),
-    retrieve_objects=extend_schema(
-        summary='Get a CAPEC object',
-        description='Get an CAPEC object by its STIX ID. To search and filter objects to get an ID use the GET Objects endpoint.',
-        filters=False,
-    ),
-    object_versions=extend_schema(
-        summary="See available CAPEC versions for CAPEC-ID",
-        description="See all imported versions available to use.",
-    ),
-)
-class CapecView(viewsets.ViewSet):
-    openapi_tags = ["CAPEC"]
-    lookup_url_kwarg = 'stix_id'
-    openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID'),
-        OpenApiParameter('capec_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CAPEC ID, e.g CAPEC-699'),
-    ]
-
-    filter_backends = [DjangoFilterBackend]
-
-    serializer_class = serializers.StixObjectsSerializer(many=True)
-    pagination_class = Pagination("objects")
-
-    class filterset_class(FilterSet):
-        id = BaseCSVFilter(label='Filter the results using the STIX ID of an object. e.g. `attack-pattern--00268a75-3243-477d-9166-8c78fddf6df6`, `course-of-action--0002fa37-9334-41e2-971a-cc8cab6c00c4`.')
-        capec_id = BaseCSVFilter(label='Filter the results by the CAPEC ID of the object. e.g. `CAPEC-112`.')
-        description = CharFilter(label='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
-        name = CharFilter(label='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
-        type = ChoiceFilter(choices=[(f,f) for f in CAPEC_TYPES], label='Filter the results by STIX Object type.')
-        capec_version = CharFilter(label="Filter the results by the version of CAPEC")
-
-    
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.MitreTaskSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.data.copy()
-        job = new_task(data, models.JobType.CAPEC_UPDATE)
-        job_s = serializers.JobSerializer(instance=job)
-        return Response(job_s.data, status=status.HTTP_201_CREATED)
-
-    
-    @decorators.action(methods=['GET'], url_path="objects", detail=False)
-    def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_weakness_or_capec_objects(types=CAPEC_TYPES)
-    
-    @extend_schema(
-            parameters=[
-                OpenApiParameter('capec_version', description="Filter the results by the version of CAPEC")
-            ],
-    )
-    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>", detail=False)
-    def retrieve_objects(self, request, *args, capec_id=None, **kwargs):
-        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_object_by_external_id(capec_id)
-    
-    @extend_schema(summary="See available CAPEC versions", description="See all imported versions available to use, and which version is the default (latest)")
-    @decorators.action(detail=False, methods=["GET"], serializer_class=serializers.MitreVersionsSerializer)
-    def versions(self, request, *args, **kwargs):
-        return ArangoDBHelper('mitre_capec_vertex_collection', request).get_mitre_versions()
-    
-    @extend_schema(filters=False)
-    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/versions", detail=False, serializer_class=serializers.MitreObjectVersions(many=True), pagination_class=None)
-    def object_versions(self, request, *args, capec_id=None, **kwargs):
-        return ArangoDBHelper(f'mitre_capec_vertex_collection', request).get_mitre_modified_versions(capec_id, source_name='capec')
-    
+      
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
@@ -595,17 +300,14 @@ class JobView(viewsets.ModelViewSet):
                 type = models.JobType.CTI_PROCESSOR
                 choices.append((f"{type}--{mode}", summary))
 
-            for mode in AttackView.MATRIX_TYPES:
-                type = models.JobType.ATTACK_UPDATE
-                choices.append((f"{type}--{mode}", f"The `{mode}` mode of {type}"))
             choices.sort(key=lambda x: x[0])
             return choices
         
         type = ChoiceFilter(
-            label='Filter the results by the type of Job',
+            help_text='Filter the results by the type of Job',
             choices=get_type_choices(), method='filter_type'
         )
-        state = Filter(label='Filter the results by the state of the Job')
+        state = Filter(help_text='Filter the results by the state of the Job')
 
         def filter_type(self, qs, field_name, value: str):
             query = {field_name: value}

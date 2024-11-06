@@ -42,7 +42,6 @@ six==1.16.0
 sqlparse==0.5.1
 stix2==3.0.1
 stix2-patterns==2.0.0
-stix2arango @ https://github.com/muchdogesec/stix2arango/archive/main.zip
 tqdm==4.66.4
 tzdata==2024.1
 uritemplate==4.1.1
@@ -50,4 +49,6 @@ urllib3==2.2.3
 vine==5.1.0
 wcwidth==0.2.13
 zipp==3.20.2
+dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2024-11-01/dogesec_commons-0.0.1b0-py3-none-any.whl
 arango_cti_processor @ https://github.com/muchdogesec/arango_cti_processor/archive/main.zip
+stix2arango @ https://github.com/muchdogesec/stix2arango/archive/main.zip

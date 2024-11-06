@@ -11,9 +11,6 @@ class JobState(models.TextChoices):
     COMPLETED = "completed"
     FAILED = "failed"
 class JobType(models.TextChoices):
-    ATTACK_UPDATE = "attack-update"
-    CWE_UPDATE    = "cwe-update"
-    CAPEC_UPDATE  = "capec-update"
     CVE_UPDATE    = "cve-update"
     CPE_UPDATE    = "cpe-update"
     CTI_PROCESSOR = "arango-cti-processor"

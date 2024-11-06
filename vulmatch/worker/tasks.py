@@ -31,12 +31,6 @@ POLL_INTERVAL = 1
 def create_celery_task_from_job(job: Job):
     data = job.parameters
     match job.type:
-        case models.JobType.ATTACK_UPDATE:
-            task = run_mitre_task(data, job, f'attack-{data["matrix"]}')
-        case models.JobType.CWE_UPDATE:
-            task = run_mitre_task(data, job, 'cwe')
-        case models.JobType.CAPEC_UPDATE:
-            task = run_mitre_task(data, job, 'capec')
         case models.JobType.CVE_UPDATE:
             task = run_nvd_task(data, job, 'cve')
         case models.JobType.CPE_UPDATE:
@@ -62,34 +56,6 @@ def run_acp_task(data: dict, job: Job):
     task =  acp_task.s(options, job_id=job.id)
     return (task | remove_temp_and_set_completed.si(None, job_id=job.id))
     
-
-
-
-def run_mitre_task(data, job: Job, mitre_type='cve'):
-    version = data['version']
-    match mitre_type:
-        case 'attack-enterprise':
-            url = urljoin(settings.ATTACK_ENTERPRISE_BUCKET_ROOT_PATH, f"enterprise-attack-{version}.json")
-            collection_name = 'mitre_attack_enterprise'
-        case 'attack-mobile':
-            url = urljoin(settings.ATTACK_MOBILE_BUCKET_ROOT_PATH, f"mobile-attack-{version}.json")
-            collection_name = 'mitre_attack_mobile'
-        case 'attack-ics':
-            url = urljoin(settings.ATTACK_ICS_BUCKET_ROOT_PATH, f"ics-attack-{version}.json")
-            collection_name = 'mitre_attack_ics'
-        case "cwe":
-            url = urljoin(settings.CWE_BUCKET_ROOT_PATH, f"cwe-bundle-v{version}.json")
-            collection_name = 'mitre_cwe'
-        case "capec":
-            url = urljoin(settings.CAPEC_BUCKET_ROOT_PATH, f"stix-capec-v{version}.json")
-            collection_name = 'mitre_capec'
-        case _:
-            raise NotImplementedError("Unknown type for mitre task")
-    
-    temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/mitre-{mitre_type}--{str(job.id)}")
-    task = download_file.si(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'mitre-version={version}', job_id=job.id)
-    return (task | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
-
 def run_nvd_task(data, job: Job, nvd_type='cve'):
     dates = date_range(data['last_modified_earliest'], data['last_modified_latest'])
     temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/nvd-{nvd_type}--{str(job.id)}")
