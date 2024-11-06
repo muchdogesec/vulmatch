@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
-from vulmatch.server.arango_helpers import CVE_SORT_FIELDS, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
+from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
 from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
 from . import models
@@ -60,9 +60,18 @@ class VulnerabilityStatus(models.models.TextChoices):
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters()+[
-            OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
-        ],
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+    ),
+    retrieve_object_relationships=extend_schema(
+        summary='Get Relationships for Vulnerability by CVE ID',
+        description=textwrap.dedent(
+            """
+            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.\n\n
+            If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
     bundle=extend_schema(
         summary='Get all objects for a Vulnerability by CVE ID',
@@ -97,7 +106,8 @@ class VulnerabilityStatus(models.models.TextChoices):
             """
         ),
 
-    )
+    ),
+
 )   
 class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
@@ -137,9 +147,10 @@ class CveView(viewsets.ViewSet):
         created_min = DateTimeFilter(help_text="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         created_max = DateTimeFilter(help_text="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
         
-        modified_min = DateTimeFilter(help_text="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        modified_max = DateTimeFilter(help_text="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], help_text="Sort results by")
+        modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
+
         vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text="filter by vulnerability status")
 
 
@@ -158,9 +169,23 @@ class CveView(viewsets.ViewSet):
     def bundle(self, request, *args, cve_id=None, **kwargs):
         return ArangoDBHelper('', request).get_cve_bundle(cve_id)
     
+    @extend_schema(
+            parameters=[
+                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+            ]
+    )
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
+    
+    @extend_schema(
+            parameters=[
+                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+            ]
+    )
+    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
+    def retrieve_object_relationships(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id, relationship_mode=True)
     
     @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, cve_id=None, **kwargs):
@@ -194,6 +219,16 @@ class CveView(viewsets.ViewSet):
         summary='Get a CPE object by STIX ID',
         description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.",
         filters=False,
+    ),
+    retrieve_object_relationships=extend_schema(
+        summary='Get Relationships for Object',
+        description=textwrap.dedent(
+            """
+            Return relationships.
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -234,7 +269,18 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
-      
+    
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('relationship_type', enum=CPE_RELATIONSHIP_TYPES, allow_blank=False, description="either `vulnerable-to` or `in-pattern` (default is both)."),
+                OpenApiParameter('sort', enum=CPE_REL_SORT_FIELDS, description="Sort results by"),
+            ]
+    )
+    @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
+    def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
+        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
+    
+    
 @extend_schema_view(
     create=extend_schema(
         responses={201: serializers.JobSerializer
