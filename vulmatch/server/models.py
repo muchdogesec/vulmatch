@@ -14,6 +14,10 @@ class JobType(models.TextChoices):
     CVE_UPDATE    = "cve-update"
     CPE_UPDATE    = "cpe-update"
     CTI_PROCESSOR = "arango-cti-processor"
+    #####
+    ATTACK_UPDATE = "attack-update"
+    CWE_UPDATE    = "cwe-update"
+    CAPEC_UPDATE  = "capec-update"
 
 class Job(models.Model):
     # file = models.OneToOneField(File, on_delete=models.CASCADE)

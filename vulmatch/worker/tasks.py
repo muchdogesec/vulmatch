@@ -37,10 +37,41 @@ def create_celery_task_from_job(job: Job):
             task = run_nvd_task(data, job, 'cpe')
         case models.JobType.CTI_PROCESSOR:
             task = run_acp_task(data, job)
+        #####
+        case models.JobType.ATTACK_UPDATE:
+            task = run_mitre_task(data, job, f'attack-{data["matrix"]}')
+        case models.JobType.CWE_UPDATE:
+            task = run_mitre_task(data, job, 'cwe')
+        case models.JobType.CAPEC_UPDATE:
+            task = run_mitre_task(data, job, 'capec')
     task.set_immutable(True)
     return task
 
 
+def run_mitre_task(data, job: Job, mitre_type='cve'):
+    version = data['version']
+    match mitre_type:
+        case 'attack-enterprise':
+            url = urljoin(settings.ATTACK_ENTERPRISE_BUCKET_ROOT_PATH, f"enterprise-attack-{version}.json")
+            collection_name = 'mitre_attack_enterprise'
+        case 'attack-mobile':
+            url = urljoin(settings.ATTACK_MOBILE_BUCKET_ROOT_PATH, f"mobile-attack-{version}.json")
+            collection_name = 'mitre_attack_mobile'
+        case 'attack-ics':
+            url = urljoin(settings.ATTACK_ICS_BUCKET_ROOT_PATH, f"ics-attack-{version}.json")
+            collection_name = 'mitre_attack_ics'
+        case "cwe":
+            url = urljoin(settings.CWE_BUCKET_ROOT_PATH, f"cwe-bundle-v{version}.json")
+            collection_name = 'mitre_cwe'
+        case "capec":
+            url = urljoin(settings.CAPEC_BUCKET_ROOT_PATH, f"stix-capec-v{version}.json")
+            collection_name = 'mitre_capec'
+        case _:
+            raise NotImplementedError("Unknown type for mitre task")
+    
+    temp_dir = str(Path(tempfile.gettempdir())/f"ctibutler/mitre-{mitre_type}--{str(job.id)}")
+    task = download_file.si(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'version={version}', job_id=job.id, params=job.parameters)
+    return (task | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 def new_task(data, type, job=None) -> Job:
     job = Job.objects.create(type=type, parameters=data)
@@ -63,7 +94,7 @@ def run_nvd_task(data, job: Job, nvd_type='cve'):
     for d in dates:
         url = urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
         task = download_file.si(url, temp_dir, job_id=job.id)
-        task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id)
+        task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id, params=job.parameters)
         task.set_immutable(True)
         tasks.append(task)
     tasks = chain(tasks)
@@ -119,7 +150,7 @@ def download_file(urlpath, tempdir, job_id=None):
 
 
 @app.task(base=CustomTask)
-def upload_file(filename, collection_name, stix2arango_note=None, job_id=None):
+def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, params=dict()):
     if not filename:
         return
     if not stix2arango_note:
@@ -131,7 +162,7 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None):
         database=settings.ARANGODB_DATABASE,
         collection=collection_name,
         stix2arango_note=stix2arango_note,
-        ignore_embedded_relationships=False,
+        ignore_embedded_relationships=params.get('ignore_embedded_relationships', False),
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
