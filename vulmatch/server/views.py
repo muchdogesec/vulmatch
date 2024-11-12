@@ -31,12 +31,18 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary="Download data for CVEs",
         description=textwrap.dedent(
             """
-            Use this data to update the CVE records.\n\n
-            The earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.\n\n
-            The easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.\n\n
-            The following key/values are accepted in the body of the request:\n\n
+            Use this data to update the CVE records.
+
+            The earliest CVE record has a `modified` value of `2007-07-13T04:00:00.000Z`. That said, as a rough guide, we recommend downloading CVEs from `last_modified_earliest` = `2020-01-01` because anything older than this is _generally_ stale.
+
+            The easiest way to identify the last update time used (to keep CVE records current) is to use the jobs endpoint which will show the `last_modified_earliest` and `last_modified_latest` dates used.
+
+            The following key/values are accepted in the body of the request:
+
             * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for vulnerability
-            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for vulnerability \n\n
+            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for vulnerability
+            * `ignore_embedded_relationships` (optional - default: `false`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` (recommended) will get stix2arango to generate SROs for these embedded relationships so they can be searched. `true` will ignore them.
+
             The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
         ),
@@ -46,8 +52,9 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary="Get Vulnerability Objects for CVEs",
         description=textwrap.dedent(
             """
-            Search and filter CVE records. This endpoint only returns the vulnerability objects for matching CVEs.\n\n
-            Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.\n\n
+            Search and filter CVE records. This endpoint only returns the vulnerability objects for matching CVEs.
+            Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.
+
             If you already know the CVE ID, use the Get a Vulnerability by ID endpoint
             """
         ),
@@ -56,7 +63,8 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get a Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.\n\n
+            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.
+
             If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
             """
         ),
@@ -67,7 +75,8 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get Relationships for Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.\n\n
+            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.
+
             If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
             """
         ),
@@ -78,7 +87,8 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get all objects for a Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            This endpoint will return all objects related to the Vulnerability. This can include the following:\n\n
+            This endpoint will return all objects related to the Vulnerability. This can include the following:
+
             * `vulnerability`: Represents the CVE
             * `indicator`: Contains a pattern identifying products affected by the CVE
             * `relationship` (`indicator`->`vulnerability`)
@@ -102,7 +112,8 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary="Get all updates for a Vulnerability by CVE ID",
         description=textwrap.dedent(
             """
-            This endpoint will return all the times a Vulnerability has been modified over time as new information becomes available.\n\n
+            This endpoint will return all the times a Vulnerability has been modified over time as new information becomes available.
+
             By default the latest version of objects will be returned by all endpoints. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to get an older versions of a Vulnerability.
             """
         ),
@@ -201,24 +212,38 @@ class CveView(viewsets.ViewSet):
         summary="Download CPE data",
         description=textwrap.dedent(
             """
-            Use this data to update the CPE records.\n\n
-            The earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.\n\n
-            Note, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.\n\n
-            The following key/values are accepted in the body of the request:\n\n
+            Use this data to update the CPE records.
+
+            The earliest CPE was `2007-09-01`. That said, as a rough guide, we recommend downloading CPEs from `last_modified_earliest` = `2015-01-01` because anything older than this is _generally_ stale.
+
+            Note, Software objects representing CPEs do not have a `modified` time in the way Vulnerability objects do. As such, you will want to store a local index of last_modified_earliest` and `last_modified_latest` used in previous request. Requesting the same dates won't cause an issue (existing records will be skipped) but it will be more inefficient.
+
+            The following key/values are accepted in the body of the request:
+
             * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for CPE
-            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for CPE\n\n
+            * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for CPE
+            * `ignore_embedded_relationships` (optional - default: `false`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` (recommended) will get stix2arango to generate SROs for these embedded relationships so they can be searched. `true` will ignore them.
+
             The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
         ),
     ),
     list_objects=extend_schema(
         summary='Get Software Objects for CPEs',
-        description="Search and filter CPE records.\n\nThis endpoint only returns the `software` objects for matching CPEs.\n\nThis endpoint is useful to find CPEs that can be used to filter CVEs.",
+        description=textwrap.dedent(
+            """
+            Search and filter CPE records.\n\nThis endpoint only returns the `software` objects for matching CPEs.\n\nThis endpoint is useful to find CPEs that can be used to filter CVEs.
+            """
+        ),
         filters=True,
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
-        description="Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.",
+        description=textwrap.dedent(
+            """
+            Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.
+            """
+        ),
         filters=False,
     ),
     retrieve_object_relationships=extend_schema(
@@ -289,10 +314,12 @@ class CpeView(viewsets.ViewSet):
         summary="Trigger arango_cti_processor `mode` to generate relationships.",
         description=textwrap.dedent(
             """
-            This endpoint will link together knowledgebases based on the `mode` selected. For more information about how this works see [arango_cti_processor](https://github.com/muchdogesec/arango_cti_processor/), specifically the `--relationship` setting.\n\n
-            The following key/values are accepted in the body of the request:\n\n
-            * `ignore_embedded_relationships` (optional - default: `true`): arango_cti_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generat SROs for these embedded relationships so they can be searched. `false` will ignore them\n\n
-            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cti_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always effecient, espeically when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.\n\n
+            This endpoint will link together knowledgebases based on the `mode` selected. For more information about how this works see [arango_cti_processor](https://github.com/muchdogesec/arango_cti_processor/), specifically the `--relationship` setting.
+
+            The following key/values are accepted in the body of the request:
+
+            * `ignore_embedded_relationships` (optional - default: `true`): arango_cti_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generat SROs for these embedded relationships so they can be searched. `false` will ignore them
+            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cti_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always effecient, espeically when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.
             * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
             """
         ),
@@ -315,12 +342,24 @@ class ACPView(viewsets.ViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        description="Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
+        description=textwrap.dedent(
+            """
+            Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.
+
+            Note, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.
+            """
+        ),
         summary="Get Jobs",
         responses={200: serializers.JobSerializer}
     ),
     retrieve=extend_schema(
-        description="Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.\n\nNote, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.",
+        description=textwrap.dedent(
+            """
+            Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.
+
+            Note, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.
+            """
+        ),
         summary="Get a Job by ID",
     ),
 )
