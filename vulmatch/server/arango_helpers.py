@@ -118,6 +118,16 @@ OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
 CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "is-vulnerable", "in-pattern": "pattern-contains"}
 CPE_REL_SORT_FIELDS = ["modified_descending", "modified_ascending", "created_descending", "created_ascending"]
+CVE_BUNDLE_TYPES = set([
+  "vulnerability",
+  "indicator",
+  "relationship",
+  "note",
+  "sighting",
+  "software",
+  "weakness",
+  "attack-pattern"
+])
 
 class ArangoDBHelper:
     max_page_size = settings.MAXIMUM_PAGE_SIZE
@@ -338,6 +348,56 @@ RETURN KEEP(doc, KEYS(doc, true))
         return self.execute_query(query, bind_vars=binds)
 
     def get_cve_bundle(self, cve_id: str):
+        cve_rels_types = []
+        binds = dict(cve_id=cve_id.upper(), cve_edge_types=cve_rels_types)
+
+        more_queries = {}
+
+        include_attack = self.query_as_bool('include_attack', True)
+        include_capec = self.query_as_bool('include_capec', True) or include_attack
+        include_cwe = self.query_as_bool('include_cwe', True) or include_capec
+        
+
+
+
+        if include_capec:
+            include_cwe = True
+            more_queries['cwe_capec'] = """
+            LET cwe_capec = FLATTEN(
+                FOR doc IN mitre_cwe_edge_collection
+                FILTER doc.relationship_type == 'exploited-using' AND [doc._from, doc._to] ANY IN cve_rels[*]._id
+                RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+            )
+            """
+
+                
+        if include_attack:
+            include_capec = True
+            more_queries["capec_attack"] = """
+            LET capec_attack = FLATTEN(
+                FOR doc IN mitre_capec_edge_collection
+                FILTER doc.relationship_type == 'technique' AND [doc._from, doc._to] ANY IN cwe_capec[*]._id
+                RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+            )
+            """
+            
+        if self.query_as_bool('include_cpe', True):
+            cve_rels_types.append('pattern-contains')
+        if self.query_as_bool('include_cpe_vulnerable', True):
+            cve_rels_types.append('is-vulnerable')
+
+        if include_cwe:
+            cve_rels_types.append('exploited-using')
+
+        if self.query_as_bool('include_epss', True):
+            cve_rels_types.append('object')
+        if self.query_as_bool('include_kev', True):
+            cve_rels_types.append('sighting-of')
+
+        types = self.query_as_array('object_type') or CVE_BUNDLE_TYPES
+        binds['types'] = list(CVE_BUNDLE_TYPES.intersection(types))
+        
+
         query = '''
 LET cve_data = (
   FOR doc IN nvd_cve_vertex_collection
@@ -346,30 +406,23 @@ LET cve_data = (
 )
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id
+    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id AND doc.relationship_type IN @cve_edge_types
+
     RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
     )
     
-LET cwe_capec = FLATTEN(
-    FOR doc IN mitre_cwe_edge_collection
-    FILTER [doc._from, doc._to] ANY IN cve_rels[*]._id
-    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
-    )
-    
-LET capec_attack = FLATTEN(
-    FOR doc IN mitre_capec_edge_collection
-    FILTER [doc._from, doc._to] ANY IN cwe_capec[*]._id
-    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
-    )
+@@@more_queries
 
     
-FOR d in UNION_DISTINCT(cve_data, cve_rels, cwe_capec, capec_attack)
-
+FOR d in UNION_DISTINCT(cve_data, cve_rels, @@@extra_rels)
+FILTER d.type IN @types
 LIMIT @offset, @count
 //RETURN KEEP(d, 'id', '_stix2arango_note', '_arango_cti_processor_note', 'description')
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
-        return self.execute_query(query, bind_vars=dict(cve_id=cve_id.upper()))
+        query = query.replace('@@@more_queries', "\n".join(more_queries.values())) \
+                    .replace("@@@extra_rels", ", ".join(more_queries.keys()) or '[]')
+        return self.execute_query(query, bind_vars=binds)
 
     def get_attack_objects(self, matrix):
         filters = []
