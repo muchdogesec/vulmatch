@@ -5,6 +5,10 @@ from rest_framework import serializers, validators
 ACP_MODES = {
     "cve-cpe": "Relate CVE objects to CPE objects",
     "cve-epss": "Add EPSS Note(s) for CVE objects",
+    ###
+    "cve-cwe": "Relate CVE objects to CWE objects",
+    "cwe-capec": "Relate CWE objects to CAPEC objects",
+    "capec-attack": "Relate CAPEC objects to ATT&CK objects",
 }
 
 class StixObjectsSerializer(serializers.Serializer):
@@ -19,6 +23,7 @@ class JobSerializer(serializers.ModelSerializer):
 class NVDTaskSerializer(serializers.Serializer):
     last_modified_earliest = serializers.DateField(help_text="(`YYYY-MM-DD`): earliest date")
     last_modified_latest = serializers.DateField(help_text="(`YYYY-MM-DD`): latest date \n* default is `1980-01-01`")
+    ignore_embedded_relationships = serializers.BooleanField(default=False)
 
     def validate(self, attrs):
         if attrs.get('last_modified_earliest') and attrs.get('last_modified_latest') and attrs['last_modified_earliest'] > attrs['last_modified_latest']:
@@ -27,6 +32,7 @@ class NVDTaskSerializer(serializers.Serializer):
 
 class MitreTaskSerializer(serializers.Serializer):
     version = serializers.CharField(help_text="mitre version passed to the script")
+    ignore_embedded_relationships = serializers.BooleanField(default=False)
 
 class MitreVersionsSerializer(serializers.Serializer):
     latest = serializers.CharField()

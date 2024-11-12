@@ -85,5 +85,4 @@ def split_mitre_version(version: str):
             pass
         finally:
             version_parts.append(v)
-    print(version_parts)
     return tuple(version_parts)
