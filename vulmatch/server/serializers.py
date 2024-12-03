@@ -35,15 +35,15 @@ class MitreTaskSerializer(serializers.Serializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False)
 
 class MitreVersionsSerializer(serializers.Serializer):
-    latest = serializers.CharField()
+    latest = serializers.CharField(required=False, allow_null=True)
     versions = serializers.ListField(child=serializers.CharField())
 
 class StixVersionsSerializer(serializers.Serializer):
-    latest = serializers.DateTimeField()
+    latest = serializers.DateTimeField(required=False, allow_null=True)
     versions = serializers.ListField(child=serializers.DateTimeField())
 
 class MitreObjectVersions(serializers.Serializer):
-    modified = serializers.DateTimeField()
+    modified = serializers.DateTimeField(required=False, allow_null=True)
     notes = serializers.ListField(child=serializers.CharField())
 
 

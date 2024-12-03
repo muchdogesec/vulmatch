@@ -1,3 +1,4 @@
+import contextlib
 from pathlib import Path
 import re
 import typing
@@ -5,6 +6,7 @@ from arango import ArangoClient
 from django.conf import settings
 from .utils import Pagination, Response
 from drf_spectacular.utils import OpenApiParameter
+from rest_framework.validators import ValidationError
 
 from ..server import utils
 if typing.TYPE_CHECKING:
@@ -129,6 +131,22 @@ CVE_BUNDLE_TYPES = set([
   "attack-pattern"
 ])
 
+
+
+def positive_int(integer_string, cutoff=None, default=1):
+    """
+    Cast a string to a strictly positive integer.
+    """
+    with contextlib.suppress(ValueError, TypeError):
+        ret = int(integer_string)
+        if ret <= 0:
+            return default
+        if cutoff:
+            return min(ret, cutoff)
+        return ret
+    return default
+
+
 class ArangoDBHelper:
     max_page_size = settings.MAXIMUM_PAGE_SIZE
     page_size = settings.DEFAULT_PAGE_SIZE
@@ -155,11 +173,13 @@ class ArangoDBHelper:
         if not query_str:
             return default
         return query_str.lower() == 'true'
+    
+
     @classmethod
     def get_page_params(cls, request):
         kwargs = request.GET.copy()
-        page_number = int(kwargs.get('page', 1))
-        page_limit  = min(int(kwargs.get('page_size', ArangoDBHelper.page_size)), ArangoDBHelper.max_page_size)
+        page_number = positive_int(kwargs.get('page'))
+        page_limit = positive_int(kwargs.get('page_size'), cutoff=ArangoDBHelper.max_page_size, default=ArangoDBHelper.page_size)
         return page_number, page_limit
 
     @classmethod
@@ -210,7 +230,7 @@ class ArangoDBHelper:
                         "type": "integer",
                         "example": cls.page_size * cls.max_page_size,
                     },
-                    container: container_schema
+                    container: {'items':container_schema, 'type':'array'}
                 }
         }
     @classmethod
@@ -252,8 +272,11 @@ class ArangoDBHelper:
         if paginate:
             return self.get_paginated_response(container or self.container, cursor, self.page, self.page_size, cursor.statistics()["fullCount"])
         return list(cursor)
+    
     def get_offset_and_count(self, count, page) -> tuple[int, int]:
         page = page or 1
+        if page >= 2**32:
+            raise ValidationError(f"invalid page `{page}`")
         offset = (page-1)*count
         return offset, count
 
@@ -836,7 +859,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         new_query = """
         LET matched_ids = (@docs_query)[*]._id
         FOR d IN @@view
-        FILTER d.type == 'relationship' AND [d._from, d._to] ANY IN matched_ids
+        SEARCH d.type == 'relationship' AND (d._from IN matched_ids OR d._to IN matched_ids)
         LIMIT @offset, @count
         RETURN KEEP(d, KEYS(d, TRUE))
         """.replace('@docs_query', re.sub(regex, lambda x: x.group(1), docs_query.replace('LIMIT @offset, @count', '')))
@@ -856,7 +879,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         LET matched_ids = (@docs_query)[*]._id
         FOR d3 IN FLATTEN(
             FOR d2 IN @@view
-            FILTER d2.type == 'relationship' AND d2.relationship_type IN @relationship_types AND [d2._from, d2._to] ANY IN matched_ids
+            SEARCH d2.type == 'relationship' AND d2.relationship_type IN @relationship_types AND (d2._from IN matched_ids OR d2._to IN matched_ids)
             RETURN [DOCUMENT(d2._from), d2, DOCUMENT(d2._to)]
         )
 

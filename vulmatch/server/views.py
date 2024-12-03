@@ -68,7 +68,7 @@ class VulnerabilityStatus(models.models.TextChoices):
             If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('vulnerabilities', 'vulnerability')},
+        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
     retrieve_object_relationships=extend_schema(
@@ -132,7 +132,7 @@ class VulnerabilityStatus(models.models.TextChoices):
 )   
 class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
-    pagination_class = Pagination("vulnerabilities")
+    pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'cve_id'
@@ -184,7 +184,7 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request, 'vulnerabilities').get_vulnerabilities()
+        return ArangoDBHelper('', request).get_vulnerabilities()
     
     @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:cve_id>/bundle")
     def bundle(self, request, *args, cve_id=None, **kwargs):
