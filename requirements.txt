@@ -36,6 +36,7 @@ referencing==0.35.1
 requests==2.32.2
 requests-toolbelt==1.0.0
 rpds-py==0.20.0
+schemathesis==3.38.7; python_version >= '3.8'
 setuptools==75.1.0
 simplejson==3.19.3
 six==1.16.0
