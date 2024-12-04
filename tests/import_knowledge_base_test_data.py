@@ -134,7 +134,7 @@ def monitor_job_status(job_id, job_name):
         print(f"{job_name} job did not complete successfully.")
 
 # Function to initiate arango-cti-processor updates
-def initiate_arango_cti_processor_update(mode):
+def initiate_arango_cve_processor_update(mode):
     print(f"Initiating arango-cti-processor update with mode: {mode}")
     response = requests.post(f'{base_url}/arango-cti-processor/{mode}/', headers=headers)
     
@@ -187,7 +187,7 @@ def monitor_jobs():
 
     # Step 7: Run arango-cti-processor for each mode
     for mode in arango_modes:
-        job_id = initiate_arango_cti_processor_update(mode)
+        job_id = initiate_arango_cve_processor_update(mode)
         if job_id:
             monitor_job_status(job_id, f"arango-cti-processor ({mode})")
 

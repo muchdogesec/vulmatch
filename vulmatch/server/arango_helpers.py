@@ -440,7 +440,6 @@ LET cve_rels = FLATTEN(
 FOR d in UNION_DISTINCT(cve_data, cve_rels, @@@extra_rels)
 FILTER d.type IN @types
 LIMIT @offset, @count
-//RETURN KEEP(d, 'id', '_stix2arango_note', '_arango_cti_processor_note', 'description')
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
         query = query.replace('@@@more_queries', "\n".join(more_queries.values())) \
