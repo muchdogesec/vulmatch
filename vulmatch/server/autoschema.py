@@ -2,12 +2,16 @@ from typing import List
 from .utils import ErrorSerializer
 from drf_spectacular.utils import OpenApiResponse, OpenApiExample
 import uritemplate
-from dogesec_commons.utils.autoschema import CustomAutoSchema
+from dogesec_commons.utils.autoschema import CustomAutoSchema, schemas
 
 
 
 
 class VulmatchAutoSchema(CustomAutoSchema):
+    default_responses = {
+            '404': (schemas.WEBSERVER_404_RESPONSE, ["application/json"]),
+            '400': (schemas.DEFAULT_400_RESPONSE, ["application/json"]),
+    }
     pass
 
 
