@@ -177,11 +177,6 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     "TAGS": [
         {"name": "CVE", "description": "Download the latest CVE objects or view existing CVE objects."},
         {"name": "CPE", "description": "Download the latest CPE objects or view existing CVE objects."},
-        {"name": "ATT&CK Enterprise", "description": "Download the latest ATT&CK Enterprise objects."},
-        {"name": "ATT&CK ICS", "description": "Download the latest ATT&CK ICS objects."},
-        {"name": "ATT&CK Mobile", "description": "Download the latest ATT&CK Mobile objects."},
-        {"name": "CAPEC", "description": "Download the latest CAPEC objects."},
-        {"name": "CWE", "description": "Download the latest CWE objects."},
         {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
         {"name": "Arango CTI Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
