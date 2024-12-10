@@ -305,7 +305,7 @@ class CveView(viewsets.ViewSet):
         summary='Get a CPE object by STIX ID',
         description=textwrap.dedent(
             """
-            Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a STIX ID using the GET CPEs endpoint.
+            Retrieve a single STIX `software` object for a CPE using its STIX ID. You can identify a CPE ID using the GET CPEs endpoint.
             """
         ),
         filters=False,
@@ -314,7 +314,7 @@ class CveView(viewsets.ViewSet):
         summary='Get Relationships for Object',
         description=textwrap.dedent(
             """
-            Return relationships.
+            This endpoint will return all SROs where the Software (CPE) selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what CVEs the CPE is found in.
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
