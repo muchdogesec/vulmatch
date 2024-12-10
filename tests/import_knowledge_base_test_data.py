@@ -9,25 +9,14 @@ headers = {
     'Content-Type': 'application/json'
 }
 
-# Versions for attack and CWE updates
-attack_versions = ["14_1","15_1"] # add these in order to avoid versioning issues
-cwe_versions = ["4_14", "4_15"] # add these in order to avoid versioning issues
-capec_versions = ["3_8", "3_9"] # add these in order to avoid versioning issues
-
 # Modes for arango-cti-processor
 arango_modes = [
-    "capec-attack",
     "cve-cwe",
-    "cwe-capec",
+    "cve-capec",
+    "cve-attack",    
     "cve-epss",
-    "cve-cpe"
+    "cve-kev"
 ]
-
-# Data for the CPE update
-cpe_data = {
-    "last_modified_earliest": "2023-12-01",
-    "last_modified_latest": "2024-09-30"
-}
 
 # Function to initiate the CVE update
 def initiate_cve_update():
@@ -43,63 +32,6 @@ def initiate_cve_update():
         return response.json()['id']
     else:
         print(f"Failed to initiate CVE update: {response.status_code} - {response.text}")
-        return None
-
-# Function to initiate the CPE update
-def initiate_cpe_update():
-    print(f"Initiating CPE update with data: {json.dumps(cpe_data, indent=2)}")
-    response = requests.post(f'{base_url}/cpe/', headers=headers, json=cpe_data)
-    
-    if response.status_code == 201:
-        print("CPE update initiated successfully.")
-        return response.json()['id']
-    else:
-        print(f"Failed to initiate CPE update: {response.status_code} - {response.text}")
-        return None
-
-# Function to initiate attack updates with version
-def initiate_attack_update(endpoint, version):
-    data = {
-        "version": version
-    }
-    print(f"Initiating {endpoint} update with version: {version}")
-    response = requests.post(f'{base_url}/{endpoint}/', headers=headers, json=data)
-    
-    if response.status_code == 201:
-        print(f"{endpoint} update initiated successfully.")
-        return response.json()['id']
-    else:
-        print(f"Failed to initiate {endpoint} update: {response.status_code} - {response.text}")
-        return None
-
-# Function to initiate the CAPEC update with version
-def initiate_capec_update(version):
-    data = {
-        "version": version
-    }
-    print(f"Initiating CAPEC update with version: {version}")
-    response = requests.post(f'{base_url}/capec/', headers=headers, json=data)
-    
-    if response.status_code == 201:
-        print(f"CAPEC update initiated successfully.")
-        return response.json()['id']
-    else:
-        print(f"Failed to initiate CAPEC update: {response.status_code} - {response.text}")
-        return None
-
-# Function to initiate the CWE update with version
-def initiate_cwe_update(version):
-    data = {
-        "version": version
-    }
-    print(f"Initiating CWE update with version: {version}")
-    response = requests.post(f'{base_url}/cwe/', headers=headers, json=data)
-    
-    if response.status_code == 201:
-        print(f"CWE update initiated successfully.")
-        return response.json()['id']
-    else:
-        print(f"Failed to initiate CWE update: {response.status_code} - {response.text}")
         return None
 
 # Function to check the job status and wait for it to complete
@@ -151,45 +83,6 @@ def monitor_jobs():
     job_id = initiate_cve_update()
     if job_id:
         monitor_job_status(job_id, "CVE")
-
-    # Step 2: CPE update
-    job_id = initiate_cpe_update()
-    if job_id:
-        monitor_job_status(job_id, "CPE")
-
-    # Step 3: attack-enterprise and attack-ics updates with both versions
-    for version in attack_versions:
-        job_id = initiate_attack_update("attack-enterprise", version)
-        if job_id:
-            monitor_job_status(job_id, f"attack-enterprise (version {version})")
-
-        job_id = initiate_attack_update("attack-ics", version)
-        if job_id:
-            monitor_job_status(job_id, f"attack-ics (version {version})")
-
-    # Step 4: attack-mobile updates with both versions
-    for version in attack_versions:
-        job_id = initiate_attack_update("attack-mobile", version)
-        if job_id:
-            monitor_job_status(job_id, f"attack-mobile (version {version})")
-
-    # Step 5: CAPEC update with both versions
-    for version in capec_versions:
-        job_id = initiate_capec_update(version)
-        if job_id:
-            monitor_job_status(job_id, f"CAPEC (version {version})")
-
-    # Step 6: CWE update with both versions
-    for version in cwe_versions:
-        job_id = initiate_cwe_update(version)
-        if job_id:
-            monitor_job_status(job_id, f"CWE (version {version})")
-
-    # Step 7: Run arango-cti-processor for each mode
-    for mode in arango_modes:
-        job_id = initiate_arango_cve_processor_update(mode)
-        if job_id:
-            monitor_job_status(job_id, f"arango-cti-processor ({mode})")
 
 # Run the script
 if __name__ == "__main__":
