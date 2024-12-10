@@ -292,7 +292,11 @@ class CveView(viewsets.ViewSet):
         summary='Get Software Objects for CPEs',
         description=textwrap.dedent(
             """
-            Search and filter CPE records.\n\nThis endpoint only returns the `software` objects for matching CPEs.\n\nThis endpoint is useful to find CPEs that can be used to filter CVEs.
+            Search and filter CPE records.
+
+            This endpoint only returns the `software` objects for matching CPEs.
+
+            This endpoint is useful to find CPEs that can be used to filter CVEs.
             """
         ),
         filters=True,
@@ -324,22 +328,48 @@ class CpeView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     lookup_url_kwarg = 'stix_id'
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`'),
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full STIX `id` of the object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`'),
         OpenApiParameter('cpe_name', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full CPE name. e.g. `cpe:2.3:a:slicewp:affiliate_program_suite:1.0.13:*:*:*:*:wordpress:*:*`'),
     ]
 
     
     class filterset_class(FilterSet):
-        id = BaseCSVFilter(help_text='Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`')
-        cpe_match_string = CharFilter(help_text='Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.')
-        vendor = CharFilter(help_text='Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.')
-        product = CharFilter(help_text='Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.')
-
+        id = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter the results by the STIX ID of the `software` object. e.g. `software--93ff5b30-0322-50e8-90c1-1c3f151c8adc`
+            """
+        ))
+        cpe_match_string = CharFilter(help_text=textwrap.dedent(
+            """
+            Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+            """
+        ))
+        vendor = CharFilter(help_text=textwrap.dedent(
+            """
+            Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.
+            """
+        ))
+        product = CharFilter(help_text=textwrap.dedent(
+            """
+            Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.
+            """
+        ))
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
-                        help_text='Filters CPEs returned by product type.'
-        )
-        cve_vulnerable = BaseCSVFilter(help_text='Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.')
-        in_cve_pattern = BaseCSVFilter(help_text='Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.')
+                        help_text=textwrap.dedent(
+            """
+            Filters CPEs returned by product type.
+            """
+        ))
+        cve_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.
+            """
+        ))
+        in_cve_pattern = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.
+            """
+        ))
 
     def create(self, request, *args, **kwargs):
         serializer = serializers.NVDTaskSerializer(data=request.data)
