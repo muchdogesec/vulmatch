@@ -53,6 +53,7 @@ class VulnerabilityStatus(models.models.TextChoices):
         description=textwrap.dedent(
             """
             Search and filter CVE records. This endpoint only returns the vulnerability objects for matching CVEs.
+
             Once you have the CVE ID you want, you can get all associated data linked to it (e.g. Indicator Objects) using the bundle endpoint.
 
             If you already know the CVE ID, use the Get a Vulnerability by ID endpoint
@@ -138,41 +139,91 @@ class CveView(viewsets.ViewSet):
     lookup_url_kwarg = 'cve_id'
     openapi_path_params = [
         OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.'),
-        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2024-3125`'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2023-22518`'),
 
     ]
 
-    
     class filterset_class(FilterSet):
-        stix_id = MultipleChoiceFilter(help_text='Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.')
-        cve_id = CharFilter(help_text='Filter the results using a CVE ID. e.g. `CVE-2023-22518`')
-        description = CharFilter(help_text='Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
-        has_kev = BooleanFilter(label=dedent('''
-        Filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
-        '''))
-        cpes_vulnerable = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
-        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
-        '''))
-        cpes_in_pattern = BaseCSVFilter(label=dedent('''
-        Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.\n\n
-        `cve-cpe` mode must have been triggered on the Arango CTI Processor endpoint for this to work.
-        '''))
-        weakness_id = BaseCSVFilter(label=dedent("""
-            Filter results by weakness (CWE ID). e.g. `CWE-122`.\n\n
-            filters using the `external_references` property of `vulnerability` object
-            """))
-        cvss_base_score_min = NumberFilter(help_text="The minumum CVSS score you want. `0` is lowest, `10` is highest.")
-        epss_score_min = NumberFilter(help_text="The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        epss_percentile_min = NumberFilter(help_text="The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).\n\n`cve-epss` mode must have been triggered on the Arango CTI Processor endpoint for this to work.")
-        created_min = DateTimeFilter(help_text="Is the minumum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        created_max = DateTimeFilter(help_text="Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        
-        modified_min = DateTimeFilter(label="Is the minumum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        modified_max = DateTimeFilter(label="Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)")
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label="Sort results by")
-
-        vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text="filter by vulnerability status")
+        stix_id = MultipleChoiceFilter(help_text=textwrap.dedent(
+            """
+            Filter the results using the STIX ID of a `vulnerability` object. e.g. `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.
+            """
+        ))
+        cve_id = CharFilter(help_text=textwrap.dedent(
+            """
+            Filter the results using a CVE ID. e.g. `CVE-2023-22518`
+            """
+        ))
+        description = CharFilter(help_text=textwrap.dedent(
+            """
+            Filter the results by the description of the Vulnerability. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.'
+            """
+        ))
+        has_kev = BooleanFilter(help_text=textwrap.dedent(
+            """
+            Optionally filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
+            """
+        ))
+        cpes_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter Vulnerabilities that are vulnerable to a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+            """
+        ))
+        cpes_in_pattern = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter Vulnerabilities that contain a full or partial CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
+            """
+        ))
+        weakness_id = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter results by weakness (CWE ID). e.g. `CWE-122`. `cve-cwe` mode must be run in Arango CVE Processor first for this to work.
+            """
+        ))
+        cvss_base_score_min = NumberFilter(help_text=textwrap.dedent(
+            """
+            The minumum CVSS score you want. `0` is lowest, `10` is highest.
+            """
+        ))
+        epss_score_min = NumberFilter(help_text=textwrap.dedent(
+            """
+            The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
+            """
+        ))
+        epss_percentile_min = NumberFilter(help_text=textwrap.dedent(
+            """
+            The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
+            """
+        ))
+        created_min = DateTimeFilter(help_text=textwrap.dedent(
+            """
+            Is the minimum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
+            """
+        ))
+        created_max = DateTimeFilter(help_text=textwrap.dedent(
+            """
+            Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
+            """
+        ))
+        modified_min = DateTimeFilter(label=textwrap.dedent(
+            """
+            Is the minimum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
+            """
+        ))
+        modified_max = DateTimeFilter(label=textwrap.dedent(
+            """
+            Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
+            """
+        ))
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label=textwrap.dedent(
+            """
+            Sort results by
+            """
+        ))
+        vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text=textwrap.dedent(
+            """
+            Filter by the Vulnerability status.
+            """
+        ))
 
 
     def create(self, request, *args, **kwargs):
