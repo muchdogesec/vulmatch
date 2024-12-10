@@ -76,9 +76,7 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get Relationships for Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            Return data for a CVE by ID. This endpoint only returns the `vulnerability` object for CVE.
-
-            If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
+            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the CVE is related to.
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
@@ -88,21 +86,23 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get all objects for a Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            This endpoint will return all objects related to the Vulnerability. This can include the following:
+            This endpoint will return the vulnerability itself and all objects related to the Vulnerability. Use this endpoint to get the complete intelligence graph for this Vulnerability.
 
-            * `vulnerability`: Represents the CVE
-            * `indicator`: Contains a pattern identifying products affected by the CVE
-            * `relationship` (`indicator`->`vulnerability`)
-            * `note`: Represents EPSS scores
-            * `sighting`: Represents CISA KEVs
-            * `software`: Represents the products listed in the pattern
-            * `relationship` (`indicator`->`software`)
-            * `weakness` (CWE): represents CWEs linked to the Vulneability (requires `cve-cwe` mode to be run)
-            * `relationship` (`vulnerability` (CVE) ->`weakness` (CWE))
-            * `attack-pattern` (CAPEC): represents CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe` and `cwe-capec` mode to be run)
-            * `relationship` (`weakness` (CWE) ->`attack-pattern` (CAPEC))
-            * `attack-pattern` (ATT&CK Enterprise/ICS/Mobile): represents ATT&CKs in CAPECs in CWEs (linked to Vulnerability) (requires `cve-cwe`, `cwe-capec` and `capec-attack` mode to be run)
-            * `relationship` (`attack-pattern` (CAPEC) ->`attack-pattern` (ATT&CK))
+            The results can include the following:
+
+            * `vulnerability`: Represents the CVE (source: cve2stix)
+            * `indicator`: Contains a pattern identifying products affected by the CVE (source: cve2stix)
+            * `relationship` (`indicator`->`vulnerability`) (source: cve2stix)
+            * `report`: Represents EPSS scores for the Vulnerability (source: cve2stix)
+            * `report`: Represents CISA KEVs for the Vulnerability (source: cve2stix)
+            * `software`: Represents the products listed in the pattern (source: cve2stix)
+            * `relationship` (`indicator`->`software`) (source: cve2stix)
+            * `weakness` (CWE): represents CWEs linked to the Vulnerability (source: arango_cve_processor, requires `cve-cwe` mode to be run)
+            * `relationship` (`vulnerability` (CVE) -> `weakness` (CWE)) (source: arango_cve_processor, requires `cve-cwe` mode to be run)
+            * `attack-pattern` (CAPEC): represents CAPECs linked to the Vulnerability (source: arango_cve_processor, requires `cve-capec` mode to be run)
+            * `relationship` (`vulnerability` (CVE) -> `attack-pattern` (CAPEC)) (source: arango_cve_processor, requires `cve-capec` mode to be run)
+            * `attack-pattern` (ATT&CK Enterprise): represents ATT&CKs linked to the Vulnerability (source: arango_cve_processor, requires `cve-attack` mode to be run)
+            * `relationship` (`vulnerability` (CVE) ->  `attack-pattern` (ATT&CK)) (source: arango_cve_processor, requires `cve-attack` mode to be run)
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
@@ -112,7 +112,7 @@ class VulnerabilityStatus(models.models.TextChoices):
             OpenApiParameter('include_cpe_vulnerable', description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_cwe', description="will show `weakness` objects related to this vulnerability, if exist (and the SROS linking cve-cwe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_epss', description="will show `note` objects related to this vulnerability, if exist", type=OpenApiTypes.BOOL),
-            OpenApiParameter('include_kev', description="will show `sighthing` objects related to this vulnerability, if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_kev', description="will show `sighting` objects related to this vulnerability, if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_capec', description="will show CAPEC `attack-pattern` objects related to this vulnerability, if exist  (and the SROS linking cwe-capec)\n * note this mode will also show `include_cwe` outputs, due to the way CAPEC is linked to CVE", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_attack', description="will show ATT&CK `attack-pattern` objects (for Techniques/Sub-techniques) related to this vulnerability, if exist (and the SROS linking capec-attack)\n * note this mode will also show `include_capec` and `include_cwe` outputs, due to the way ATT&CK is linked to CVE", type=OpenApiTypes.BOOL),
         ],
@@ -181,7 +181,7 @@ class CveView(viewsets.ViewSet):
         ))
         cvss_base_score_min = NumberFilter(help_text=textwrap.dedent(
             """
-            The minumum CVSS score you want. `0` is lowest, `10` is highest.
+            The minimum CVSS score you want. `0` is lowest, `10` is highest.
             """
         ))
         epss_score_min = NumberFilter(help_text=textwrap.dedent(
@@ -408,8 +408,8 @@ class CpeView(viewsets.ViewSet):
 
             The following key/values are accepted in the body of the request:
 
-            * `ignore_embedded_relationships` (optional - default: `true`): arango_cve_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generat SROs for these embedded relationships so they can be searched. `false` will ignore them
-            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cve_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always effecient, espeically when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.
+            * `ignore_embedded_relationships` (optional - default: `true`): arango_cve_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generate SROs for these embedded relationships so they can be searched. `false` will ignore them
+            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cve_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always efficient, especially when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.
             * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
             """
         ),
@@ -435,8 +435,6 @@ class ACPView(viewsets.ViewSet):
         description=textwrap.dedent(
             """
             Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.
-
-            Note, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.
             """
         ),
         summary="Get Jobs",
@@ -446,8 +444,6 @@ class ACPView(viewsets.ViewSet):
         description=textwrap.dedent(
             """
             Get information about a specific Job. To retrieve a Job ID, use the GET Jobs endpoint.
-
-            Note, for job types `cpe-update` and `cve-update` you might see a lot of urls marked as `errors`. This is expected. This simply means there is no data for the day requested and the script is not smart enough to handle it gracefully.
             """
         ),
         summary="Get a Job by ID",
