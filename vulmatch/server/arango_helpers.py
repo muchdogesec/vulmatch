@@ -300,11 +300,11 @@ class ArangoDBHelper:
 
         if q := self.query.get('epss_score_min'):
             binds['epss_score_min'] = float(q)
-            filters.append("FILTER doc.x_epss.score >= @epss_score_min")
+            filters.append("FILTER TO_NUMBER(epss[doc.name].score) >= @epss_score_min")
 
         if q := self.query.get('epss_percentile_min'):
             binds['epss_percentile_min'] = float(q)
-            filters.append("FILTER doc.x_epss.percentile >= @epss_percentile_min")
+            filters.append("FILTER TO_NUMBER(epss[doc.name].percentile) >= @epss_percentile_min")
 
 
         for v in ['created', 'modified']:
@@ -337,7 +337,7 @@ class ArangoDBHelper:
         if (q := self.query_as_bool('has_kev', None)) != None:
             binds['has_kev'] = q
             filters.append('''
-            LET hasKev = LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to AND d.relationship_type == 'sighting-of' RETURN d._from) > 0
+            LET hasKev = doc.id IN kevs
             FILTER hasKev == @has_kev
             ''')
 
@@ -360,6 +360,18 @@ class ArangoDBHelper:
                 ''')
 
         query = """
+
+LET kevs = (
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest AND doc.labels[0] == "kev"
+RETURN doc.object_refs[0]
+)
+LET epss = MERGE(
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest AND doc.labels[0] == "epss"
+RETURN {[doc.external_references[0].external_id]: LAST(doc.x_epss)}
+)
+
 FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'vulnerability' AND doc._is_latest
 LET indicator_ref = FIRST(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to RETURN d._from)
@@ -374,7 +386,8 @@ RETURN KEEP(doc, KEYS(doc, true))
             self.get_sort_stmt(
                 CVE_SORT_FIELDS,
                 {
-                    "epss_score": "doc.x_epss.score",
+                    "epss_score": "TO_NUMBER(epss[doc.name].score)",
+                    "epss_percentile": "TO_NUMBER(epss[doc.name].percentile)",
                     "cvss_base_score": "FIRST(VALUES(doc.x_cvss)).base_score",
                 },
             ),
