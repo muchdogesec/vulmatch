@@ -344,7 +344,19 @@ class ArangoDBHelper:
         if q := self.query_as_array('weakness_id'):
             binds['weakness_ids'] = q
             filters.append('''
-                FILTER LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND LAST(SPLIT(d.description, ' ')) IN @weakness_ids LIMIT 1 RETURN TRUE) > 0
+                FILTER doc.external_references[? ANY FILTER CURRENT.source_name=='cwe' AND CURRENT.external_id IN @weakness_ids]
+                ''')
+            
+        if q := self.query_as_array('attack_id'):
+            binds['attack_ids'] = q
+            filters.append('''
+                FILTER LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND LAST(SPLIT(d.description, ' ')) IN @attack_ids LIMIT 1 RETURN TRUE) > 0
+                ''')
+            
+        if q := self.query_as_array('capec_id'):
+            binds['capec_ids'] = q
+            filters.append('''
+                FILTER LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND LAST(SPLIT(d.description, ' ')) IN @capec_ids LIMIT 1 RETURN TRUE) > 0
                 ''')
 
         query = """
@@ -367,7 +379,7 @@ RETURN KEEP(doc, KEYS(doc, true))
                 },
             ),
         )
-        # return Response(query)
+        # return Response([query, binds])
         return self.execute_query(query, bind_vars=binds)
 
     def get_cve_bundle(self, cve_id: str):

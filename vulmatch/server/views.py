@@ -204,17 +204,17 @@ class CveView(viewsets.ViewSet):
             Is the maximum `created` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
             """
         ))
-        modified_min = DateTimeFilter(label=textwrap.dedent(
+        modified_min = DateTimeFilter(help_text=textwrap.dedent(
             """
             Is the minimum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
             """
         ))
-        modified_max = DateTimeFilter(label=textwrap.dedent(
+        modified_max = DateTimeFilter(help_text=textwrap.dedent(
             """
             Is the maximum `modified` value (`YYYY-MM-DDThh:mm:ss.sssZ`)
             """
         ))
-        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], label=textwrap.dedent(
+        sort = ChoiceFilter(choices=[(v, v) for v in CVE_SORT_FIELDS], help_text=textwrap.dedent(
             """
             Sort results by
             """
@@ -222,6 +222,19 @@ class CveView(viewsets.ViewSet):
         vuln_status = ChoiceFilter(choices=VulnerabilityStatus.choices, help_text=textwrap.dedent(
             """
             Filter by the Vulnerability status.
+            """
+        ))
+
+        attack_id = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter results by weakness (ATT&CK ID). e.g. `T1223`.\n\n
+            filters using the `description` property of `cve-attack` relationship object
+            """
+        ))
+        capec_id = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Filter results by weakness (CAPEC ID). e.g. `CAPEC-665`.\n\n
+            filters using the `description` property of `cve-capec` relationship object
             """
         ))
 
