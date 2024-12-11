@@ -509,8 +509,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
     def get_softwares(self):
         filters = []
         bind_vars = {
-                "@collection": 'nvd_cpe_vertex_collection',
-                "types": ['software'],
+                "@collection": 'nvd_cve_vertex_collection',
         }
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
@@ -523,22 +522,22 @@ RETURN KEEP(d, KEYS(d, TRUE))
             filters.append(
                 "FILTER @cpe_match_string[? ANY FILTER CONTAINS(doc.cpe, CURRENT)]"
             )
+
+        struct_match = {}
         if value := self.query.get('product_type'):
-            bind_vars['product_type'] = value[0]
-            filters.append(
-                "FILTER @product_type == SPLIT(doc.cpe, ':')[2]"
-            )
+            struct_match['part'] = value[0]
+            filters.append('FILTER doc.x_cpe_struct.part == @struct_match.part')
 
         if value := self.query.get('product'):
-            bind_vars['product'] = value
-            filters.append(
-                "FILTER @product == SPLIT(doc.cpe, ':')[4]"
-            )
+            struct_match['product'] = value.lower()
+            filters.append('FILTER CONTAINS(doc.x_cpe_struct.product, @struct_match.product)')
+            
         if value := self.query.get('vendor'):
-            bind_vars['vendor'] = value
-            filters.append(
-                "FILTER @vendor == SPLIT(doc.cpe, ':')[3]"
-            )
+            struct_match['vendor'] = value
+            filters.append('FILTER CONTAINS(doc.x_cpe_struct.vendor, @struct_match.vendor)')
+
+        if struct_match:
+            bind_vars['struct_match'] = struct_match
 
         if q := self.query_as_array('cve_vulnerable'):
             bind_vars['cve_vulnerable'] = q
@@ -551,13 +550,14 @@ RETURN KEEP(d, KEYS(d, TRUE))
             FILTER cve_matches[? ANY FILTER CURRENT[0]=='pattern-contains' AND CURRENT[1] IN @in_cve_pattern]
             ''')
 
+
         if q := self.query.get('name'):
             bind_vars['name'] = q
             filters.append('FILTER CONTAINS(doc.name, @name)')
 
         query = """
             FOR doc in @@collection
-            FILTER CONTAINS(@types, doc.type) AND doc._is_latest
+            FILTER doc.type == 'software' AND doc._is_latest
             LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['is-vulnerable', 'pattern-contains'] RETURN [d.relationship_type, FIRST(SPLIT(d.description, ' '))])
 
             @filters

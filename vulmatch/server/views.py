@@ -384,12 +384,6 @@ class CpeView(viewsets.ViewSet):
             """
         ))
 
-    def create(self, request, *args, **kwargs):
-        serializer = serializers.NVDTaskSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        job = new_task(serializer.data, models.JobType.CPE_UPDATE)
-        job_s = serializers.JobSerializer(instance=job)
-        return Response(job_s.data, status=status.HTTP_201_CREATED)
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
@@ -397,7 +391,7 @@ class CpeView(viewsets.ViewSet):
 
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
+        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
     
     @extend_schema(
             parameters=[
@@ -407,7 +401,7 @@ class CpeView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cpe_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
+        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
 
 
 @extend_schema_view(
@@ -429,7 +423,7 @@ class CpeView(viewsets.ViewSet):
     ),
 )
 class ACPView(viewsets.ViewSet):
-    openapi_tags = ["Arango CTI Processor"]
+    openapi_tags = ["Arango CVE Processor"]
     serializer_class = serializers.ACPSerializer
     openapi_path_params = [
             OpenApiParameter(name='mode', enum=list(serializers.ACP_MODES), location=OpenApiParameter.PATH, description='The  [`arango_cve_processor`](https://github.com/muchdogesec/arango_cve_processor/) `--relationship` mode.')
@@ -439,7 +433,7 @@ class ACPView(viewsets.ViewSet):
         serializer = serializers.ACPSerializerWithMode(data={**request.data, **kwargs})
         serializer.is_valid(raise_exception=True)
         data = serializer.data.copy()
-        job = new_task(data, models.JobType.CTI_PROCESSOR)
+        job = new_task(data, models.JobType.CVE_PROCESSOR)
         job_s = serializers.JobSerializer(instance=job)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
@@ -447,7 +441,7 @@ class ACPView(viewsets.ViewSet):
     list=extend_schema(
         description=textwrap.dedent(
             """
-            Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CTI Processor runs to join the data together.
+            Search and filter Jobs. Jobs are triggered for each time a data download request is executed (e.g. GET ATT&CK). The response of these requests will contain a Job ID. Note, Jobs also include Arango CVE Processor runs to join the data together.
             """
         ),
         summary="Get Jobs",
@@ -482,7 +476,7 @@ class JobView(viewsets.ModelViewSet):
         def get_type_choices():
             choices = list(models.JobType.choices)
             for mode, summary in serializers.ACP_MODES.items():
-                type = models.JobType.CTI_PROCESSOR
+                type = models.JobType.CVE_PROCESSOR
                 choices.append((f"{type}--{mode}", summary))
 
             choices.sort(key=lambda x: x[0])

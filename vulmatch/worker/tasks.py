@@ -34,45 +34,10 @@ def create_celery_task_from_job(job: Job):
     match job.type:
         case models.JobType.CVE_UPDATE:
             task = run_nvd_task(data, job, 'cve')
-        case models.JobType.CPE_UPDATE:
-            task = run_nvd_task(data, job, 'cpe')
-        case models.JobType.CTI_PROCESSOR:
+        case models.JobType.CVE_PROCESSOR:
             task = run_acp_task(data, job)
-        #####
-        case models.JobType.ATTACK_UPDATE:
-            task = run_mitre_task(data, job, f'attack-{data["matrix"]}')
-        case models.JobType.CWE_UPDATE:
-            task = run_mitre_task(data, job, 'cwe')
-        case models.JobType.CAPEC_UPDATE:
-            task = run_mitre_task(data, job, 'capec')
     task.set_immutable(True)
     return task
-
-
-def run_mitre_task(data, job: Job, mitre_type='cve'):
-    version = data['version']
-    match mitre_type:
-        case 'attack-enterprise':
-            url = urljoin(settings.ATTACK_ENTERPRISE_BUCKET_ROOT_PATH, f"enterprise-attack-{version}.json")
-            collection_name = 'mitre_attack_enterprise'
-        case 'attack-mobile':
-            url = urljoin(settings.ATTACK_MOBILE_BUCKET_ROOT_PATH, f"mobile-attack-{version}.json")
-            collection_name = 'mitre_attack_mobile'
-        case 'attack-ics':
-            url = urljoin(settings.ATTACK_ICS_BUCKET_ROOT_PATH, f"ics-attack-{version}.json")
-            collection_name = 'mitre_attack_ics'
-        case "cwe":
-            url = urljoin(settings.CWE_BUCKET_ROOT_PATH, f"cwe-bundle-v{version}.json")
-            collection_name = 'mitre_cwe'
-        case "capec":
-            url = urljoin(settings.CAPEC_BUCKET_ROOT_PATH, f"stix-capec-v{version}.json")
-            collection_name = 'mitre_capec'
-        case _:
-            raise NotImplementedError("Unknown type for mitre task")
-    
-    temp_dir = str(Path(tempfile.gettempdir())/f"ctibutler/mitre-{mitre_type}--{str(job.id)}")
-    task = download_file.si(url, temp_dir, job_id=job.id) | upload_file.s(collection_name, stix2arango_note=f'version={version}', job_id=job.id, params=job.parameters)
-    return (task | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
 
 def new_task(data, type, job=None) -> Job:
     job = Job.objects.create(type=type, parameters=data)
@@ -111,7 +76,7 @@ def date_range(start_date: date, end_date: date):
 
 def daily_url(d: date, type='cve'):
     dstr = d.strftime('%Y_%m_%d')
-    return f"{type}/{d.strftime('%Y-%m')}/{type}-bundle-{dstr}-00_00_00-{dstr}-23_59_59.json"
+    return f"{d.strftime('%Y-%m')}/{type}-bundle-{dstr}-00_00_00-{dstr}-23_59_59.json"
 
 
 class CustomTask(Task):
