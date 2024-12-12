@@ -350,13 +350,25 @@ class ArangoDBHelper:
         if q := self.query_as_array('attack_id'):
             binds['attack_ids'] = q
             filters.append('''
-                FILTER LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND LAST(SPLIT(d.description, ' ')) IN @attack_ids LIMIT 1 RETURN TRUE) > 0
+                FILTER LENGTH(
+                    FOR d IN nvd_cve_edge_collection
+                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND NOT doc._is_ref AND d.external_references
+                        FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'mitre-attack' RETURN c.external_id) IN @attack_ids
+                        LIMIT 1
+                        RETURN TRUE
+                    ) > 0
                 ''')
             
         if q := self.query_as_array('capec_id'):
             binds['capec_ids'] = q
             filters.append('''
-                FILTER LENGTH(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND LAST(SPLIT(d.description, ' ')) IN @capec_ids LIMIT 1 RETURN TRUE) > 0
+                FILTER LENGTH(
+                    FOR d IN nvd_cve_edge_collection
+                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND NOT doc._is_ref AND d.external_references
+                        FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'capec' RETURN c.external_id) IN @capec_ids
+                        LIMIT 1
+                        RETURN TRUE
+                    ) > 0
                 ''')
 
         query = """
