@@ -118,7 +118,7 @@ CVE_SORT_FIELDS = [
 ]
 OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
-CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "is-vulnerable", "in-pattern": "pattern-contains"}
+CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "exploits", "in-pattern": "relies-on"}
 CPE_REL_SORT_FIELDS = ["modified_descending", "modified_ascending", "created_descending", "created_ascending"]
 CVE_BUNDLE_TYPES = set([
   "vulnerability",
@@ -320,13 +320,13 @@ class ArangoDBHelper:
         if q := self.query_as_array('cpes_vulnerable'):
             binds['cpes_vulnerable'] = q
             filters.append('''
-            LET vulnerable_cpes = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'is-vulnerable' AND DOCUMENT(d._to).cpe IN @cpes_vulnerable RETURN TRUE)
+            LET vulnerable_cpes = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'exploits' AND DOCUMENT(d._to).cpe IN @cpes_vulnerable RETURN TRUE)
             FILTER LENGTH(vulnerable_cpes) > 0
             ''')
         if q := self.query_as_array('cpes_in_pattern'):
             binds['cpes_in_pattern'] = q
             filters.append('''
-            LET cpes_in_pattern = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'pattern-contains' AND DOCUMENT(d._to).cpe IN @cpes_in_pattern RETURN TRUE)
+            LET cpes_in_pattern = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'relies-on' AND DOCUMENT(d._to).cpe IN @cpes_in_pattern RETURN TRUE)
             FILTER LENGTH(cpes_in_pattern) > 0
             ''')
 
@@ -442,9 +442,9 @@ RETURN KEEP(doc, KEYS(doc, true))
             """
             
         if self.query_as_bool('include_cpe', True):
-            cve_rels_types.append('pattern-contains')
+            cve_rels_types.append('relies-on')
         if self.query_as_bool('include_cpe_vulnerable', True):
-            cve_rels_types.append('is-vulnerable')
+            cve_rels_types.append('exploits')
 
         if include_cwe:
             cve_rels_types.append('exploited-using')
@@ -554,12 +554,12 @@ RETURN KEEP(d, KEYS(d, TRUE))
         if q := self.query_as_array('cve_vulnerable'):
             bind_vars['cve_vulnerable'] = q
             filters.append('''
-            FILTER cve_matches[? ANY FILTER CURRENT[0]=='is-vulnerable' AND CURRENT[1] IN @cve_vulnerable]
+            FILTER cve_matches[? ANY FILTER CURRENT[0]=='exploits' AND CURRENT[1] IN @cve_vulnerable]
             ''')
         if q := self.query_as_array('in_cve_pattern'):
             bind_vars['in_cve_pattern'] = q
             filters.append('''
-            FILTER cve_matches[? ANY FILTER CURRENT[0]=='pattern-contains' AND CURRENT[1] IN @in_cve_pattern]
+            FILTER cve_matches[? ANY FILTER CURRENT[0]=='relies-on' AND CURRENT[1] IN @in_cve_pattern]
             ''')
 
 
@@ -570,7 +570,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         query = """
             FOR doc in @@collection
             FILTER doc.type == 'software' AND doc._is_latest
-            LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['is-vulnerable', 'pattern-contains'] RETURN [d.relationship_type, FIRST(SPLIT(d.description, ' '))])
+            LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, FIRST(SPLIT(d.description, ' '))])
 
             @filters
             LIMIT @offset, @count
