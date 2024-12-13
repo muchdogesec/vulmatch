@@ -124,8 +124,7 @@ CVE_BUNDLE_TYPES = set([
   "vulnerability",
   "indicator",
   "relationship",
-  "note",
-  "sighting",
+  "report",
   "software",
   "weakness",
   "attack-pattern"
@@ -414,32 +413,19 @@ RETURN KEEP(doc, KEYS(doc, true))
         more_queries = {}
 
         include_attack = self.query_as_bool('include_attack', True)
-        include_capec = self.query_as_bool('include_capec', True) or include_attack
-        include_cwe = self.query_as_bool('include_cwe', True) or include_capec
+        include_capec = self.query_as_bool('include_capec', True) # or include_attack
+        include_cwe = self.query_as_bool('include_cwe', True) # or include_capec
         
 
 
 
         if include_capec:
-            include_cwe = True
-            more_queries['cwe_capec'] = """
-            LET cwe_capec = FLATTEN(
-                FOR doc IN mitre_cwe_edge_collection
-                FILTER doc.relationship_type == 'exploited-using' AND [doc._from, doc._to] ANY IN cve_rels[*]._id
-                RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
-            )
-            """
+            cve_rels_types.append('cve-capec')
 
                 
         if include_attack:
-            include_capec = True
-            more_queries["capec_attack"] = """
-            LET capec_attack = FLATTEN(
-                FOR doc IN mitre_capec_edge_collection
-                FILTER doc.relationship_type == 'technique' AND [doc._from, doc._to] ANY IN cwe_capec[*]._id
-                RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
-            )
-            """
+            cve_rels_types.append('cve-attack')
+
             
         if self.query_as_bool('include_cpe', True):
             cve_rels_types.append('relies-on')
@@ -447,12 +433,15 @@ RETURN KEEP(doc, KEYS(doc, true))
             cve_rels_types.append('exploits')
 
         if include_cwe:
-            cve_rels_types.append('exploited-using')
+            cve_rels_types.append('cve-cwe')
 
+        vertex_filters = ["(doc.type IN ['indicator', 'vulnerability'])"]
         if self.query_as_bool('include_epss', True):
             cve_rels_types.append('object')
+            vertex_filters.append("(doc.type == 'report' AND 'epss' IN doc.labels)")
         if self.query_as_bool('include_kev', True):
-            cve_rels_types.append('sighting-of')
+            cve_rels_types.append('object')
+            vertex_filters.append("(doc.type == 'report' AND 'kev' IN doc.labels)")
 
         types = self.query_as_array('object_type') or CVE_BUNDLE_TYPES
         binds['types'] = list(CVE_BUNDLE_TYPES.intersection(types))
@@ -461,12 +450,12 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = '''
 LET cve_data = (
   FOR doc IN nvd_cve_vertex_collection
-  FILTER doc._is_latest AND doc.name == @cve_id
+  FILTER doc._is_latest AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
   RETURN doc
 )
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id AND doc.relationship_type IN @cve_edge_types
+    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
 
     RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
     )
@@ -479,8 +468,12 @@ FILTER d.type IN @types
 LIMIT @offset, @count
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
-        query = query.replace('@@@more_queries', "\n".join(more_queries.values())) \
+        query = query \
+                    .replace("@@@vertex_filters", " OR ".join(vertex_filters)) \
+                    .replace('@@@more_queries', "\n".join(more_queries.values())) \
                     .replace("@@@extra_rels", ", ".join(more_queries.keys()) or '[]')
+        
+        # return Response([query, binds])
         return self.execute_query(query, bind_vars=binds)
   
     def get_cxe_object(self, cve_id, type="vulnerability", var='name', version_param='cve_version', relationship_mode=False):
@@ -570,7 +563,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         query = """
             FOR doc in @@collection
             FILTER doc.type == 'software' AND doc._is_latest
-            LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, FIRST(SPLIT(d.description, ' '))])
+            LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, d.external_references[0].external_id])
 
             @filters
             LIMIT @offset, @count
