@@ -3,12 +3,12 @@ from rest_framework import serializers, validators
 
 
 ACP_MODES = {
-    "cve-cpe": "Relate CVE objects to CPE objects",
     "cve-epss": "Add EPSS Note(s) for CVE objects",
+    "cve-kev": "Add EPSS Note(s) for CVE objects",
     ###
     "cve-cwe": "Relate CVE objects to CWE objects",
-    "cwe-capec": "Relate CWE objects to CAPEC objects",
-    "capec-attack": "Relate CAPEC objects to ATT&CK objects",
+    "cve-capec": "Relate CWE objects to CAPEC objects",
+    "cve-attack": "Relate CAPEC objects to ATT&CK objects",
 }
 
 class StixObjectsSerializer(serializers.Serializer):

@@ -177,13 +177,8 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     "TAGS": [
         {"name": "CVE", "description": "Download the latest CVE objects or view existing CVE objects."},
         {"name": "CPE", "description": "Download the latest CPE objects or view existing CVE objects."},
-        {"name": "ATT&CK Enterprise", "description": "Download the latest ATT&CK Enterprise objects."},
-        {"name": "ATT&CK ICS", "description": "Download the latest ATT&CK ICS objects."},
-        {"name": "ATT&CK Mobile", "description": "Download the latest ATT&CK Mobile objects."},
-        {"name": "CAPEC", "description": "Download the latest CAPEC objects."},
-        {"name": "CWE", "description": "Download the latest CWE objects."},
         {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
-        {"name": "Arango CTI Processor", "description": "Trigger the generation of relationships between objects."},
+        {"name": "Arango CVE Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
     ]
 }
@@ -195,9 +190,3 @@ ARANGODB_HOST_URL   = os.getenv("ARANGODB_HOST_URL")
 ARANGODB_DATABASE   = "vulmatch"
 
 NVD_BUCKET_ROOT_PATH    = os.environ["NVD_BUCKET_ROOT_PATH"]
-
-CWE_BUCKET_ROOT_PATH    = os.environ["CWE_BUCKET_ROOT_PATH"]
-CAPEC_BUCKET_ROOT_PATH    = os.environ["CAPEC_BUCKET_ROOT_PATH"]
-ATTACK_ENTERPRISE_BUCKET_ROOT_PATH = os.environ["ATTACK_ENTERPRISE_BUCKET_ROOT_PATH"]
-ATTACK_MOBILE_BUCKET_ROOT_PATH = os.environ["ATTACK_MOBILE_BUCKET_ROOT_PATH"]
-ATTACK_ICS_BUCKET_ROOT_PATH = os.environ["ATTACK_ICS_BUCKET_ROOT_PATH"]
