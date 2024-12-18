@@ -57,7 +57,7 @@ def run_nvd_task(data, job: Job, nvd_type='cve'):
     temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/nvd-{nvd_type}--{str(job.id)}")
     tasks = []
     for d in dates:
-        url = urljoin(settings.NVD_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
+        url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
         task = download_file.si(url, temp_dir, job_id=job.id)
         task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id, params=job.parameters)
         task.set_immutable(True)
