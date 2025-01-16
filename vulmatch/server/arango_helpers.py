@@ -541,6 +541,11 @@ RETURN KEEP(d, KEYS(d, TRUE))
             struct_match['vendor'] = value
             filters.append('FILTER CONTAINS(doc.x_cpe_struct.vendor, @struct_match.vendor)')
 
+        for k in ['version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']:
+            if v := self.query.get(k):
+                struct_match[k] = v
+                filters.append(f'FILTER CONTAINS(doc.x_cpe_struct.{k}, @struct_match.{k})')
+
         if struct_match:
             bind_vars['struct_match'] = struct_match
 

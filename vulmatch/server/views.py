@@ -384,6 +384,16 @@ class CpeView(viewsets.ViewSet):
             """
         ))
 
+        ### more filters
+        version = CharFilter(help_text='vendor-specific alphanumeric strings characterising the particular release version of the product')
+        update = CharFilter(help_text='vendor-specific alphanumeric strings characterising the particular update, service pack, or point release of the product.')
+        edition = CharFilter(help_text='assigned the logical value ANY (*) except where required for backward compatibility with version 2.2 of the CPE specification')
+        language = CharFilter(help_text='valid language tags as defined by [RFC5646]')
+        sw_edition = CharFilter(help_text='characterises how the product is tailored to a particular market or class of end users.')
+        target_sw = CharFilter(help_text='characterises the software computing environment within which the product operates.')
+        target_hw = CharFilter(help_text='characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates')
+        other = CharFilter(help_text='capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value')
+
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
