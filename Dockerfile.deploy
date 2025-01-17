@@ -24,6 +24,8 @@ ENV ARANGODB_HOST_URL=http://host.docker.internal:8529
 ENV POSTGRES_USER=vulmatch
 ENV POSTGRES_DB=vulmatch_database
 ENV POSTGRES_HOST=host.docker.internal
+ENV CELERY_BROKER_URL=redis://host.docker.internal:6379/0
+ENV result_backend=redis://host.docker.internal:6379/1
 
 WORKDIR /usr/src/app
 COPY requirements.txt ./
