@@ -132,6 +132,7 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
+        always_latest=params.get('always_latest', False),
     )
     s2a.run()
 

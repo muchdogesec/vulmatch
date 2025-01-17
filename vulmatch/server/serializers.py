@@ -24,27 +24,16 @@ class NVDTaskSerializer(serializers.Serializer):
     last_modified_earliest = serializers.DateField(help_text="(`YYYY-MM-DD`): earliest date")
     last_modified_latest = serializers.DateField(help_text="(`YYYY-MM-DD`): latest date \n* default is `1980-01-01`")
     ignore_embedded_relationships = serializers.BooleanField(default=False)
+    always_latest = serializers.BooleanField(default=False, help_text="Skip _is_latest check when uploading, this should only be used when working with large backfill tasks")
 
     def validate(self, attrs):
         if attrs.get('last_modified_earliest') and attrs.get('last_modified_latest') and attrs['last_modified_earliest'] > attrs['last_modified_latest']:
             raise serializers.ValidationError(f'last_modified_earliest cannot be greater than last_modified_latest')
         return super().validate(attrs)
 
-class MitreTaskSerializer(serializers.Serializer):
-    version = serializers.CharField(help_text="mitre version passed to the script")
-    ignore_embedded_relationships = serializers.BooleanField(default=False)
-
-class MitreVersionsSerializer(serializers.Serializer):
-    latest = serializers.CharField(required=False, allow_null=True)
-    versions = serializers.ListField(child=serializers.CharField())
-
 class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField(required=False, allow_null=True)
     versions = serializers.ListField(child=serializers.DateTimeField())
-
-class MitreObjectVersions(serializers.Serializer):
-    modified = serializers.DateTimeField(required=False, allow_null=True)
-    notes = serializers.ListField(child=serializers.CharField())
 
 
 class ACPSerializer(serializers.Serializer):

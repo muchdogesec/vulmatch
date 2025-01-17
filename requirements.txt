@@ -51,4 +51,4 @@ wcwidth==0.2.13
 zipp==3.20.2
 dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2024-12-23-10-31-09/dogesec_commons-0.0.3-py3-none-any.whl
 arango_cve_processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/main-2025-01-10-10-35-43/arango_cve_processor-0.0.1-py3-none-any.whl
-stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2024-12-23-10-31-37/stix2arango-0.0.3-py3-none-any.whl
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/always-latest-param-2025-01-17-09-28-37/stix2arango-0.0.3-py3-none-any.whl
