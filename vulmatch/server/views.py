@@ -359,18 +359,18 @@ class CpeView(viewsets.ViewSet):
         ))
         vendor = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc.
+            Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc. (this is the 3ed value in the CPE URI).
             """
         ))
         product = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc.
+            Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc. (this is the 4th value in the CPE URI).
             """
         ))
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
                         help_text=textwrap.dedent(
             """
-            Filters CPEs returned by product type.
+            Filters CPEs returned by product type (this is the 2nd value in the CPE URI).
             """
         ))
         cve_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
@@ -385,16 +385,15 @@ class CpeView(viewsets.ViewSet):
         ))
 
         ### more filters
-        version = CharFilter(help_text='vendor-specific alphanumeric strings characterising the particular release version of the product')
-        update = CharFilter(help_text='vendor-specific alphanumeric strings characterising the particular update, service pack, or point release of the product.')
-        edition = CharFilter(help_text='assigned the logical value ANY (*) except where required for backward compatibility with version 2.2 of the CPE specification')
-        language = CharFilter(help_text='valid language tags as defined by [RFC5646]')
-        sw_edition = CharFilter(help_text='characterises how the product is tailored to a particular market or class of end users.')
-        target_sw = CharFilter(help_text='characterises the software computing environment within which the product operates.')
-        target_hw = CharFilter(help_text='characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates')
-        other = CharFilter(help_text='capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value')
+        version = CharFilter(help_text='Vendor-specific alphanumeric strings characterising the particular release version of the product (this is the 5th value in the CPE URI).')
+        update = CharFilter(help_text='Vendor-specific alphanumeric strings characterising the particular update, service pack, or point release of the product (this is the 6th value in the CPE URI).')
+        edition = CharFilter(help_text='Assigned the logical value ANY (*) except where required for backward compatibility with version 2.2 of the CPE specification (this is the 7th value in the CPE URI).')
+        language = CharFilter(help_text='Valid language tags as defined by RFC5646 (this is the 8th value in the CPE URI).')
+        sw_edition = CharFilter(help_text='Characterises how the product is tailored to a particular market or class of end users (this is the 9th value in the CPE URI).')
+        target_sw = CharFilter(help_text='Characterises the software computing environment within which the product operates (this is the 10th value in the CPE URI).')
+        target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
+        other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
 
-    
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
