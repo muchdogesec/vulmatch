@@ -42,8 +42,9 @@ class VulnerabilityStatus(models.models.TextChoices):
             * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for vulnerability
             * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for vulnerability
             * `ignore_embedded_relationships` (optional - default: `false`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` (recommended) will get stix2arango to generate SROs for these embedded relationships so they can be searched. `true` will ignore them.
+            * `always_latest`: this is a stix2arango setting that defines how updates happen. Default is `true`, setting this to `false` will get stix2arango to bypass the check for updated objects. The only time you should ever set this to `false` is on first backfill where you can be sure no duplicate objects exist.
 
-            The data for updates is requested from `https://downloads.ctibutler.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
+            The data for updates is requested from `https://cve2stix.vulmatch.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
         ),
     ),
