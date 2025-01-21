@@ -1,4 +1,5 @@
 import contextlib
+import json
 from pathlib import Path
 import re
 import typing
@@ -7,6 +8,8 @@ from django.conf import settings
 from .utils import Pagination, Response
 from drf_spectacular.utils import OpenApiParameter
 from rest_framework.validators import ValidationError
+
+from django.http import HttpResponse
 
 from ..server import utils
 if typing.TYPE_CHECKING:
@@ -319,14 +322,16 @@ class ArangoDBHelper:
         if q := self.query_as_array('cpes_vulnerable'):
             binds['cpes_vulnerable'] = q
             filters.append('''
-            LET vulnerable_cpes = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'exploits' AND DOCUMENT(d._to).cpe IN @cpes_vulnerable RETURN TRUE)
-            FILTER LENGTH(vulnerable_cpes) > 0
+            LET cpes_vulnerable_ids = (FOR d IN nvd_cve_vertex_collection FILTER d.cpe IN @cpes_vulnerable RETURN d.id)
+            LET cpes_vulnerable = (FOR d IN nvd_cve_edge_collection FILTER d.relationship_type == 'exploits' AND d.target_ref IN cpes_vulnerable_ids RETURN d._from)
+            FILTER indicator_ref IN cpes_vulnerable
             ''')
         if q := self.query_as_array('cpes_in_pattern'):
             binds['cpes_in_pattern'] = q
             filters.append('''
-            LET cpes_in_pattern = (FOR d in nvd_cve_edge_collection FILTER d._from == indicator_ref AND d.relationship_type == 'relies-on' AND DOCUMENT(d._to).cpe IN @cpes_in_pattern RETURN TRUE)
-            FILTER LENGTH(cpes_in_pattern) > 0
+            LET cpes_in_pattern_ids = (FOR d IN nvd_cve_vertex_collection FILTER d.cpe IN @cpes_in_pattern RETURN d.id)
+            LET cpes_in_pattern = (FOR d IN nvd_cve_edge_collection FILTER d.relationship_type == 'relies-on' AND d.target_ref IN cpes_in_pattern_ids RETURN d._from)
+            FILTER indicator_ref IN cpes_in_pattern
             ''')
 
         if q := self.query_as_array('cve_id'):
@@ -374,17 +379,17 @@ class ArangoDBHelper:
 
 LET kevs = (
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest AND doc.labels[0] == "kev"
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "kev"
 RETURN doc.object_refs[0]
 )
 LET epss = MERGE(
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest AND doc.labels[0] == "epss"
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "epss"
 RETURN {[doc.external_references[0].external_id]: LAST(doc.x_epss)}
 )
 
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'vulnerability' AND doc._is_latest
+FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 LET indicator_ref = FIRST(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to RETURN d._from)
 @filters
 @sort_stmt
@@ -403,8 +408,8 @@ RETURN KEEP(doc, KEYS(doc, true))
                 },
             ),
         )
-        # return Response([query, binds])
         return self.execute_query(query, bind_vars=binds)
+        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
 
     def get_cve_bundle(self, cve_id: str):
         cve_rels_types = []
@@ -445,7 +450,7 @@ RETURN KEEP(doc, KEYS(doc, true))
 
         types = self.query_as_array('object_type') or CVE_BUNDLE_TYPES
         binds['types'] = list(CVE_BUNDLE_TYPES.intersection(types))
-        
+        binds['@view'] = settings.VIEW_NAME
 
         query = '''
 LET cve_data = (
@@ -453,27 +458,24 @@ LET cve_data = (
   FILTER doc._is_latest AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
   RETURN doc
 )
+
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER [doc._from, doc._to] ANY IN cve_data[*]._id AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
+    FILTER (doc._from IN cve_data[*]._id OR doc._to IN cve_data[*]._id) AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
 
-    RETURN [doc, DOCUMENT(doc._from), DOCUMENT(doc._to)]
+    RETURN [doc._id, doc._from, doc._to]
     )
     
-@@@more_queries
-
-    
-FOR d in UNION_DISTINCT(cve_data, cve_rels, @@@extra_rels)
-FILTER d.type IN @types
+LET all_objects_ids = APPEND(cve_data[*]._id, cve_rels)
+FOR d in @@view
+SEARCH d.type IN @types AND d._id IN all_objects_ids
 LIMIT @offset, @count
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
         query = query \
-                    .replace("@@@vertex_filters", " OR ".join(vertex_filters)) \
-                    .replace('@@@more_queries', "\n".join(more_queries.values())) \
-                    .replace("@@@extra_rels", ", ".join(more_queries.keys()) or '[]')
+                    .replace("@@@vertex_filters", " OR ".join(vertex_filters))
         
-        # return Response([query, binds])
+        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
         return self.execute_query(query, bind_vars=binds)
   
     def get_cxe_object(self, cve_id, type="vulnerability", var='name', version_param='cve_version', relationship_mode=False):
