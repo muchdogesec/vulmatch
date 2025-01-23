@@ -529,20 +529,20 @@ RETURN KEEP(d, KEYS(d, TRUE))
             )
 
         if value := self.query.get('cpe_match_string'):
-            bind_vars['cpe_match_string'] = self.like_string(value)
+            bind_vars['cpe_match_string'] = self.like_string(value).lower()
             filters.append(
                 "FILTER doc.cpe LIKE @cpe_match_string"
             )
 
         struct_match = {}
         if value := self.query.get('product_type'):
-            struct_match['part'] = value[0]
+            struct_match['part'] = value[0].lower()
             filters.append('FILTER doc.x_cpe_struct.part == @struct_match.part')
 
 
         for k in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']:
             if v := self.query.get(k):
-                struct_match[k] = self.like_string(v)
+                struct_match[k] = self.like_string(v).lower()
                 filters.append(f'FILTER doc.x_cpe_struct.{k} LIKE @struct_match.{k}')
 
         if struct_match:
