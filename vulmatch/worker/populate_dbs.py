@@ -34,9 +34,18 @@ def create_indexes(db: StandardDatabase):
     time = int(datetime.now().timestamp())
     for sorter in "created modified name cpe".split():
         vertex_collection.add_index(dict(type='persistent', fields=["type", "_is_latest", sorter], inBackground=True, name=f"vulmatch_cve_sort_{sorter}_{time}"))
-    vertex_collection.add_index(dict(type='persistent', fields=["cpe"], storedValues=["id"], inBackground=True, name=f"vulmatch_cpe"))
-    vertex_collection.add_index(dict(type='persistent', fields=["name"], inBackground=True, name=f"vulmatch_name"))    
-            
+    vertex_collection.add_index(dict(type='persistent', fields=["cpe"], storedValues=["id"], inBackground=True, name=f"vulmatch_cpe", sparse=True))
+    vertex_collection.add_index(dict(type='persistent', fields=["type", "cpe"], storedValues=["id"], inBackground=True, name=f"vulmatch_type_cpe"))
+    vertex_collection.add_index(dict(type='persistent', fields=["name"], inBackground=True, name=f"vulmatch_name"))
+    db.create_analyzer('norm_en', analyzer_type='norm', properties={ "locale": "en", "accent": False, "case": "lower" })
+    vertex_collection.add_index(dict(type='inverted', name='cpe_search_inv', fields=[
+        dict(name='cpe', analyzer='norm_en'),
+        "id",
+        "type",
+        *[dict(name=f'x_cpe_struct.{name}', analyzer='norm_en') for name in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']],
+        "x_cpe_struct.part"
+    ], inBackground=True))
+
 
 def create_collections():
     #create db/collections

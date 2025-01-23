@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
-from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
+from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CPE_SORT_FIELDS, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
 from vulmatch.server.autoschema import DEFAULT_400_ERROR
 from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
@@ -394,7 +394,13 @@ class CpeView(viewsets.ViewSet):
         target_sw = CharFilter(help_text='Characterises the software computing environment within which the product operates (this is the 10th value in the CPE URI).')
         target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
         other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
-
+    
+    
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('sort', enum=CPE_SORT_FIELDS, description="Sort results by"),
+            ]
+    )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
