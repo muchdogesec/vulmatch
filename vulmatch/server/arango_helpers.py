@@ -285,7 +285,37 @@ class ArangoDBHelper:
             raise ValidationError(f"invalid page `{page}`")
         offset = (page-1)*count
         return offset, count
+    
+    def get_kev_or_epss(self, label):
+        binds = {"label": label}
+        binds['cve_ids'] = [qq.upper() for  qq in self.query_as_array('cve_id')] or None
+        
+        query = """
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+LIMIT @offset, @count
+RETURN KEEP(doc, KEYS(doc, TRUE))
+        """
+        return self.execute_query(query, bind_vars=binds)
 
+
+    def get_kev_or_epss_object(self, cve_id, label, relationship_mode=False):
+        bind_vars={'cve_id': cve_id, "label":label}
+
+        query = '''
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER doc.external_references[0].external_id == @cve_id
+LIMIT @offset, @count
+RETURN KEEP(doc, KEYS(doc, TRUE))
+            '''
+        
+        if relationship_mode:
+            return self.get_relationships(query, bind_vars)
+
+        return self.execute_query(query, bind_vars=bind_vars)
+    
     def get_vulnerabilities(self):
         binds = {}
         filters = []

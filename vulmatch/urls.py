@@ -34,6 +34,8 @@ router.register("arango-cve-processor/<str:mode>", views.ACPView, "acp-view")
 router.register("cve", views.CveView, "cve-view")
 router.register("cpe", views.CpeView, "cpe-view")
 
+router.register("kev", views.KevView, "kev-view")
+router.register("epss", views.EPSSView, "epss-view")
 ## objects
 router.register('objects/smos', arango_views.SMOView, "object-view-smo")
 router.register('objects/scos', arango_views.SCOView, "object-view-sco")
