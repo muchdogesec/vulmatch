@@ -175,8 +175,10 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         "url": "https://github.com/muchdogesec/vulmatch",
     },
     "TAGS": [
-        {"name": "CVE", "description": "Download the latest CVE objects or view existing CVE objects."},
-        {"name": "CPE", "description": "Download the latest CPE objects or view existing CVE objects."},
+        {"name": "CVE", "description": "Download and search the latest CVE objects."},
+        {"name": "CPE", "description": "Search and filter CPE objects."},
+        {"name": "KEV", "description": "Search and filter KEV objects."},
+        {"name": "EPSS", "description": "Search and filter EPSS objects."},
         {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
         {"name": "Arango CVE Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},

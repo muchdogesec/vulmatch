@@ -283,7 +283,11 @@ class CveView(viewsets.ViewSet):
         summary="Get KEV Objects for CVEs",
         description=textwrap.dedent(
             """
-            Search and filter KEV records.
+            Search and filter [CISA KEV records](https://www.cisa.gov/known-exploited-vulnerabilities-catalog).
+
+            This endpoint returns `report` objects with the `labels` = `kev` for CVEs.
+
+            **IMPORTANT:** You need to run Arango CVE Processor in `cve-kev` mode to generate these reports.
             """
         ),
     ),
@@ -291,7 +295,9 @@ class CveView(viewsets.ViewSet):
         summary='Get a KEV Report by CVE ID',
         description=textwrap.dedent(
             """
-            Get a KEV Report by CVE ID
+            Use this endpoint to get a KEV `report` object using the CVE ID.
+
+            If there is no KEV reported for the CVE, the response will be empty.
             """
         ),
         responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'report')},
@@ -310,7 +316,7 @@ class CveView(viewsets.ViewSet):
 )  
 class KevView(viewsets.ViewSet):
 
-    openapi_tags = ["CVE"]
+    openapi_tags = ["KEV"]
     pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.StixObjectsSerializer(many=True)
@@ -341,7 +347,11 @@ class KevView(viewsets.ViewSet):
         summary="Get EPSS Objects for CVEs",
         description=textwrap.dedent(
             """
-            Search and filter EPSS records.
+            Search and filter EPSS `report` objects for CVEs.
+
+            This endpoint returns `report` objects with the `labels` = `epss`.
+
+            **IMPORTANT:** You need to run Arango CVE Processor in `cve-epss` mode to generate these reports.
             """
         ),
     ),
@@ -349,7 +359,9 @@ class KevView(viewsets.ViewSet):
         summary='Get a EPSS Report by CVE ID',
         description=textwrap.dedent(
             """
-            Get a EPSS Report by CVE ID
+            Use this endpoint to get an EPSS `report` object using the CVE ID.
+
+            Every CVE has an EPSS score that can change over time. EPSS report objects can be used to track the change in EPSS score over time.
             """
         ),
     ),
@@ -363,7 +375,7 @@ class KevView(viewsets.ViewSet):
     ),
 )     
 class EPSSView(KevView):
-    openapi_tags = ["CVE"]
+    openapi_tags = ["EPSS"]
     label = "epss"
 
 
