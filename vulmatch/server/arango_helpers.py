@@ -119,6 +119,18 @@ CVE_SORT_FIELDS = [
     "cvss_base_score_ascending",
     "cvss_base_score_descending",
 ]
+EPSS_SORT_FIELDS = [
+    "name_descending",
+    "name_ascending",
+    "created_descending",
+    "created_ascending",
+    "modified_descending",
+    "modified_ascending",
+    "epss_score_descending",
+    "epss_score_ascending"
+]
+KEV_SORT_FIELDS = EPSS_SORT_FIELDS[:-2]
+
 OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
 CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "exploits", "in-pattern": "relies-on"}
@@ -294,13 +306,23 @@ class ArangoDBHelper:
 FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
 FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+@sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
-        """
+        """.replace(
+            "@sort_stmt",
+            self.get_sort_stmt(
+                EPSS_SORT_FIELDS,
+                {
+                    "epss_score": "TO_NUMBER(LAST(doc.x_epss).epss)",
+                },
+            ),
+        )
+        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
         return self.execute_query(query, bind_vars=binds)
 
 
-    def get_kev_or_epss_object(self, cve_id, label, relationship_mode=False):
+    def get_kev_or_epss_object(self, cve_id, label):
         bind_vars={'cve_id': cve_id, "label":label}
 
         query = '''
@@ -310,9 +332,6 @@ FILTER doc.external_references[0].external_id == @cve_id
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
             '''
-        
-        if relationship_mode:
-            return self.get_relationships(query, bind_vars)
 
         return self.execute_query(query, bind_vars=bind_vars)
     
@@ -336,7 +355,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
 
         if q := self.query.get('epss_score_min'):
             binds['epss_score_min'] = float(q)
-            filters.append("FILTER TO_NUMBER(epss[doc.name].score) >= @epss_score_min")
+            filters.append("FILTER TO_NUMBER(epss[doc.name].epss) >= @epss_score_min")
 
         if q := self.query.get('epss_percentile_min'):
             binds['epss_percentile_min'] = float(q)
@@ -436,7 +455,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             self.get_sort_stmt(
                 CVE_SORT_FIELDS,
                 {
-                    "epss_score": "TO_NUMBER(epss[doc.name].score)",
+                    "epss_score": "TO_NUMBER(epss[doc.name].epss)",
                     "epss_percentile": "TO_NUMBER(epss[doc.name].percentile)",
                     "cvss_base_score": "FIRST(VALUES(doc.x_cvss)).base_score",
                 },

@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
-from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CPE_SORT_FIELDS, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
+from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CPE_SORT_FIELDS, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
 from vulmatch.server.autoschema import DEFAULT_400_ERROR
 from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
@@ -303,16 +303,6 @@ class CveView(viewsets.ViewSet):
         responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'report')},
         parameters=ArangoDBHelper.get_schema_operation_parameters(),
     ),
-    retrieve_object_relationships=extend_schema(
-        summary='Get Relationships for KEV Report by CVE ID',
-        description=textwrap.dedent(
-            """
-            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the KEV is related to.
-            """
-        ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
-    ),
 )  
 class KevView(viewsets.ViewSet):
 
@@ -324,11 +314,21 @@ class KevView(viewsets.ViewSet):
     label = "kev"
 
     openapi_path_params = [
-        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.'),
         OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2023-22518`'),
 
     ]
-
+    class filterset_class(FilterSet):
+        cve_id = CharFilter(help_text=textwrap.dedent(
+            """
+            Filter the results using a CVE ID. e.g. `CVE-2024-23897`
+            """
+        ))
+        
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('sort', enum=KEV_SORT_FIELDS, description="Sort results by"),
+            ]
+    )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_kev_or_epss(self.label)
@@ -337,10 +337,6 @@ class KevView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_kev_or_epss_object(cve_id, self.label)
-    
-    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_kev_or_epss_object(cve_id, self.label, relationship_mode=True)
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -354,6 +350,9 @@ class KevView(viewsets.ViewSet):
             **IMPORTANT:** You need to run Arango CVE Processor in `cve-epss` mode to generate these reports.
             """
         ),
+        parameters=[
+            OpenApiParameter('sort', enum=EPSS_SORT_FIELDS, description="Sort results by"),
+        ],
     ),
     retrieve_objects=extend_schema(
         summary='Get a EPSS Report by CVE ID',
@@ -362,14 +361,6 @@ class KevView(viewsets.ViewSet):
             Use this endpoint to get an EPSS `report` object using the CVE ID.
 
             Every CVE has an EPSS score that can change over time. EPSS report objects can be used to track the change in EPSS score over time.
-            """
-        ),
-    ),
-    retrieve_object_relationships=extend_schema(
-        summary='Get Relationships for EPSS Report by CVE ID',
-        description=textwrap.dedent(
-            """
-            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the EPSS is related to.
             """
         ),
     ),
