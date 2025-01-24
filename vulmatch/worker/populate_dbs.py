@@ -45,6 +45,8 @@ def create_indexes(db: StandardDatabase):
         *[dict(name=f'x_cpe_struct.{name}', analyzer='norm_en') for name in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']],
         "x_cpe_struct.part"
     ], inBackground=True))
+    vertex_collection.add_index(dict(type='persistent', fields=["_arango_cve_processor_note", "type"], inBackground=True, name=f"acvep_imports-type", sparse=True))
+
 
 
 def create_collections():
