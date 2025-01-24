@@ -476,7 +476,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
 
     def get_cve_bundle(self, cve_id: str):
-        cve_rels_types = []
+        cve_rels_types = ['detects']
         binds = dict(cve_id=cve_id.upper(), cve_edge_types=cve_rels_types, default_imports=CVE_BUNDLE_DEFAULT_OBJECTS)
 
         more_queries = {}
