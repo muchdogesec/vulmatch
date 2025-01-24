@@ -137,16 +137,27 @@ CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "exploits", "in-pattern": "relies-on"
 CPE_REL_SORT_FIELDS = ["modified_descending", "modified_ascending", "created_descending", "created_ascending"]
 CPE_SORT_FIELDS = ['part_descending', 'part_ascending', 'vendor_descending', 'vendor_ascending', 'product_ascending', 'product_descending', 'version_ascending', 'version_descending']
 CVE_BUNDLE_TYPES = set([
-  "vulnerability",
-  "indicator",
-  "relationship",
-  "report",
-  "software",
-  "weakness",
-  "attack-pattern"
+    "vulnerability",
+    "indicator",
+    "relationship",
+    "report",
+    "software",
+    "weakness",
+    "attack-pattern",
+    # default objects
+    "extension-definition",
+    "marking-definition",
+    "identity",
 ])
 
-
+CVE_BUNDLE_DEFAULT_OBJECTS = [
+    "extension-definition--ad995824-2901-5f6e-890b-561130a239d4",
+    "extension-definition--82cad0bb-0906-5885-95cc-cafe5ee0a500",
+    "extension-definition--2c5c13af-ee92-5246-9ba7-0b958f8cd34a",
+    "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+    "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3",
+    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",
+]
 
 def positive_int(integer_string, cutoff=None, default=1):
     """
@@ -466,7 +477,7 @@ RETURN KEEP(doc, KEYS(doc, true))
 
     def get_cve_bundle(self, cve_id: str):
         cve_rels_types = []
-        binds = dict(cve_id=cve_id.upper(), cve_edge_types=cve_rels_types)
+        binds = dict(cve_id=cve_id.upper(), cve_edge_types=cve_rels_types, default_imports=CVE_BUNDLE_DEFAULT_OBJECTS)
 
         more_queries = {}
 
@@ -506,20 +517,26 @@ RETURN KEEP(doc, KEYS(doc, true))
         binds['@view'] = settings.VIEW_NAME
 
         query = '''
-LET cve_data = (
+LET cve_data_ids = (
   FOR doc IN nvd_cve_vertex_collection
   FILTER doc._is_latest AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
-  RETURN doc
+  RETURN doc._id
+)
+
+LET default_object_ids = (
+  FOR doc IN nvd_cve_vertex_collection
+  FILTER doc.id IN @default_imports AND doc._is_latest
+  RETURN doc._id
 )
 
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER (doc._from IN cve_data[*]._id OR doc._to IN cve_data[*]._id) AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
+    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
 
     RETURN [doc._id, doc._from, doc._to]
     )
     
-LET all_objects_ids = APPEND(cve_data[*]._id, cve_rels)
+LET all_objects_ids = UNION_DISTINCT(default_object_ids, cve_data_ids, cve_rels)
 FOR d in @@view
 SEARCH d.type IN @types AND d._id IN all_objects_ids
 LIMIT @offset, @count
@@ -528,7 +545,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         query = query \
                     .replace("@@@vertex_filters", " OR ".join(vertex_filters))
         
-        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
+        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
   
     def get_cxe_object(self, cve_id, type="vulnerability", var='name', version_param='cve_version', relationship_mode=False):
