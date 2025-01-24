@@ -300,7 +300,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         return self.execute_query(query, bind_vars=binds)
 
 
-    def get_kev_or_epss_object(self, cve_id, label, relationship_mode=False):
+    def get_kev_or_epss_object(self, cve_id, label):
         bind_vars={'cve_id': cve_id, "label":label}
 
         query = '''
@@ -310,9 +310,6 @@ FILTER doc.external_references[0].external_id == @cve_id
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
             '''
-        
-        if relationship_mode:
-            return self.get_relationships(query, bind_vars)
 
         return self.execute_query(query, bind_vars=bind_vars)
     
