@@ -123,6 +123,7 @@ OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
 CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "exploits", "in-pattern": "relies-on"}
 CPE_REL_SORT_FIELDS = ["modified_descending", "modified_ascending", "created_descending", "created_ascending"]
+CPE_SORT_FIELDS = ['part_descending', 'part_ascending', 'vendor_descending', 'vendor_ascending', 'product_ascending', 'product_descending', 'version_ascending', 'version_descending']
 CVE_BUNDLE_TYPES = set([
   "vulnerability",
   "indicator",
@@ -176,7 +177,10 @@ class ArangoDBHelper:
             return default
         return query_str.lower() == 'true'
     
-
+    @classmethod
+    def like_string(cls, string: str):
+        return '%'+string+'%'
+    
     @classmethod
     def get_page_params(cls, request):
         kwargs = request.GET.copy()
@@ -281,7 +285,37 @@ class ArangoDBHelper:
             raise ValidationError(f"invalid page `{page}`")
         offset = (page-1)*count
         return offset, count
+    
+    def get_kev_or_epss(self, label):
+        binds = {"label": label}
+        binds['cve_ids'] = [qq.upper() for  qq in self.query_as_array('cve_id')] or None
+        
+        query = """
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+LIMIT @offset, @count
+RETURN KEEP(doc, KEYS(doc, TRUE))
+        """
+        return self.execute_query(query, bind_vars=binds)
 
+
+    def get_kev_or_epss_object(self, cve_id, label, relationship_mode=False):
+        bind_vars={'cve_id': cve_id, "label":label}
+
+        query = '''
+FOR doc IN nvd_cve_vertex_collection
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER doc.external_references[0].external_id == @cve_id
+LIMIT @offset, @count
+RETURN KEEP(doc, KEYS(doc, TRUE))
+            '''
+        
+        if relationship_mode:
+            return self.get_relationships(query, bind_vars)
+
+        return self.execute_query(query, bind_vars=bind_vars)
+    
     def get_vulnerabilities(self):
         binds = {}
         filters = []
@@ -524,29 +558,22 @@ RETURN KEEP(d, KEYS(d, TRUE))
                 "FILTER doc.id in @ids"
             )
 
-        if value := self.query_as_array('cpe_match_string'):
-            bind_vars['cpe_match_string'] = value
+        if value := self.query.get('cpe_match_string'):
+            bind_vars['cpe_match_string'] = self.like_string(value).lower()
             filters.append(
-                "FILTER @cpe_match_string[? ANY FILTER CONTAINS(doc.cpe, CURRENT)]"
+                "FILTER doc.cpe LIKE @cpe_match_string"
             )
 
         struct_match = {}
         if value := self.query.get('product_type'):
-            struct_match['part'] = value[0]
+            struct_match['part'] = value[0].lower()
             filters.append('FILTER doc.x_cpe_struct.part == @struct_match.part')
 
-        if value := self.query.get('product'):
-            struct_match['product'] = value.lower()
-            filters.append('FILTER CONTAINS(doc.x_cpe_struct.product, @struct_match.product)')
-            
-        if value := self.query.get('vendor'):
-            struct_match['vendor'] = value
-            filters.append('FILTER CONTAINS(doc.x_cpe_struct.vendor, @struct_match.vendor)')
 
-        for k in ['version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']:
+        for k in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']:
             if v := self.query.get(k):
-                struct_match[k] = v
-                filters.append(f'FILTER CONTAINS(doc.x_cpe_struct.{k}, @struct_match.{k})')
+                struct_match[k] = self.like_string(v).lower()
+                filters.append(f'FILTER doc.x_cpe_struct.{k} LIKE @struct_match.{k}')
 
         if struct_match:
             bind_vars['struct_match'] = struct_match
@@ -568,14 +595,17 @@ RETURN KEEP(d, KEYS(d, TRUE))
             filters.append('FILTER CONTAINS(doc.name, @name)')
 
         query = """
-            FOR doc in @@collection
-            FILTER doc.type == 'software' AND doc._is_latest
+            FOR doc in @@collection OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
+            FILTER doc.type == 'software' AND doc._is_latest == TRUE
             LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, d.external_references[0].external_id])
 
             @filters
+            @sort_stmt
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
-        """.replace('@filters', '\n'.join(filters))
+        """.replace('@filters', '\n'.join(filters))\
+            .replace('@sort_stmt', self.get_sort_stmt(CPE_SORT_FIELDS, doc_name='doc.x_cpe_struct'))
+        # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""")
         return self.execute_query(query, bind_vars=bind_vars)
 
     def get_relationships(self, docs_query, binds):

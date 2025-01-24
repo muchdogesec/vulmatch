@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status, decorators
 
-from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
+from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CPE_SORT_FIELDS, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
 from vulmatch.server.autoschema import DEFAULT_400_ERROR
 from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
 from vulmatch.worker.tasks import new_task
@@ -277,6 +277,95 @@ class CveView(viewsets.ViewSet):
     def versions(self, request, *args, cve_id=None, **kwargs):
         return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_versions(cve_id)
 
+@extend_schema_view(
+    list_objects=extend_schema(
+        responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
+        summary="Get KEV Objects for CVEs",
+        description=textwrap.dedent(
+            """
+            Search and filter KEV records.
+            """
+        ),
+    ),
+    retrieve_objects=extend_schema(
+        summary='Get a KEV Report by CVE ID',
+        description=textwrap.dedent(
+            """
+            Get a KEV Report by CVE ID
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'report')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+    ),
+    retrieve_object_relationships=extend_schema(
+        summary='Get Relationships for KEV Report by CVE ID',
+        description=textwrap.dedent(
+            """
+            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the KEV is related to.
+            """
+        ),
+        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
+        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+    ),
+)  
+class KevView(viewsets.ViewSet):
+
+    openapi_tags = ["CVE"]
+    pagination_class = Pagination("objects")
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = serializers.StixObjectsSerializer(many=True)
+    lookup_url_kwarg = 'cve_id'
+    label = "kev"
+
+    openapi_path_params = [
+        OpenApiParameter('stix_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The STIX ID, e.g `vulnerability--4d2cad44-0a5a-5890-925c-29d535c3f49e`.'),
+        OpenApiParameter('cve_id', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The CVE ID, e.g `CVE-2023-22518`'),
+
+    ]
+
+    @decorators.action(methods=['GET'], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
+        return ArangoDBHelper('', request).get_kev_or_epss(self.label)
+    
+
+    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
+    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_kev_or_epss_object(cve_id, self.label)
+    
+    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
+    def retrieve_object_relationships(self, request, *args, cve_id=None, **kwargs):
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_kev_or_epss_object(cve_id, self.label, relationship_mode=True)
+
+@extend_schema_view(
+    list_objects=extend_schema(
+        summary="Get EPSS Objects for CVEs",
+        description=textwrap.dedent(
+            """
+            Search and filter EPSS records.
+            """
+        ),
+    ),
+    retrieve_objects=extend_schema(
+        summary='Get a EPSS Report by CVE ID',
+        description=textwrap.dedent(
+            """
+            Get a EPSS Report by CVE ID
+            """
+        ),
+    ),
+    retrieve_object_relationships=extend_schema(
+        summary='Get Relationships for EPSS Report by CVE ID',
+        description=textwrap.dedent(
+            """
+            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the EPSS is related to.
+            """
+        ),
+    ),
+)     
+class EPSSView(KevView):
+    openapi_tags = ["CVE"]
+    label = "epss"
+
 
 @extend_schema_view(
     create=extend_schema(
@@ -394,7 +483,13 @@ class CpeView(viewsets.ViewSet):
         target_sw = CharFilter(help_text='Characterises the software computing environment within which the product operates (this is the 10th value in the CPE URI).')
         target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
         other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
-
+    
+    
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('sort', enum=CPE_SORT_FIELDS, description="Sort results by"),
+            ]
+    )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()
