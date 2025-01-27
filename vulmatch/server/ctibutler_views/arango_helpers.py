@@ -401,7 +401,7 @@ class ArangoDBHelper:
 
         query = """
             FOR doc in @@collection
-            FILTER doc.type IN @types AND doc._arango_cve_processor_note == 'cve-attack' AND (@include_revoked OR NOT doc.revoked) AND (@include_deprecated OR NOT doc.x_mitre_deprecated)
+            FILTER doc.type IN @types AND doc._arango_cve_processor_note == 'cve-attack' AND (@include_revoked OR doc.revoked != TRUE) AND (@include_deprecated OR doc.x_mitre_deprecated != TRUE)
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
