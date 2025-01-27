@@ -293,6 +293,7 @@ class ArangoDBHelper:
         self.page, self.count = self.get_page_params(request)
         self.request = request
         self.query = request.query_params.dict()
+        
     def execute_query(self, query, bind_vars={}, paginate=True, relationship_mode=False, container=None):
         if relationship_mode:
             return self.get_relationships(query, bind_vars)
