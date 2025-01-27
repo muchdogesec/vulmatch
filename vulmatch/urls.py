@@ -38,12 +38,12 @@ router.register("cpe", views.CpeView, "cpe-view")
 router.register("kev", views.KevView, "kev-view")
 router.register("epss", views.EPSSView, "epss-view")
 ## objects
-router.register('objects/smos', arango_views.SMOView, "object-view-smo")
-router.register('objects/scos', arango_views.SCOView, "object-view-sco")
-router.register('objects/sros', arango_views.SROView, "object-view-sro")
-router.register('objects/sdos', arango_views.SDOView, "object-view-sdo")
-router.register("object", arango_views.SingleObjectView, "object-view-orig")
-
+obj_router = routers.SimpleRouter(use_regex_path=True)
+obj_router.register("", arango_views.SingleObjectView, "object-view-orig")
+obj_router.register('smos', arango_views.SMOView, "object-view-smo")
+obj_router.register('scos', arango_views.SCOView, "object-view-sco")
+obj_router.register('sros', arango_views.SROView, "object-view-sro")
+obj_router.register('sdos', arango_views.SDOView, "object-view-sdo")
 ### more views
 router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
@@ -51,6 +51,7 @@ router.register("attack", ctibutler_views.AttackView, "attack-view")
 
 urlpatterns = [
     path(f'api/{API_VERSION}/', include(router.urls)),
+    path(f'api/{API_VERSION}/objects/', include(obj_router.urls)),
     path('admin/', admin.site.urls),
     # YOUR PATTERNS
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
