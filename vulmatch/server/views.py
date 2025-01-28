@@ -487,12 +487,6 @@ class CpeView(viewsets.ViewSet):
         target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
         other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
     
-    
-    @extend_schema(
-            parameters=[
-                OpenApiParameter('sort', enum=CPE_SORT_FIELDS, description="Sort results by"),
-            ]
-    )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return ArangoDBHelper('', request).get_softwares()

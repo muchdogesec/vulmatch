@@ -1,5 +1,6 @@
 import contextlib
 import json
+import logging
 from pathlib import Path
 import re
 import typing
@@ -292,12 +293,14 @@ class ArangoDBHelper:
         self.page, self.count = self.get_page_params(request)
         self.request = request
         self.query = request.query_params.dict()
+        
     def execute_query(self, query, bind_vars={}, paginate=True, relationship_mode=False, container=None):
         if relationship_mode:
             return self.get_relationships(query, bind_vars)
         if paginate:
             bind_vars['offset'], bind_vars['count'] = self.get_offset_and_count(self.count, self.page)
         cursor = self.db.aql.execute(query, bind_vars=bind_vars, count=True, full_count=True)
+        logging.info("AQL stat: %s", cursor.statistics())
         if paginate:
             return self.get_paginated_response(container or self.container, cursor, self.page, self.page_size, cursor.statistics()["fullCount"])
         return list(cursor)
@@ -420,7 +423,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             filters.append('''
                 FILTER LENGTH(
                     FOR d IN nvd_cve_edge_collection
-                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND NOT doc._is_ref AND d.external_references
+                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND doc._is_ref != TRUE AND d.external_references != NULL
                         FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'mitre-attack' RETURN c.external_id) IN @attack_ids
                         LIMIT 1
                         RETURN TRUE
@@ -432,7 +435,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             filters.append('''
                 FILTER LENGTH(
                     FOR d IN nvd_cve_edge_collection
-                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND NOT doc._is_ref AND d.external_references
+                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND doc._is_ref != TRUE AND d.external_references != NULL
                         FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'capec' RETURN c.external_id) IN @capec_ids
                         LIMIT 1
                         RETURN TRUE
@@ -519,13 +522,13 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = '''
 LET cve_data_ids = (
   FOR doc IN nvd_cve_vertex_collection
-  FILTER doc._is_latest AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
+  FILTER doc._is_latest == TRUE AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
   RETURN doc._id
 )
 
 LET default_object_ids = (
   FOR doc IN nvd_cve_vertex_collection
-  FILTER doc.id IN @default_imports AND doc._is_latest
+  FILTER doc.id IN @default_imports AND doc._is_latest == TRUE
   RETURN doc._id
 )
 
@@ -551,7 +554,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
     def get_cxe_object(self, cve_id, type="vulnerability", var='name', version_param='cve_version', relationship_mode=False):
         bind_vars={'@collection': self.collection, 'obj_name': cve_id, "type":type, 'var':var}
         #return Response(bind_vars)
-        filters = ['FILTER doc._is_latest']
+        filters = ['FILTER doc._is_latest == TRUE']
         if q := self.query.get(version_param):
             bind_vars['stix_modified'] = q
             filters[0] = 'FILTER doc.modified == @stix_modified'
@@ -627,21 +630,20 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
 
         if q := self.query.get('name'):
-            bind_vars['name'] = q
-            filters.append('FILTER CONTAINS(doc.name, @name)')
+            bind_vars['name'] = self.like_string(q).lower()
+            filters.append('FILTER doc.name LIKE @name')
 
         query = """
             FOR doc in @@collection OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
-            FILTER doc.type == 'software' AND doc._is_latest == TRUE
+            FILTER doc.type == 'software' 
             LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, d.external_references[0].external_id])
 
             @filters
-            @sort_stmt
+            FILTER doc._is_latest == TRUE //*/
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
-        """.replace('@filters', '\n'.join(filters))\
-            .replace('@sort_stmt', self.get_sort_stmt(CPE_SORT_FIELDS, doc_name='doc.x_cpe_struct'))
-        # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""")
+        """.replace('@filters', '\n'.join(filters))
+        
         return self.execute_query(query, bind_vars=bind_vars)
 
     def get_relationships(self, docs_query, binds):

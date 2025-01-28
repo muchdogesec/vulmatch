@@ -8,6 +8,7 @@ if typing.TYPE_CHECKING:
 
 
 from stix2arango.stix2arango import Stix2Arango
+from arango_cve_processor.tools.utils import create_indexes as create_acvep_indexes
 
 
 collections_to_create = ['nvd_cve']
@@ -43,9 +44,10 @@ def create_indexes(db: StandardDatabase):
         "id",
         "type",
         *[dict(name=f'x_cpe_struct.{name}', analyzer='norm_en') for name in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']],
-        "x_cpe_struct.part"
+        "x_cpe_struct.part",
+        "_is_latest"
     ], inBackground=True))
-    vertex_collection.add_index(dict(type='persistent', fields=["_arango_cve_processor_note", "type"], inBackground=True, name=f"acvep_imports-type", sparse=True))
+    create_acvep_indexes(db)
 
 
 
