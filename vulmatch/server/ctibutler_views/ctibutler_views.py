@@ -19,15 +19,21 @@ REVOKED_AND_DEPRECATED_PARAMS = [
 @extend_schema_view(
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
-        filters=True
+        filters=True,
+        summary="Get ATT&CK Objects",
+        description="Get ATT&CK Objects",
     ),
     retrieve_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
         parameters=REVOKED_AND_DEPRECATED_PARAMS,
+        summary="Get ATT&CK Objects by ID",
+        description="Get ATT&CK Objects by ID",
     ),
     retrieve_object_relationships=extend_schema(
         responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=ArangoDBHelper.get_relationship_schema_operation_parameters() + REVOKED_AND_DEPRECATED_PARAMS,
+        summary="Get ATT&CK Relationship using ATT&CK ID",
+        description="Get ATT&CK Relationship using ATT&CK ID",
     ),
 )  
 class AttackView(viewsets.ViewSet):
