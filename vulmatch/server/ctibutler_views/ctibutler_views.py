@@ -19,15 +19,37 @@ REVOKED_AND_DEPRECATED_PARAMS = [
 @extend_schema_view(
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
-        filters=True
+        filters=True,
+        summary="Search and filter MITRE ATT&CK Objects",
+        description=textwrap.dedent(
+            """
+            Search and filter MITRE ATT&CK Objects
+            """
+        ),
     ),
     retrieve_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
         parameters=REVOKED_AND_DEPRECATED_PARAMS,
+        summary="Get a MITRE ATT&CK Object by ID",
+        description=textwrap.dedent(
+            """
+            Get a MITRE object by its ID (e.g. `T1548`, `T1037`).
+
+            If you do not know the ID of the object you can use the GET MITRE ATT&CK Objects endpoint to find it.
+            """
+        ),
     ),
     retrieve_object_relationships=extend_schema(
         responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=ArangoDBHelper.get_relationship_schema_operation_parameters() + REVOKED_AND_DEPRECATED_PARAMS,
+        summary="Get ATT&CK Relationship using ATT&CK ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
+
+            MITRE ATT&CK objects can also be `target_ref` from MITRE CAPEC objects. Requires POST arango-cti-processor request using `capec-attack` mode for this data to show.
+            """
+        ),
     ),
 )  
 class AttackView(viewsets.ViewSet):
@@ -127,7 +149,7 @@ class AttackView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_objects=extend_schema(
-        summary='Get a CWE object',
+        summary='Get a CWE object by ID',
         description=textwrap.dedent(
             """
             Get an CWE object by its ID (e.g. `CWE-242` `CWE-250`).
@@ -201,7 +223,7 @@ class CweView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_objects=extend_schema(
-        summary='Get a CAPEC object',
+        summary='Get a CAPEC object by ID',
         description=textwrap.dedent(
             """
             Get a CAPEC object by its ID (e.g. `CAPEC-112`, `CAPEC-699`).
