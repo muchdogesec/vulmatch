@@ -128,11 +128,12 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         database=settings.ARANGODB_DATABASE,
         collection=collection_name,
         stix2arango_note=stix2arango_note,
-        ignore_embedded_relationships=params.get('ignore_embedded_relationships', False),
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
-        always_latest=params.get('always_latest', False),
+        # always_latest=params.get('always_latest', False),
+        # ignore_embedded_relationships=params.get('ignore_embedded_relationships', False),
+        **params
     )
     s2a.run()
 
