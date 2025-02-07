@@ -41,8 +41,10 @@ class VulnerabilityStatus(models.models.TextChoices):
 
             * `last_modified_earliest` (required - `YYYY-MM-DD`): earliest modified time for vulnerability
             * `last_modified_latest` (required - `YYYY-MM-DD`): latest modified time for vulnerability
-            * `ignore_embedded_relationships` (optional - default: `false`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` (recommended) will get stix2arango to generate SROs for these embedded relationships so they can be searched. `true` will ignore them.
-            * `always_latest`: this is a stix2arango setting that defines how updates happen. Default is `true`, setting this to `false` will get stix2arango to bypass the check for updated objects. The only time you should ever set this to `false` is on first backfill where you can be sure no duplicate objects exist.
+            * `ignore_embedded_relationships` (optional - default: `true`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` is not recommended as it will get stix2arango to generate SROs for these embedded relationships so they can be searched (this will create millions of additional relationships). `true` will ignore them. This is a stix2arango setting.
+            * `ignore_embedded_relationships_sro` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SRO objects (`type` = `relationship`). Default is `true`. This is a stix2arango setting.
+            * `ignore_embedded_relationships_smo` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SMO objects (`type` = `marking-definition`, `extension-definition`, `language-content`). Default is `true`. This is a stix2arango setting.
+            * `always_latest`: this is a stix2arango setting that defines how updates happen. Default is `true`, setting this to `false` will get stix2arango to bypass the check for updated objects. The only time you should ever set this to `false` is on first run AND when dates are between `1988-01-01` and `2024-12-31` (because of the way we generated cve2stix data).
 
             The data for updates is requested from `https://cve2stix.vulmatch.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
@@ -517,7 +519,9 @@ class CpeView(viewsets.ViewSet):
 
             The following key/values are accepted in the body of the request:
 
-            * `ignore_embedded_relationships` (optional - default: `true`): arango_cve_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `true` (recommended) will generate SROs for these embedded relationships so they can be searched. `false` will ignore them
+            * `ignore_embedded_relationships` (optional - default: `false`): arango_cve_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `false` is generally recommended, but ALWAYS when running `cve-epss` and `cve-kev` to ensure the Report objects created are correctly joined to the CVE.
+            * `ignore_embedded_relationships_sro` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SRO objects (`type` = `relationship`). Default is `true`. This is a stix2arango setting.
+            * `ignore_embedded_relationships_smo` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SMO objects (`type` = `marking-definition`, `extension-definition`, `language-content`). Default is `true`. This is a stix2arango setting.
             * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cve_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always efficient, especially when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.
             * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
             """
