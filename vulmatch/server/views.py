@@ -354,6 +354,7 @@ class KevView(viewsets.ViewSet):
         ),
         parameters=[
             OpenApiParameter('sort', enum=EPSS_SORT_FIELDS, description="Sort results by"),
+            OpenApiParameter('epss_min_score', type=OpenApiTypes.FLOAT, description="minimum epss score"),
         ],
     ),
     retrieve_objects=extend_schema(

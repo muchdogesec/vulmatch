@@ -315,11 +315,16 @@ class ArangoDBHelper:
     def get_kev_or_epss(self, label):
         binds = {"label": label}
         binds['cve_ids'] = [qq.upper() for  qq in self.query_as_array('cve_id')] or None
+        filters = []
+        if min_score := self.query.get('epss_min_score'):
+            filters.append('FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score')
+            binds['epss_min_score'] = float(min_score)
         
         query = """
 FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
 FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+//#filters
 @sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
@@ -331,7 +336,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
                     "epss_score": "TO_NUMBER(LAST(doc.x_epss).epss)",
                 },
             ),
-        )
+        ).replace('//#filters', '\n'.join(filters))
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
         return self.execute_query(query, bind_vars=binds)
 
@@ -507,13 +512,15 @@ RETURN KEEP(doc, KEYS(doc, true))
         if include_cwe:
             cve_rels_types.append('cve-cwe')
 
-        vertex_filters = ["(doc.type IN ['indicator', 'vulnerability'])"]
+        docnames = [cve_id]
+        doctypes = ['indicator', 'vulnerability']
+        binds.update(docnames=docnames, doctypes=doctypes)
         if self.query_as_bool('include_epss', True):
+            docnames.append(f"EPSS Scores: {cve_id}")
             cve_rels_types.append('object')
-            vertex_filters.append("(doc.type == 'report' AND 'epss' IN doc.labels)")
         if self.query_as_bool('include_kev', True):
+            docnames.append(f"CISA KEV: {cve_id}")
             cve_rels_types.append('object')
-            vertex_filters.append("(doc.type == 'report' AND 'kev' IN doc.labels)")
 
         types = self.query_as_array('object_type') or CVE_BUNDLE_TYPES
         binds['types'] = list(CVE_BUNDLE_TYPES.intersection(types))
@@ -522,7 +529,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = '''
 LET cve_data_ids = (
   FOR doc IN nvd_cve_vertex_collection
-  FILTER doc._is_latest == TRUE AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
+  FILTER (doc.name IN @docnames AND doc.type IN @doctypes) AND doc._is_latest == TRUE
   RETURN doc._id
 )
 
@@ -545,8 +552,8 @@ SEARCH d.type IN @types AND d._id IN all_objects_ids
 LIMIT @offset, @count
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
-        query = query \
-                    .replace("@@@vertex_filters", " OR ".join(vertex_filters))
+        # query = query \
+        #             .replace("@@@vertex_filters", " OR ".join(vertex_filters))
         
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
