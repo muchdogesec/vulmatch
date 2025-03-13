@@ -333,12 +333,12 @@ class KevView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request).get_kev_or_epss(self.label)
+        return ArangoDBHelper('', request).list_kev_or_epss_objects(self.label)
     
 
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_kev_or_epss_object(cve_id, self.label)
+        return ArangoDBHelper('nvd_cve_vertex_collection', request).retrieve_kev_or_epss_object(cve_id, self.label)
 
 @extend_schema_view(
     list_objects=extend_schema(
