@@ -312,14 +312,19 @@ class ArangoDBHelper:
         offset = (page-1)*count
         return offset, count
     
-    def get_kev_or_epss(self, label):
+    def list_kev_or_epss_objects(self, label):
         binds = {"label": label}
         binds['cve_ids'] = [qq.upper() for  qq in self.query_as_array('cve_id')] or None
+        filters = []
+        if min_score := self.query.get('epss_min_score'):
+            filters.append('FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score')
+            binds['epss_min_score'] = float(min_score)
         
         query = """
 FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
 FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+//#filters
 @sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
@@ -331,12 +336,12 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
                     "epss_score": "TO_NUMBER(LAST(doc.x_epss).epss)",
                 },
             ),
-        )
+        ).replace('//#filters', '\n'.join(filters))
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
         return self.execute_query(query, bind_vars=binds)
 
 
-    def get_kev_or_epss_object(self, cve_id, label):
+    def retrieve_kev_or_epss_object(self, cve_id, label):
         bind_vars={'cve_id': cve_id, "label":label}
 
         query = '''
@@ -386,31 +391,46 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
                 binds[mx] = q
                 filters.append(f"FILTER doc.{v} <= @{mx}")
 
-        if q := self.query_as_array('cpes_vulnerable'):
-            binds['cpes_vulnerable'] = q
-            filters.append('''
-            LET cpes_vulnerable_ids = (FOR d IN nvd_cve_vertex_collection FILTER d.cpe IN @cpes_vulnerable RETURN d.id)
-            LET cpes_vulnerable = (FOR d IN nvd_cve_edge_collection FILTER d.relationship_type == 'exploits' AND d.target_ref IN cpes_vulnerable_ids RETURN d._from)
-            FILTER indicator_ref IN cpes_vulnerable
-            ''')
-        if q := self.query_as_array('cpes_in_pattern'):
-            binds['cpes_in_pattern'] = q
-            filters.append('''
-            LET cpes_in_pattern_ids = (FOR d IN nvd_cve_vertex_collection FILTER d.cpe IN @cpes_in_pattern RETURN d.id)
-            LET cpes_in_pattern = (FOR d IN nvd_cve_edge_collection FILTER d.relationship_type == 'relies-on' AND d.target_ref IN cpes_in_pattern_ids RETURN d._from)
-            FILTER indicator_ref IN cpes_in_pattern
-            ''')
+        ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
+        union = None
+        if cpes_in_pattern := self.query_as_array('cpes_in_pattern'):
+            binds['cpes_in_pattern'] = cpes_in_pattern
+            filters.append('''LET cpes_in_pattern = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'relies-on' AND d.external_references[*].external_id IN @cpes_in_pattern RETURN d._from)''')
+        if cpes_vulnerable := self.query_as_array('cpes_vulnerable'):
+            binds['cpes_vulnerable'] = cpes_vulnerable
+            filters.append('''LET cpes_vulnerable = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploits' AND d.external_references[*].external_id IN @cpes_vulnerable RETURN d._from)''')
+        
+        if cpes_in_pattern and cpes_vulnerable:
+            union = 'INTERSECTION(cpes_in_pattern, cpes_vulnerable)'
+        elif cpes_in_pattern:
+            union = 'cpes_in_pattern'
+        elif cpes_vulnerable:
+            union = 'cpes_vulnerable'
+
+        if union:
+            filters.append(
+                """
+            LET indicator_refs = (
+                FOR d IN nvd_cve_edge_collection
+                FILTER d._from IN #{union}
+                RETURN d._to
+            )
+            FILTER doc._id IN indicator_refs
+            """.replace('#{union}', union)
+            )
+
+        ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
+        
 
         if q := self.query_as_array('cve_id'):
             binds['cve_ids'] = q
             filters.append('FILTER doc.external_references[0].external_id IN @cve_ids')
 
-        if (q := self.query_as_bool('has_kev', None)) != None:
-            binds['has_kev'] = q
-            filters.append('''
-            LET hasKev = doc.id IN kevs
-            FILTER hasKev == @has_kev
-            ''')
+        if (hasKev := self.query_as_bool('has_kev', None)) != None:
+            if hasKev:
+                filters.append('FILTER doc.id IN kevs')
+            else:
+                filters.append('FILTER doc.id NOT IN kevs')
 
         if q := self.query_as_array('weakness_id'):
             binds['weakness_ids'] = q
@@ -421,25 +441,15 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if q := self.query_as_array('attack_id'):
             binds['attack_ids'] = q
             filters.append('''
-                FILTER LENGTH(
-                    FOR d IN nvd_cve_edge_collection
-                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND doc._is_ref != TRUE AND d.external_references != NULL
-                        FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'mitre-attack' RETURN c.external_id) IN @attack_ids
-                        LIMIT 1
-                        RETURN TRUE
-                    ) > 0
+                LET attack_matches = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND d.external_references[*].external_id IN @attack_ids RETURN d._from)
+                FILTER doc._id IN attack_matches
                 ''')
             
         if q := self.query_as_array('capec_id'):
             binds['capec_ids'] = q
             filters.append('''
-                FILTER LENGTH(
-                    FOR d IN nvd_cve_edge_collection
-                        FILTER doc._id == d._from AND d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND doc._is_ref != TRUE AND d.external_references != NULL
-                        FILTER FIRST(FOR c IN d.external_references FILTER c.source_name == 'capec' RETURN c.external_id) IN @capec_ids
-                        LIMIT 1
-                        RETURN TRUE
-                    ) > 0
+                LET capec_matches = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND d.external_references[*].external_id IN @capec_ids RETURN d._from)
+                FILTER doc._id IN capec_matches
                 ''')
 
         query = """
@@ -457,7 +467,6 @@ RETURN {[doc.external_references[0].external_id]: LAST(doc.x_epss)}
 
 FOR doc IN nvd_cve_vertex_collection
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
-LET indicator_ref = FIRST(FOR d IN nvd_cve_edge_collection FILTER doc._id == d._to RETURN d._from)
 @filters
 @sort_stmt
 LIMIT @offset, @count
@@ -475,12 +484,13 @@ RETURN KEEP(doc, KEYS(doc, true))
                 },
             ),
         )
-        return self.execute_query(query, bind_vars=binds)
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
+        return self.execute_query(query, bind_vars=binds)
 
     def get_cve_bundle(self, cve_id: str):
+        cve_id = cve_id.upper()
         cve_rels_types = ['detects']
-        binds = dict(cve_id=cve_id.upper(), cve_edge_types=cve_rels_types, default_imports=CVE_BUNDLE_DEFAULT_OBJECTS)
+        binds = dict(cve_edge_types=cve_rels_types, default_imports=CVE_BUNDLE_DEFAULT_OBJECTS)
 
         more_queries = {}
 
@@ -507,13 +517,17 @@ RETURN KEEP(doc, KEYS(doc, true))
         if include_cwe:
             cve_rels_types.append('cve-cwe')
 
-        vertex_filters = ["(doc.type IN ['indicator', 'vulnerability'])"]
+        docnames = [cve_id]
+        doctypes = ['indicator', 'vulnerability']
+        binds.update(docnames=docnames, doctypes=doctypes)
         if self.query_as_bool('include_epss', True):
+            docnames.append(f"EPSS Scores: {cve_id}")
             cve_rels_types.append('object')
-            vertex_filters.append("(doc.type == 'report' AND 'epss' IN doc.labels)")
+            doctypes.append('report')
         if self.query_as_bool('include_kev', True):
+            docnames.append(f"CISA KEV: {cve_id}")
             cve_rels_types.append('object')
-            vertex_filters.append("(doc.type == 'report' AND 'kev' IN doc.labels)")
+            doctypes.append('report')
 
         types = self.query_as_array('object_type') or CVE_BUNDLE_TYPES
         binds['types'] = list(CVE_BUNDLE_TYPES.intersection(types))
@@ -522,20 +536,20 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = '''
 LET cve_data_ids = (
   FOR doc IN nvd_cve_vertex_collection
-  FILTER doc._is_latest == TRUE AND doc.external_references[0].external_id == @cve_id AND ( @@@vertex_filters )
+  FILTER (doc.name IN @docnames AND doc.type IN @doctypes) AND doc._is_latest == TRUE
   RETURN doc._id
 )
 
 LET default_object_ids = (
   FOR doc IN nvd_cve_vertex_collection
   FILTER doc.id IN @default_imports AND doc._is_latest == TRUE
-  RETURN doc._id
+  COLLECT id = doc.id INTO docs
+  RETURN docs[0].doc._id
 )
 
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
     FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
-
     RETURN [doc._id, doc._from, doc._to]
     )
     
@@ -545,8 +559,8 @@ SEARCH d.type IN @types AND d._id IN all_objects_ids
 LIMIT @offset, @count
 RETURN KEEP(d, KEYS(d, TRUE))
 '''
-        query = query \
-                    .replace("@@@vertex_filters", " OR ".join(vertex_filters))
+        # query = query \
+        #             .replace("@@@vertex_filters", " OR ".join(vertex_filters))
         
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
@@ -617,16 +631,30 @@ RETURN KEEP(d, KEYS(d, TRUE))
         if struct_match:
             bind_vars['struct_match'] = struct_match
 
-        if q := self.query_as_array('cve_vulnerable'):
-            bind_vars['cve_vulnerable'] = q
-            filters.append('''
-            FILTER cve_matches[? ANY FILTER CURRENT[0]=='exploits' AND CURRENT[1] IN @cve_vulnerable]
-            ''')
-        if q := self.query_as_array('in_cve_pattern'):
-            bind_vars['in_cve_pattern'] = q
-            filters.append('''
-            FILTER cve_matches[? ANY FILTER CURRENT[0]=='relies-on' AND CURRENT[1] IN @in_cve_pattern]
-            ''')
+        ######################## in_cve_pattern and cve_vulnerable filters ##############################
+        union = None
+        if in_cve_pattern := self.query_as_array('in_cve_pattern'):
+            bind_vars['in_cve_pattern'] = in_cve_pattern
+            filters.append('''LET in_cve_pattern = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'relies-on' AND d.external_references[*].external_id IN @in_cve_pattern RETURN d.target_ref)''')
+        if cve_vulnerable := self.query_as_array('cve_vulnerable'):
+            bind_vars['cve_vulnerable'] = cve_vulnerable
+            filters.append('''LET cve_vulnerable = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploits' AND d.external_references[*].external_id IN @cve_vulnerable RETURN d.target_ref)''')
+        
+        if in_cve_pattern and cve_vulnerable:
+            union = 'INTERSECTION(in_cve_pattern, cve_vulnerable)'
+        elif in_cve_pattern:
+            union = 'in_cve_pattern'
+        elif cve_vulnerable:
+            union = 'cve_vulnerable'
+
+        if union:
+            filters.append(
+                """
+            FILTER doc.id IN #{union}
+            """.replace('#{union}', union)
+            )
+
+        ######################## in_cve_pattern and cve_vulnerable filters ##############################
 
 
         if q := self.query.get('name'):
@@ -636,7 +664,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
         query = """
             FOR doc in @@collection OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
             FILTER doc.type == 'software' 
-            LET cve_matches = (FOR d in nvd_cve_edge_collection FILTER d._to == doc._id AND d.relationship_type IN ['exploits', 'relies-on'] RETURN [d.relationship_type, d.external_references[0].external_id])
 
             @filters
             FILTER doc._is_latest == TRUE //*/
@@ -644,6 +671,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
             RETURN KEEP(doc, KEYS(doc, true))
         """.replace('@filters', '\n'.join(filters))
         
+        # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""")
         return self.execute_query(query, bind_vars=bind_vars)
 
     def get_relationships(self, docs_query, binds):

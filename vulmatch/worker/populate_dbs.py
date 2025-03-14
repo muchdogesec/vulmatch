@@ -15,7 +15,7 @@ collections_to_create = ['nvd_cve']
 
 
 def get_db():
-    client = ArangoClient(settings.ARANGODB_HOST_URL)
+    client = ArangoClient(settings.ARANGODB_HOST_URL, request_timeout=600)
     return client.db(settings.ARANGODB_DATABASE+"_database", settings.ARANGODB_USERNAME, settings.ARANGODB_PASSWORD, verify=True)
 
 def find_missing(collections_to_create):
@@ -30,6 +30,7 @@ def find_missing(collections_to_create):
         ]
 
 def create_indexes(db: StandardDatabase):
+    print("creating vulmatch's indexes, this may take several minutes if creating for the first time depending on how much data on the server")
     vertex_collection = db.collection('nvd_cve_vertex_collection')
     edge_collection = db.collection('nvd_cve_edge_collection')
     time = int(datetime.now().timestamp())
@@ -47,6 +48,11 @@ def create_indexes(db: StandardDatabase):
         "x_cpe_struct.part",
         "_is_latest"
     ], inBackground=True))
+    edge_collection.add_index(dict(type='inverted', name='cve_edge_inv', fields=[
+        "external_references[*].external_id",
+        "relationship_type",
+        "_arango_cve_processor_note",
+    ], storedValues=["_from", "_to"], inBackground=True))
     create_acvep_indexes(db)
 
 
