@@ -9,6 +9,7 @@ if typing.TYPE_CHECKING:
 
 from stix2arango.stix2arango import Stix2Arango
 from arango_cve_processor.tools.utils import create_indexes as create_acvep_indexes
+from dogesec_commons.objects import db_view_creator
 
 
 collections_to_create = ['nvd_cve']
@@ -68,6 +69,7 @@ def create_collections():
    
 if __name__ == '__main__':
     create_collections()
+    db_view_creator.startup_func()
 
 
 
