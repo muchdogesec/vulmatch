@@ -364,7 +364,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
 
         if q := self.query.get('cvss_base_score_min'):
             binds['cvss_base_score_min'] = float(q)
-            filters.append("FILTER VALUES(doc.x_cvss)[? FILTER CURRENT.base_score >= @cvss_base_score_min]")
+            filters.append("FILTER LAST(doc.x_cvss).base_score >= @cvss_base_score_min")
 
         if value := self.query_as_array('stix_id'):
             binds['stix_ids'] = value
@@ -423,7 +423,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         
 
         if q := self.query_as_array('cve_id'):
-            binds['cve_ids'] = q
+            binds['cve_ids'] = [qq.upper() for qq in q]
             filters.append('FILTER doc.external_references[0].external_id IN @cve_ids')
 
         if (hasKev := self.query_as_bool('has_kev', None)) != None:
@@ -433,20 +433,20 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
                 filters.append('FILTER doc.id NOT IN kevs')
 
         if q := self.query_as_array('weakness_id'):
-            binds['weakness_ids'] = q
+            binds['weakness_ids'] = [qq.upper() for qq in q]
             filters.append('''
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name=='cwe' AND CURRENT.external_id IN @weakness_ids]
                 ''')
             
         if q := self.query_as_array('attack_id'):
-            binds['attack_ids'] = q
+            binds['attack_ids'] = [qq.upper() for qq in q]
             filters.append('''
                 LET attack_matches = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-attack" AND d.external_references[*].external_id IN @attack_ids RETURN d._from)
                 FILTER doc._id IN attack_matches
                 ''')
             
         if q := self.query_as_array('capec_id'):
-            binds['capec_ids'] = q
+            binds['capec_ids'] = [qq.upper() for qq in q]
             filters.append('''
                 LET capec_matches = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploited-using' AND d._arango_cve_processor_note == "cve-capec" AND d.external_references[*].external_id IN @capec_ids RETURN d._from)
                 FILTER doc._id IN capec_matches
@@ -480,7 +480,7 @@ RETURN KEEP(doc, KEYS(doc, true))
                 {
                     "epss_score": "TO_NUMBER(epss[doc.name].epss)",
                     "epss_percentile": "TO_NUMBER(epss[doc.name].percentile)",
-                    "cvss_base_score": "FIRST(VALUES(doc.x_cvss)).base_score",
+                    "cvss_base_score": "LAST(VALUES(doc.x_cvss)).base_score",
                 },
             ),
         )
@@ -549,7 +549,7 @@ LET default_object_ids = (
 
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND [doc._arango_cve_processor_note, doc.relationship_type] ANY IN @cve_edge_types
+    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND (doc._arango_cve_processor_note IN @cve_edge_types OR doc.relationship_type IN @cve_edge_types)
     RETURN [doc._id, doc._from, doc._to]
     )
     
@@ -626,7 +626,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         for k in ['product', 'vendor', 'version', 'update', 'edition', 'language', 'sw_edition', 'target_sw', 'target_hw', 'other']:
             if v := self.query.get(k):
                 struct_match[k] = self.like_string(v).lower()
-                filters.append(f'FILTER doc.x_cpe_struct.{k} LIKE @struct_match.{k}')
+                filters.append(f'FILTER doc.x_cpe_struct.`{k}` LIKE @struct_match.`{k}`')
 
         if struct_match:
             bind_vars['struct_match'] = struct_match

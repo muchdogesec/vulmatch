@@ -24,6 +24,13 @@ from vulmatch.server import views
 from vulmatch.server.ctibutler_views import ctibutler_views
 import dogesec_commons.objects.views as arango_views
 
+from django.http import JsonResponse
+def handler404(*args, **kwargs):
+    return JsonResponse(dict(code=404, message='non-existent page'), status=404)
+
+def handler500(*args, **kwargs):
+    return JsonResponse(dict(code=500, message='internal server error'), status=500)
+
 
 API_VERSION = "v1"
 

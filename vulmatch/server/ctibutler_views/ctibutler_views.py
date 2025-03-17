@@ -84,11 +84,11 @@ class AttackView(viewsets.ViewSet):
 
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
     def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, revokable=True)
+        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', revokable=True)
 
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, attack_id=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, relationship_mode=True, revokable=True)
+        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', relationship_mode=True, revokable=True)
 
     # @classmethod
     # def attack_view(cls, matrix_name: str):
