@@ -10,7 +10,7 @@ click==8.1.7
 click-didyoumean==0.3.1
 click-plugins==1.1.1
 click-repl==0.3.0
-Django==5.1.5
+Django==5.1.7
 django-filter==24.3
 django-restframework==0.0.1
 djangorestframework==3.15.2
@@ -51,4 +51,4 @@ wcwidth==0.2.13
 zipp==3.20.2
 dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-03-07-15-29-11/dogesec_commons-0.0.7rc0-py3-none-any.whl
 arango_cve_processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/main-2025-02-06-16-08-34/arango_cve_processor-0.0.1-py3-none-any.whl
-stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-02-04-14-14-39/stix2arango-0.0.4rc0-py3-none-any.whl
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-03-03-16-02-58/stix2arango-0.0.4rc0-py3-none-any.whl
