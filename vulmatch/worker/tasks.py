@@ -51,10 +51,11 @@ def run_acp_task(data: dict, job: Job):
 
     task =  acp_task.s(options, job_id=job.id)
     return (task | remove_temp_and_set_completed.si(None, job_id=job.id))
+
     
 def run_nvd_task(data, job: Job, nvd_type='cve'):
     dates = date_range(data['last_modified_earliest'], data['last_modified_latest'])
-    temp_dir = str(Path(tempfile.gettempdir())/f"vulmatch/nvd-{nvd_type}--{str(job.id)}")
+    temp_dir = get_temp_dir_for_job(job.id)
     tasks = []
     for d in dates:
         url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
@@ -64,6 +65,9 @@ def run_nvd_task(data, job: Job, nvd_type='cve'):
         tasks.append(task)
     tasks = chain(tasks)
     return (tasks | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
+
+def get_temp_dir_for_job(job_id):
+    return str(Path(tempfile.gettempdir())/f"vulmatch/nvd-cve--{str(job_id)}")
 
 
 def date_range(start_date: date, end_date: date):
@@ -86,6 +90,13 @@ class CustomTask(Task):
         job.errors.append(f"celery task {self.name} failed with: {exc}")
         logging.exception(exc, exc_info=True)
         job.save()
+        try:
+            logging.info('removing directory')
+            path = get_temp_dir_for_job(job.id)
+            shutil.rmtree(path)
+            logging.info(f'directory `{path}` removed')
+        except Exception as e:
+            logging.error(f'delete dir failed: {e}')
         return super().on_failure(exc, task_id, args, kwargs, einfo)
     
     def before_start(self, task_id, args, kwargs):
@@ -131,8 +142,6 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
-        # always_latest=params.get('always_latest', False),
-        # ignore_embedded_relationships=params.get('ignore_embedded_relationships', False),
         **params
     )
     s2a.run()
