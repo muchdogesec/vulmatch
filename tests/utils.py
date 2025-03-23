@@ -29,7 +29,7 @@ def wait_for_jobs(job_id):
             assert job_status == "completed", f"response: {job_data}"
             return job_data
         try_count += 1
-        assert try_count < 90, "stopped after 60 retries"
+        assert try_count < 90, "stopped after 90 retries"
         time.sleep(5)
 
 def random_list(l: list, k=5):
