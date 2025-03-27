@@ -9,6 +9,7 @@ from tests.utils import is_sorted, remove_unknown_keys, wait_for_jobs
 
 base_url = os.environ["SERVICE_BASE_URL"]
 import requests
+
 CVE_BUNDLE_DEFAULT_OBJECTS = [
     "extension-definition--ad995824-2901-5f6e-890b-561130a239d4",
     "extension-definition--82cad0bb-0906-5885-95cc-cafe5ee0a500",
@@ -29,6 +30,7 @@ CVE_SORT_FIELDS = [
     "cvss_base_score_ascending",
     "cvss_base_score_descending",
 ]
+
 
 @pytest.mark.parametrize(
     ["filters", "expected_ids"],
@@ -174,6 +176,47 @@ CVE_SORT_FIELDS = [
             ["vulnerability--3dd99f0e-efde-508a-91ba-9556aebc937a"],
             id="attack_id multiple + weakness_id",
         ),
+        pytest.param(
+            dict(
+                cpes_in_pattern="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+            ),
+            ["vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2"],
+            id="cpes_in_pattern",
+        ),
+        pytest.param(
+            dict(
+                cpes_vulnerable="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+            ),
+            ["vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2"],
+            id="cpes_vulnerable",
+        ),
+        pytest.param(
+            dict(
+                cpes_vulnerable="cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*,cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+            ),
+            [
+                "vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2",
+                "vulnerability--053796db-e34c-5e96-8a10-4f317962fd30",
+                "vulnerability--70fc0123-3c86-5e4c-b3dc-a9fff4b16546",
+                "vulnerability--79a5a175-0530-5554-8598-c3ce67f64f26",
+                "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
+                "vulnerability--f47fa004-825f-5bd9-8c03-07465e1e7ad2",
+            ],
+            id="cpes_vulnerable x2",
+        ),
+        pytest.param(
+            dict(cpes_vulnerable="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
+            [],
+            id="cpes_vulnerable 3",
+        ),
+        pytest.param(
+            dict(cpes_in_pattern="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
+            [
+                "vulnerability--0b2df06c-dff3-5366-a402-afc855f0fb06",
+                "vulnerability--0fda7712-f026-5a75-a562-bd70d03e8b1e",
+            ],
+            id="cpes_in_pattern 3",
+        ),
     ],
 )
 def test_filters_generic(filters: dict, expected_ids: list[str]):
@@ -299,8 +342,9 @@ def test_retrieve_vulnerability(cve_id):
     assert resp_data["total_results_count"] == 1
     assert resp_data["objects"][0]["name"] == cve_id
 
+
 @pytest.mark.parametrize(
-    ['cve_id', 'filters', 'expected_count'],
+    ["cve_id", "filters", "expected_count"],
     [
         ["CVE-2024-12978", None, 10],
         ["CVE-2024-53647", None, 34],
@@ -311,38 +355,42 @@ def test_retrieve_vulnerability(cve_id):
         ["CVE-2023-31025", dict(include_capec=False), 22],
         ["CVE-2023-31025", dict(include_epss=False), 21],
         ["CVE-2023-53647", dict(include_epss=False, include_capec=False), 6],
-    ]
+    ],
 )
 def test_bundle(cve_id, filters, expected_count):
     url = urljoin(base_url, f"api/v1/cve/objects/{cve_id}/bundle/")
     resp = requests.get(url, params=filters)
     resp_data = resp.json()
-    objects = {obj['id'] for obj in resp_data["objects"]}
+    objects = {obj["id"] for obj in resp_data["objects"]}
     assert resp_data["total_results_count"] == expected_count
-    assert len(objects) == resp_data["page_results_count"], "response contains duplicates"
-    assert objects.issuperset(CVE_BUNDLE_DEFAULT_OBJECTS), "result must contain default objects"
+    assert (
+        len(objects) == resp_data["page_results_count"]
+    ), "response contains duplicates"
+    assert objects.issuperset(
+        CVE_BUNDLE_DEFAULT_OBJECTS
+    ), "result must contain default objects"
 
 
 @pytest.mark.parametrize(
-    ['cve_id', 'expected_count'],
+    ["cve_id", "expected_count"],
     [
         ["CVE-2024-12978", 1],
         ["CVE-2024-53647", 13],
         ["CVE-2023-31025", 3],
-    ]
+    ],
 )
 def test_relationships(cve_id, expected_count):
     url = urljoin(base_url, f"api/v1/cve/objects/{cve_id}/relationships/")
     resp = requests.get(url)
     resp_data = resp.json()
-    objects = {obj['id'] for obj in resp_data["relationships"]}
+    objects = {obj["id"] for obj in resp_data["relationships"]}
     assert resp_data["total_results_count"] == expected_count
-    assert len(objects) == resp_data["page_results_count"], "response contains duplicates"
+    assert (
+        len(objects) == resp_data["page_results_count"]
+    ), "response contains duplicates"
 
-@pytest.mark.parametrize(
-        "sort_param",
-        CVE_SORT_FIELDS
-)
+
+@pytest.mark.parametrize("sort_param", CVE_SORT_FIELDS)
 def test_sort(sort_param):
     url = urljoin(base_url, "api/v1/cve/objects/")
     resp = requests.get(url, params=dict(sort=sort_param))
@@ -352,20 +400,36 @@ def test_sort(sort_param):
         cve["type"] == "vulnerability" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be vulnerability"
 
-    param, _, direction = sort_param.rpartition('_')
+    param, _, direction = sort_param.rpartition("_")
     sort_objects_to_consider = resp_data["objects"][:50]
+
     def get_epss_scores(cve_ids):
-        resp = requests.get(urljoin(base_url, "api/v1/epss/objects/"), params=dict(cve_id=','.join(cve_ids)))
-        return {obj['external_references'][0]['external_id']: float(obj['x_epss'][-1]['epss']) for obj in resp.json()['objects']}
-    cve_epss_score_map = get_epss_scores([cve['name'] for cve in sort_objects_to_consider])
+        resp = requests.get(
+            urljoin(base_url, "api/v1/epss/objects/"),
+            params=dict(cve_id=",".join(cve_ids)),
+        )
+        return {
+            obj["external_references"][0]["external_id"]: float(
+                obj["x_epss"][-1]["epss"]
+            )
+            for obj in resp.json()["objects"]
+        }
+
+    cve_epss_score_map = get_epss_scores(
+        [cve["name"] for cve in sort_objects_to_consider]
+    )
+
     def key_fn(obj):
-        if param == 'epss_score':
-            return cve_epss_score_map.get(obj['name'], 0)
-        if param == 'cvss_base_score':
+        if param == "epss_score":
+            return cve_epss_score_map.get(obj["name"], 0)
+        if param == "cvss_base_score":
             try:
-                return float(obj['x_cvss'][-1]['base_score'])
+                return float(obj["x_cvss"][-1]["base_score"])
             except:
                 return 0
         return obj[param]
-    revered = direction == 'descending'
-    assert is_sorted(sort_objects_to_consider, key=key_fn, reverse=revered), "objects not sorted"
+
+    revered = direction == "descending"
+    assert is_sorted(
+        sort_objects_to_consider, key=key_fn, reverse=revered
+    ), "objects not sorted"
