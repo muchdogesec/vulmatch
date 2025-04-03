@@ -184,7 +184,7 @@ class CveView(viewsets.ViewSet):
         ))
         cvss_base_score_min = NumberFilter(help_text=textwrap.dedent(
             """
-            The minimum CVSS score you want. `0` is lowest, `10` is highest.
+            The minimum CVSS score you want. `0` is lowest, `10` is highest. Note, some CVEs have multiple CVSS scores. This filter will use the base score from the highest version of CVSS reported (e.g. v4.0 over v3.1) and always use the primary source reporting the CVSS if it exist.
             """
         ))
         epss_score_min = NumberFilter(help_text=textwrap.dedent(
