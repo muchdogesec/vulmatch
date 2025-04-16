@@ -102,6 +102,7 @@ CVE_SORT_FIELDS = [
         pytest.param(
             dict(has_kev=True),
             [
+                "vulnerability--0143ea6c-4085-57f1-bac0-18b57a88cffb",
                 "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
                 "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
                 "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
