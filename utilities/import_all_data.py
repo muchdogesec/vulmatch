@@ -55,8 +55,8 @@ def monitor_job_status(job_id, job_name):
         job_status = check_job_status(job_id)
         if job_status:
             state = job_status['state']
-            if state == 'pending':
-                print(f"{job_name} job still pending. Retrying in 10 seconds...")
+            if state in ['pending', 'processing']:
+                print(f"{job_name} job still {state}. Retrying in 10 seconds...")
                 time.sleep(10)
             else:
                 print(f"{job_name} job completed with state: {state}")
