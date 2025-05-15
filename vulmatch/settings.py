@@ -165,15 +165,12 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     "TITLE": "Vulmatch API",
     "DESCRIPTION": dedent(
         """
-        Vulmatch is a database of CVEs in STIX 2.1 format with a REST API wrapper to access them.\n\n
-        [DOGESEC](https://www.dogesec.com/) offer a fully hosted web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
+        Vulmatch turns CVE and CPE data into STIX 2.1 objects.\n\n
+        Vulmatch enriches every CVE with MITRE ATT&CK Techniques and common product weaknesses so you can quickly understand how they can be exploited.\n\n
+        You are viewing the open-source version of Vulmatch available at [github.com/muchdogesec/vulmatch/](https://github.com/muchdogesec/vulmatch/)\n\n
+        A fully hosted version of Vulmatch, with many more advanced features can be found at [vulmatch.com](https://www.vulmatch.com)
     """
     ),
-    "VERSION": "1.0.0",
-    "CONTACT": {
-        "email": "noreply@dogesec.com",
-        "url": "https://github.com/muchdogesec/vulmatch",
-    },
     "TAGS": [
         {"name": "CVE", "description": "Download and search the latest CVE objects."},
         {"name": "CPE", "description": "Search and filter CPE objects."},
