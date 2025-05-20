@@ -395,10 +395,10 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         union = None
         if cpes_in_pattern := self.query_as_array('cpes_in_pattern'):
             binds['cpes_in_pattern'] = cpes_in_pattern
-            filters.append('''LET cpes_in_pattern = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'relies-on' AND d.external_references[*].external_id IN @cpes_in_pattern RETURN d._from)''')
+            filters.append('''LET cpes_in_pattern = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'relies-on' AND d.external_references[*].external_id IN @cpes_in_pattern RETURN SUBSTITUTE(d.source_ref, "indicator", "vulnerability", 1))''')
         if cpes_vulnerable := self.query_as_array('cpes_vulnerable'):
             binds['cpes_vulnerable'] = cpes_vulnerable
-            filters.append('''LET cpes_vulnerable = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploits' AND d.external_references[*].external_id IN @cpes_vulnerable RETURN d._from)''')
+            filters.append('''LET cpes_vulnerable = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploits' AND d.external_references[*].external_id IN @cpes_vulnerable RETURN SUBSTITUTE(d.source_ref, "indicator", "vulnerability", 1))''')
         
         if cpes_in_pattern and cpes_vulnerable:
             union = 'INTERSECTION(cpes_in_pattern, cpes_vulnerable)'
@@ -410,12 +410,8 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if union:
             filters.append(
                 """
-            LET indicator_refs = (
-                FOR d IN nvd_cve_edge_collection
-                FILTER d._from IN #{union}
-                RETURN d._to
-            )
-            FILTER doc._id IN indicator_refs
+            LET indicator_refs = #{union}
+            FILTER doc.id IN indicator_refs
             """.replace('#{union}', union)
             )
 
