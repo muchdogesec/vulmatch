@@ -222,16 +222,14 @@ def test_filters_generic(filters: dict, expected_ids: list[str]):
 
 
 def test_has_kev():
-    [
+    expected_ids = set([
         "vulnerability--0143ea6c-4085-57f1-bac0-18b57a88cffb",
         "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
         "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
         "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
         "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
         'vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3',
-    ]
-
-    expected_ids = set(expected_ids)
+    ])
     url = urljoin(base_url, "api/v1/cve/objects/")
     resp = requests.get(url, params=dict(has_kev=True))
     resp_data = resp.json()
