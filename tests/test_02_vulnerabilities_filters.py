@@ -100,17 +100,6 @@ CVE_SORT_FIELDS = [
             id="stix_id filter",
         ),
         pytest.param(
-            dict(has_kev=True),
-            [
-                "vulnerability--0143ea6c-4085-57f1-bac0-18b57a88cffb",
-                "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
-                "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
-                "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
-                "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
-            ],
-            id="has_kev positive",
-        ),
-        pytest.param(
             dict(
                 stix_id="vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d,vulnerability--f361b90a-21dd-5f91-9f24-292e81f65836",
             ),
@@ -231,6 +220,26 @@ def test_filters_generic(filters: dict, expected_ids: list[str]):
     assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
     assert resp_data["total_results_count"] == len(expected_ids)
 
+
+def test_has_kev():
+    [
+        "vulnerability--0143ea6c-4085-57f1-bac0-18b57a88cffb",
+        "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
+        "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
+        "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
+        "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
+        'vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3',
+    ]
+
+    expected_ids = set(expected_ids)
+    url = urljoin(base_url, "api/v1/cve/objects/")
+    resp = requests.get(url, params=dict(has_kev=True))
+    resp_data = resp.json()
+    assert all(
+        cve["type"] == "vulnerability" for cve in resp_data["objects"]
+    ), "response.objects[*].type must always be vulnerability"
+    assert {cve["id"] for cve in resp_data["objects"]}.issuperset(expected_ids)
+    assert resp_data["total_results_count"] >= len(expected_ids)
 
 def random_cve_values(key, count):
     url = urljoin(base_url, "api/v1/cve/objects/")
