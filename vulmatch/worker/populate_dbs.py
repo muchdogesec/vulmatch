@@ -49,6 +49,18 @@ def create_indexes(db: StandardDatabase):
         "x_cpe_struct.part",
         "_is_latest"
     ], inBackground=True))
+    vertex_collection.add_index(dict(type='inverted', name='cve_search_inv', sparse=True, fields=[
+        "name",
+        "id",
+        "modified",
+        "created",
+        dict(name="description", analyzer='norm_en'),
+        "type",
+        "_cvss_base_score",
+        "_epss_score",
+        "_epss_percentile",
+        "_is_latest",
+    ], inBackground=True, storedValues=["external_references"]))
     edge_collection.add_index(dict(type='inverted', name='cve_edge_inv', fields=[
         "external_references[*].external_id",
         "relationship_type",
