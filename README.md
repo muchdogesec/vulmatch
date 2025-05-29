@@ -1,5 +1,7 @@
 # Vulmatch
 
+[![codecov](https://codecov.io/gh/muchdogesec/vulmatch/graph/badge.svg?token=OII43KYDAI)](https://codecov.io/gh/muchdogesec/vulmatch)
+
 ## Before you begin...
 
 We offer a fully hosted web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
