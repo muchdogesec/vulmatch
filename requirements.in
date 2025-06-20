@@ -15,7 +15,7 @@ django-cleanup
 
 ## dogesec
 dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-06-05-08-47-25/dogesec_commons-0.0.7rc1-py3-none-any.whl
-stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-06-12-05-09-47/stix2arango-0.0.4rc0-py3-none-any.whl
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/use-transaction-for-uploads-2025-06-20-16-13-38/stix2arango-0.0.4rc0-py3-none-any.whl
 arango_cve_processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/update-deps-2025-06-20-15-48-04/arango_cve_processor-0.0.1-py3-none-any.whl
 
 ## llms
