@@ -1,5 +1,7 @@
 name: Run Tests
 
+permissions:
+  contents: read
 on:
   push:
     branches:
@@ -21,71 +23,72 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-    
-          
-      - name: Set .env for docker-compose
-        run: |
-            echo > .env
-            echo "CTIBUTLER_BASE_URL=${{ secrets.CTIBUTLER_BASE_URL }}" >> .env
-            echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> .env
-            echo 'DEFAULT_PAGE_SIZE=5000'
 
-            cat tests/st/.env.schemathesis >> .env
-            cp tests/st/docker-compose.yml arango-compose.yml
-
-            echo ==== env file start =====
-            cat .env
-            echo
-            echo ==== env file end   =====
 
          
       - name: Start docker-compose
         uses: hoverkraft-tech/compose-action@v2.0.2
+        id: start_container
         with:
           compose-file: |
-            arango-compose.yml
-            docker-compose.yml
+            tests/st/docker-compose.yml
           compose-flags:
-            --env-file .env
-            -p vulmatch-action
+            --env-file tests/tests.env
+            -p stixify-action
 
       - name: Get IP addresses
         id: get_ip
         run: |
-              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' vulmatch-action_default)
+              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' stixify-action_default)
               echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
               echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:8005/" >> "$GITHUB_OUTPUT"
+              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:18529/" >> "$GITHUB_OUTPUT"
               cat "$GITHUB_OUTPUT"
-
-      - name: Wait for server to start
-        run: |
-              RETRY_DELAY=3
-              RETRY_COUNT=10
-              echo "Waiting for server to start"
-              curl --retry-delay $RETRY_DELAY --retry $RETRY_COUNT --retry-connrefused ${{ steps.get_ip.outputs.SERVICE_BASE_URL }} > /dev/null
-              if [ $? -ne 0 ]; then
-                echo "exiting after waiting $(( $RETRY_DELAY * $RETRY_COUNT )) seconds for server to start"
-                exit 1
-              fi
 
     
 
-      - name: test all endpoints 1
-        id: test-endpoints
+      - id: set-env
         run: |
-          pip install -r tests/requirements.txt
-          export SERVICE_BASE_URL="${{ steps.get_ip.outputs.SERVICE_BASE_URL }}"
+          pip install -r requirements.txt -r tests/requirements.txt
+          echo ARANGODB_HOST_URL="http://${{ steps.get_ip.outputs.IP_ADDRESS }}:18529" >> tests/tests.env
+          echo POSTGRES_HOST="${{ steps.get_ip.outputs.IP_ADDRESS }}" >> tests/tests.env
+          echo DJANGO_WWW_PATH=$PWD/django_www_path/ >> tests/tests.env
+          echo PYTHONPATH=. >> tests/tests.env
+          echo "CTIBUTLER_BASE_URL=${{ secrets.CTIBUTLER_BASE_URL }}" >> tests/tests.env
+          echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> tests/tests.env
 
-          pytest tests/
+      - name: test all endpoints 1
+        run: |
+          set -a; source tests/tests.env; set +a
+          pytest --cov --cov-branch --cov-report=xml --junitxml=unittest.junit.xml -o junit_family=legacy tests/
+      
+      - name: test schema
+        if: ${{ failure() || success() }}
+        run: |
+          set -a; source tests/tests.env; set +a
+          pytest --cov --cov-branch --cov-append --cov-report=xml --junitxml=schemathesis.junit.xml -o junit_family=legacy tests/st/test_schemathesis.py
 
-      - name: run schemathesis
-        uses: schemathesis/action@v1
-        if: always()
-        env:
-          SCHEMATHESIS_HOOKS: tests.st.hooks
+      - name: Upload coverage reports to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v5
         with:
-          schema: ${{ steps.get_ip.outputs.SERVICE_BASE_URL }}/api/schema/
-          checks: all
-          wait-for-schema: '30'
-          args: '--generation-allow-x00 false --exclude-method POST'
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: unittest.junit.xml
+          flags: unittest
+
+      
+      - name: Upload schemathesis test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: schemathesis.junit.xml
+          flags: schemathesis
+
+

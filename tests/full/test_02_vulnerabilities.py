@@ -1,14 +1,7 @@
-import os
 import random
-import time
-from types import SimpleNamespace
-import unittest, pytest
-from urllib.parse import urljoin
+import pytest
 
-from tests.utils import is_sorted, remove_unknown_keys, wait_for_jobs
-
-base_url = os.environ["SERVICE_BASE_URL"]
-import requests
+from .utils import is_sorted
 
 CVE_BUNDLE_DEFAULT_OBJECTS = [
     "extension-definition--ad995824-2901-5f6e-890b-561130a239d4",
@@ -209,10 +202,10 @@ CVE_SORT_FIELDS = [
         ),
     ],
 )
-def test_filters_generic(filters: dict, expected_ids: list[str]):
+def test_filters_generic(client, filters: dict, expected_ids: list[str]):
     expected_ids = set(expected_ids)
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url, params=filters)
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=filters)
     resp_data = resp.json()
     assert all(
         cve["type"] == "vulnerability" for cve in resp_data["objects"]
@@ -221,7 +214,7 @@ def test_filters_generic(filters: dict, expected_ids: list[str]):
     assert resp_data["total_results_count"] == len(expected_ids)
 
 
-def test_has_kev():
+def test_has_kev(client, ):
     expected_ids = set([
         "vulnerability--0143ea6c-4085-57f1-bac0-18b57a88cffb",
         "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
@@ -230,8 +223,8 @@ def test_has_kev():
         "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
         'vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3',
     ])
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url, params=dict(has_kev=True))
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=dict(has_kev=True))
     resp_data = resp.json()
     assert all(
         cve["type"] == "vulnerability" for cve in resp_data["objects"]
@@ -239,9 +232,9 @@ def test_has_kev():
     assert {cve["id"] for cve in resp_data["objects"]}.issuperset(expected_ids)
     assert resp_data["total_results_count"] >= len(expected_ids)
 
-def random_cve_values(key, count):
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url)
+def random_cve_values(client, key, count):
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url)
     data = resp.json()
     return [post[key] for post in random.choices(data["objects"], k=count)]
 
@@ -249,18 +242,18 @@ def random_cve_values(key, count):
 @pytest.mark.parametrize(
     "cvss_base_score_min", [random.randint(0, 100) / 10 for i in range(15)]
 )
-def test_cvss_base_score_min(cvss_base_score_min):
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url, params=dict(cvss_base_score_min=cvss_base_score_min))
+def test_cvss_base_score_min(client, cvss_base_score_min):
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=dict(cvss_base_score_min=cvss_base_score_min))
     vulnerabilities = resp.json()["objects"]
     for cve in vulnerabilities:
         cvss = list(cve["x_cvss"].values())[-1]
         assert cvss["base_score"] >= cvss_base_score_min
 
 
-def more_created_filters(prop, count):
+def more_created_filters(client, prop, count):
     filters = []
-    createds = random_cve_values(prop, 50)
+    createds = random_cve_values(client, prop, 50)
     for i in range(count):
         mmin = mmax = None
         if random.random() > 0.7:
@@ -272,7 +265,7 @@ def more_created_filters(prop, count):
     return filters
 
 
-def minmax_test(param_name, param_min, param_max):
+def minmax_test(client, param_name, param_min, param_max):
     filters = {}
     if param_min:
         filters.update({f"{param_name}_min": param_min})
@@ -281,33 +274,37 @@ def minmax_test(param_name, param_min, param_max):
 
     assert param_max or param_min, "at least one of two filters required"
 
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url, params=filters)
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=filters)
+    if param_max and param_min and param_min > param_max:
+        assert resp.status_code == 400, "bad parameters"
+        return
     assert resp.status_code == 200
     resp_data = resp.json()
     for d in resp_data["objects"]:
+        param_value = d[param_name]
         if param_min:
             assert (
-                d[param_name] >= param_min
-            ), f"{param_name} must not be less than {param_name}_min : {filters}"
+                param_value >= param_min
+            ), f"{param_name} ({param_value})  must not be less than {param_name}_min : {filters}"
         if param_max:
             assert (
-                d[param_name] <= param_max
-            ), f"{param_name} must not be greater than {param_name}_max : {filters}"
+                param_value <= param_max
+            ), f"{param_name} ({param_value}) must not be greater than {param_name}_max : {filters}"
 
 
-def test_extra_created_filters(subtests):
-    for dmin, dmax in more_created_filters("created", 22):
+def test_extra_created_filters(client, subtests):
+    for dmin, dmax in more_created_filters(client, "created", 20):
         with subtests.test(
             "randomly_generated created_* query", created_min=dmin, created_max=dmax
         ):
-            minmax_test("created", dmin, dmax)
+            minmax_test(client, "created", dmin, dmax)
 
-    for dmin, dmax in more_created_filters("modified", 22):
+    for dmin, dmax in more_created_filters(client, "modified", 20):
         with subtests.test(
             "randomly_generated modified_* query", modified_min=dmin, modified_max=dmax
         ):
-            minmax_test("modified", dmin, dmax)
+            minmax_test(client, "modified", dmin, dmax)
 
 
 @pytest.mark.parametrize(
@@ -343,9 +340,9 @@ def test_extra_created_filters(subtests):
         "CVE-2023-31025",
     ],
 )
-def test_retrieve_vulnerability(cve_id):
-    url = urljoin(base_url, f"api/v1/cve/objects/{cve_id}/")
-    resp = requests.get(url)
+def test_retrieve_vulnerability(client, cve_id):
+    url = f"/api/v1/cve/objects/{cve_id}/"
+    resp = client.get(url)
     resp_data = resp.json()
     assert resp_data["total_results_count"] == 1
     assert resp_data["objects"][0]["name"] == cve_id
@@ -365,9 +362,9 @@ def test_retrieve_vulnerability(cve_id):
         ["CVE-2023-53647", dict(include_epss=False, include_capec=False), 6],
     ],
 )
-def test_bundle(cve_id, filters, expected_count):
-    url = urljoin(base_url, f"api/v1/cve/objects/{cve_id}/bundle/")
-    resp = requests.get(url, params=filters)
+def test_bundle(client, cve_id, filters, expected_count):
+    url = f"/api/v1/cve/objects/{cve_id}/bundle/"
+    resp = client.get(url, query_params=filters)
     resp_data = resp.json()
     objects = {obj["id"] for obj in resp_data["objects"]}
     assert resp_data["total_results_count"] == expected_count
@@ -387,9 +384,9 @@ def test_bundle(cve_id, filters, expected_count):
         ["CVE-2023-31025", 3],
     ],
 )
-def test_relationships(cve_id, expected_count):
-    url = urljoin(base_url, f"api/v1/cve/objects/{cve_id}/relationships/")
-    resp = requests.get(url)
+def test_relationships(client, cve_id, expected_count):
+    url = f"/api/v1/cve/objects/{cve_id}/relationships/"
+    resp = client.get(url)
     resp_data = resp.json()
     objects = {obj["id"] for obj in resp_data["relationships"]}
     assert resp_data["total_results_count"] == expected_count
@@ -399,9 +396,9 @@ def test_relationships(cve_id, expected_count):
 
 
 @pytest.mark.parametrize("sort_param", CVE_SORT_FIELDS)
-def test_sort(sort_param):
-    url = urljoin(base_url, "api/v1/cve/objects/")
-    resp = requests.get(url, params=dict(sort=sort_param))
+def test_sort(client, sort_param):
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=dict(sort=sort_param))
     assert resp.status_code == 200
     resp_data = resp.json()
     assert all(
@@ -412,9 +409,9 @@ def test_sort(sort_param):
     sort_objects_to_consider = resp_data["objects"][:50]
 
     def get_epss_scores(cve_ids):
-        resp = requests.get(
-            urljoin(base_url, "api/v1/epss/objects/"),
-            params=dict(cve_id=",".join(cve_ids)),
+        resp = client.get(
+            f"/api/v1/epss/objects/",
+            query_params=dict(cve_id=",".join(cve_ids)),
         )
         return {
             obj["external_references"][0]["external_id"]: float(
@@ -441,3 +438,26 @@ def test_sort(sort_param):
     assert is_sorted(
         sort_objects_to_consider, key=key_fn, reverse=revered
     ), "objects not sorted"
+
+
+@pytest.mark.parametrize(
+    "cve_id",
+    [
+        "CVE-2024-52047",
+        "CVE-2024-13078",
+        "CVE-2024-13079",
+        "CVE-2024-56803",
+        "CVE-2024-56063",
+        "CVE-2024-56062",
+        "CVE-2024-13085",
+        "CVE-2024-13084",
+        "CVE-2024-13083",
+        "CVE-2024-13082",
+        "CVE-2024-13081",
+    ]
+)
+def test_versions(client, cve_id):
+    resp = client.get(f"/api/v1/cve/objects/{cve_id}/versions/")
+    assert resp.status_code == 200
+    assert {'versions', 'latest'} == set(resp.data.keys())
+    assert resp.data['latest'] == resp.data['versions'][0]

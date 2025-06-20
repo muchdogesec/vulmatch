@@ -74,14 +74,17 @@ def create_collections():
     #create db/collections
     for c in find_missing(collections_to_create):
         print(f"creating collection: {c}")
-        s2a = Stix2Arango(settings.ARANGODB_DATABASE, collection=c, file='no-file', username=settings.ARANGODB_USERNAME, password=settings.ARANGODB_PASSWORD, host_url=settings.ARANGODB_HOST_URL)
+        s2a = Stix2Arango(settings.ARANGODB_DATABASE, collection=c, file='no-file', username=settings.ARANGODB_USERNAME, password=settings.ARANGODB_PASSWORD, host_url=settings.ARANGODB_HOST_URL, skip_default_indexes=True)
     create_indexes(get_db())
 
    
    
-if __name__ == '__main__':
+def setup_arangodb():
     create_collections()
     db_view_creator.startup_func()
+
+if __name__ == '__main__':
+    setup_arangodb()
 
 
 

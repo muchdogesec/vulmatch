@@ -26,7 +26,6 @@ class NVDTaskSerializer(serializers.Serializer):
     ignore_embedded_relationships = serializers.BooleanField(default=True)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
-    always_latest = serializers.BooleanField(default=True, help_text="Skip _is_latest check when uploading, this should only be used when working with large backfill tasks")
 
     def validate(self, attrs):
         if attrs.get('last_modified_earliest') and attrs.get('last_modified_latest') and attrs['last_modified_earliest'] > attrs['last_modified_latest']:
