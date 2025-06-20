@@ -34,15 +34,14 @@ jobs:
             tests/st/docker-compose.yml
           compose-flags:
             --env-file tests/tests.env
-            -p stixify-action
+            -p vulmatch-action
 
       - name: Get IP addresses
         id: get_ip
         run: |
-              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' stixify-action_default)
+              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' vulmatch-action_default)
               echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
               echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:18529/" >> "$GITHUB_OUTPUT"
               cat "$GITHUB_OUTPUT"
 
     
