@@ -1,14 +1,7 @@
-import os
-import random
-import time
-from types import SimpleNamespace
-import unittest, pytest
-from urllib.parse import urljoin
+import pytest
 
-from tests.utils import is_sorted, remove_unknown_keys, wait_for_jobs
 
-base_url = os.environ["SERVICE_BASE_URL"]
-import requests
+
 
 
 @pytest.mark.parametrize(
@@ -20,9 +13,9 @@ import requests
             "sdos",
         ]
 )
-def test_paths_no_dup(endpoint):
-    url = urljoin(base_url, f'api/v1/objects/{endpoint}/')
-    resp = requests.get(url)
+def test_paths_no_dup(client, endpoint):
+    url = f'/api/v1/objects/{endpoint}/'
+    resp = client.get(url)
     assert resp.status_code == 200, url
     data = resp.json()
     assert data['page_results_count'] <= data['total_results_count']
@@ -41,9 +34,9 @@ def test_paths_no_dup(endpoint):
         "vulnerability--024e52d0-9888-5beb-87f0-80249127ef0f",
     ]
 )
-def test_object_retrieve(object_id):
-    url = urljoin(base_url, f'api/v1/objects/{object_id}/')
-    resp = requests.get(url)
+def test_object_retrieve(client, object_id):
+    url = f'/api/v1/objects/{object_id}/'
+    resp = client.get(url)
     assert resp.status_code == 200, url
     data = resp.json()
     assert data['total_results_count'] == 1, "object must return only 1 object"

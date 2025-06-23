@@ -1,14 +1,9 @@
-import os
 import random
-import time
-from types import SimpleNamespace
-import unittest, pytest
-from urllib.parse import urljoin
+import pytest
 
-from tests.utils import is_sorted, remove_unknown_keys, wait_for_jobs
+from tests.full.utils import is_sorted
 
-base_url = os.environ["SERVICE_BASE_URL"]
-import requests
+
 
 @pytest.mark.parametrize(
         "path",
@@ -17,9 +12,9 @@ import requests
             "epss"
         ]
 )
-def test_list_obvjects(path):
-    url = urljoin(base_url, f"api/v1/{path}/objects/")
-    resp = requests.get(url)
+def test_list_obvjects(client, path):
+    url = f"/api/v1/{path}/objects/"
+    resp = client.get(url)
     resp_data = resp.json()
     assert all(
         cve["type"] == "report" for cve in resp_data["objects"]
@@ -43,9 +38,9 @@ def test_list_obvjects(path):
             ["epss", "CVE-2023-7028"],
         ]
 )
-def test_cve_id_filter(path, cve_id):
-    url = urljoin(base_url, f"api/v1/{path}/objects/")
-    resp = requests.get(url, params=dict(cve_id=cve_id))
+def test_cve_id_filter(client, path, cve_id):
+    url = f"/api/v1/{path}/objects/"
+    resp = client.get(url, query_params=dict(cve_id=cve_id))
     resp_data = resp.json()
     
     assert all(
@@ -63,9 +58,9 @@ def test_cve_id_filter(path, cve_id):
             random.randint(0, 110)/10 for i in range(15)
         ]
 )
-def test_epss_min_score(min_score):
-    url = urljoin(base_url, f"api/v1/epss/objects/")
-    resp = requests.get(url, params=dict(epss_min_score=min_score))
+def test_epss_min_score(client, min_score):
+    url = f"/api/v1/epss/objects/"
+    resp = client.get(url, query_params=dict(epss_min_score=min_score))
     resp_data = resp.json()
     assert all(
         report["type"] == "report" and report['labels'][0] == 'epss' for report in resp_data["objects"]
@@ -96,9 +91,9 @@ def test_epss_min_score(min_score):
             ["epss", "epss_score_descending"],
         ]
 )
-def test_sort(path, sort_param: str):
-    url = urljoin(base_url, f"api/v1/{path}/objects/")
-    resp = requests.get(url, params=dict(sort=sort_param))
+def test_sort(client, path, sort_param: str):
+    url = f"/api/v1/{path}/objects/"
+    resp = client.get(url, query_params=dict(sort=sort_param))
     resp_data = resp.json()
     assert all(
         report["type"] == "report" and report['labels'][0] == path for report in resp_data["objects"]

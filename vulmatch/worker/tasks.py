@@ -143,6 +143,7 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
+        skip_default_indexes=True,
         **params
     )
     data = json.loads(Path(filename).read_text())
@@ -153,6 +154,8 @@ def modify_objects(objects):
     for obj in objects:
         if obj['type'] == 'vulnerability':
             x_cvss = list(obj['x_cvss'].values())
+            if not x_cvss:
+                continue
             primary_cvss = x_cvss[-1]
             for cvss in reversed(x_cvss):
                 if cvss['type'].lower() == 'primary':

@@ -1,14 +1,5 @@
-import os
-import random
-import time
-from types import SimpleNamespace
-import unittest, pytest
-from urllib.parse import urljoin
+import pytest
 
-from tests.utils import remove_unknown_keys, wait_for_jobs
-
-base_url = os.environ["SERVICE_BASE_URL"]
-import requests
 
 
 @pytest.mark.parametrize(
@@ -25,9 +16,9 @@ import requests
         [dict(product_type="operating-system"), 332],
     ],
 )
-def test_struct_filter(filters, expected_count):
-    url = urljoin(base_url, "api/v1/cpe/objects/")
-    resp = requests.get(url, params=filters)
+def test_struct_filter(client, filters, expected_count):
+    url = f"/api/v1/cpe/objects/"
+    resp = client.get(url, query_params=filters)
     resp_data = resp.json()
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
@@ -57,9 +48,9 @@ def test_struct_filter(filters, expected_count):
         ["qfx5130", 1],
     ],
 )
-def test_cpe_match_string(cpe_match_string, expected_count):
-    url = urljoin(base_url, "api/v1/cpe/objects/")
-    resp = requests.get(url, params=dict(cpe_match_string=cpe_match_string))
+def test_cpe_match_string(client, cpe_match_string, expected_count):
+    url = f"/api/v1/cpe/objects/"
+    resp = client.get(url, query_params=dict(cpe_match_string=cpe_match_string))
     resp_data = resp.json()
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
@@ -92,9 +83,9 @@ def test_cpe_match_string(cpe_match_string, expected_count):
         "cpe:2.3:a:ays-pro:quiz_maker:6.2.7.1:*:*:*:*:wordpress:*:*",
     ],
 )
-def test_retrieve_cpe(cpe_name):
-    url = urljoin(base_url, f"api/v1/cpe/objects/{cpe_name}/")
-    resp = requests.get(url)
+def test_retrieve_cpe(client, cpe_name):
+    url = f"/api/v1/cpe/objects/{cpe_name}/"
+    resp = client.get(url)
     resp_data = resp.json()
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
@@ -127,12 +118,12 @@ def test_retrieve_cpe(cpe_name):
         ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", 'vulnerable-to', 3],
     ],
 )
-def test_relationships(cpe_name, relationship_type, expected_count):
-    url = urljoin(base_url, f"api/v1/cpe/objects/{cpe_name}/relationships/")
+def test_relationships(client, cpe_name, relationship_type, expected_count):
+    url = f"/api/v1/cpe/objects/{cpe_name}/relationships/"
     filters = {}
     if relationship_type:
         filters.update(relationship_type=relationship_type)
-    resp = requests.get(url, params=filters)
+    resp = client.get(url, query_params=filters)
     resp_data = resp.json()
     assert (
         len({cpe["id"] for cpe in resp_data["relationships"]})

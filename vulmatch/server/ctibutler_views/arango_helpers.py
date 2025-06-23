@@ -1,64 +1,18 @@
 import contextlib
-import json
-from pathlib import Path
 import re
 import typing
 
-from django.http import HttpResponse
-from arango import ArangoClient
 from django.conf import settings
-from vulmatch.server.utils import Pagination, Response
 from drf_spectacular.utils import OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from rest_framework.validators import ValidationError
-from vulmatch.server import utils
+from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
+from rest_framework.response import Response
 if typing.TYPE_CHECKING:
     from .. import settings
 
+
 import textwrap
 
-SDO_TYPES = set(
-    [
-        "report",
-        "note",
-        "indicator",
-        "attack-pattern",
-        "weakness",
-        "campaign",
-        "course-of-action",
-        "infrastructure",
-        "intrusion-set",
-        "malware",
-        "threat-actor",
-        "tool",
-        "identity",
-        "location",
-    ]
-)
-SCO_TYPES = set(
-    [
-        "ipv4-addr",
-        "network-traffic",
-        "ipv6-addr",
-        "domain-name",
-        "url",
-        "file",
-        "directory",
-        "email-addr",
-        "mac-addr",
-        "windows-registry-key",
-        "autonomous-system",
-        "user-agent",
-        "cryptocurrency-wallet",
-        "cryptocurrency-transaction",
-        "bank-card",
-        "bank-account",
-        "phone-number",
-    ]
-)
-TLP_TYPES = set([
-    "marking-definition"
-])
 ATTACK_TYPES = set([
     "attack-pattern",
     "campaign",
@@ -89,23 +43,6 @@ ATTACK_FORMS = {
 }
 
 
-ATLAS_FORMS = {
-    "Tactic": [dict(type='x-mitre-tactic')],
-    "Technique": [dict(type='attack-pattern', x_mitre_is_subtechnique=False), dict(type='attack-pattern', x_mitre_is_subtechnique=None)],
-    "Sub-technique": [dict(type='attack-pattern', x_mitre_is_subtechnique=True)],
-    "Mitigation": [dict(type='course-of-action')],
-}
-
-
-DISARM_FORMS = {
-    "Tactic": [dict(type='x-mitre-tactic')],
-    "Technique": [dict(type='attack-pattern', x_mitre_is_subtechnique=False), dict(type='attack-pattern', x_mitre_is_subtechnique=None)],
-    "Sub-technique": [dict(type='attack-pattern', x_mitre_is_subtechnique=True)],
-}
-
-LOCATION_TYPES = set([
-    'location'
-])
 CWE_TYPES = set([
     "weakness",
     # "grouping",
@@ -115,30 +52,6 @@ CWE_TYPES = set([
 ]
 )
 
-DISARM_TYPES = set([
-  "attack-pattern",
-  "identity",
-  "marking-definition",
-  "x-mitre-matrix",
-  "x-mitre-tactic"
-])
-
-ATLAS_TYPES = set([
-  "attack-pattern",
-  "course-of-action",
-#   "identity",
-#   "marking-definition",
-  "x-mitre-collection",
-  "x-mitre-matrix",
-  "x-mitre-tactic"
-])
-
-SOFTWARE_TYPES = set([
-    "software",
-    "identity",
-    "marking-definition"
-]
-)
 CAPEC_TYPES = set([
   "attack-pattern",
   "course-of-action",
@@ -147,28 +60,6 @@ CAPEC_TYPES = set([
 ]
 )
 
-LOCATION_SUBTYPES = set(
-[
-  "intermediate-region",
-  "sub-region",
-  "region",
-  "country"
-]
-)
-
-CVE_SORT_FIELDS = [
-    "modified_descending",
-    "modified_ascending",
-    "created_ascending",
-    "created_descending",
-    "name_ascending",
-    "name_descending",
-    "epss_score_ascending",
-    "epss_score_descending",
-    "cvss_base_score_ascending",
-    "cvss_base_score_descending",
-]
-OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
 
 def positive_int(integer_string, cutoff=None, default=1):
@@ -184,42 +75,10 @@ def positive_int(integer_string, cutoff=None, default=1):
         return ret
     return default
 
-class ArangoDBHelper:
-    max_page_size = settings.MAXIMUM_PAGE_SIZE
-    page_size = settings.DEFAULT_PAGE_SIZE
-
-    def get_sort_stmt(self, sort_options: list[str], customs={}):
-        finder = re.compile(r"(.+)_((a|de)sc)ending")
-        sort_field = self.query.get('sort', sort_options[0])
-        if sort_field not in sort_options:
-            return ""
-        if m := finder.match(sort_field):
-            field = m.group(1)
-            direction = m.group(2).upper()
-            if cfield := customs.get(field):
-                return f"SORT {cfield} {direction}"
-            return f"SORT doc.{field} {direction}"
-
-    def query_as_array(self, key):
-        query = self.query.get(key)
-        if not query:
-            return []
-        return query.split(',')
-    def query_as_bool(self, key, default=True):
-        query_str = self.query.get(key)
-        if not query_str:
-            return default
-        return query_str.lower() == 'true'
-    
-    @classmethod
-    def get_page_params(cls, request):
-        kwargs = request.GET.copy()
-        page_number = positive_int(kwargs.get('page'))
-        page_limit = positive_int(kwargs.get('page_size'), cutoff=ArangoDBHelper.max_page_size, default=ArangoDBHelper.page_size)
-        return page_number, page_limit
+class AttachedDBHelper(DCHelper):
 
     @classmethod
-    def get_paginated_response(cls, container,  data, page_number, page_size=page_size, full_count=0):
+    def get_paginated_response(cls, container,  data, page_number, page_size=None, full_count=0):
         return Response(
             {
                 "page_size": page_size or cls.page_size,
@@ -300,36 +159,12 @@ class ArangoDBHelper:
                 description="Filter results by `_arango_cti_processor_note`"
             )
         ]
-    @classmethod
-    def get_schema_operation_parameters(self):
-        parameters = [
-            OpenApiParameter(
-                Pagination.page_query_param,
-                type=int,
-                description=Pagination.page_query_description,
-            ),
-            OpenApiParameter(
-                Pagination.page_size_query_param,
-                type=int,
-                description=Pagination.page_size_query_description,
-            ),
-        ]
-        return parameters
-    client = ArangoClient(
-        hosts=settings.ARANGODB_HOST_URL
-    )
-    DB_NAME = f"{settings.ARANGODB_DATABASE}_database"
+    
     def __init__(self, collection, request, container='objects') -> None:
-        self.collection = collection
-        self.db = self.client.db(
-            self.DB_NAME,
-            username=settings.ARANGODB_USERNAME,
-            password=settings.ARANGODB_PASSWORD,
-        )
+        super().__init__(collection, request, container)
         self.container = container
-        self.page, self.count = self.get_page_params(request)
-        self.request = request
-        self.query = request.query_params.dict()
+
+
     def execute_query(self, query, bind_vars={}, paginate=True, relationship_mode=False, container=None):
         if relationship_mode:
             return self.get_relationships(query, bind_vars)
@@ -337,16 +172,9 @@ class ArangoDBHelper:
             bind_vars['offset'], bind_vars['count'] = self.get_offset_and_count(self.count, self.page)
         cursor = self.db.aql.execute(query, bind_vars=bind_vars, count=True, full_count=True)
         if paginate:
-            return self.get_paginated_response(container or self.container, cursor, self.page, self.page_size, cursor.statistics()["fullCount"])
+            return self.get_paginated_response(container or self.container, cursor, self.page, self.count, cursor.statistics()["fullCount"])
         return list(cursor)
    
-    def get_offset_and_count(self, count, page) -> tuple[int, int]:
-        page = page or 1
-        if page >= 2**32:
-            raise ValidationError(f"invalid page `{page}`")
-        offset = (page-1)*count
-        return offset, count
-
     def get_attack_objects(self, matrix):
         filters = []
         types = ATTACK_TYPES
@@ -366,21 +194,13 @@ class ArangoDBHelper:
                 filters.append('FILTER @attack_form_list[? ANY FILTER MATCHES(doc, CURRENT)]')
                 bind_vars['attack_form_list'] = form_list
 
-
-        if q := self.query.get(f'attack_version'):
-            bind_vars['mitre_version'] = "version="+q.replace('.', '_').strip('v')
-            filters.append('FILTER doc._stix2arango_note == @mitre_version')
-        else:
-            filters.append('FILTER doc._is_latest')
+        filters.append('FILTER doc._is_latest')
 
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
             filters.append(
                 "FILTER doc.id in @ids"
             )
-
-        bind_vars['include_deprecated'] = self.query_as_bool('include_deprecated', False)
-        bind_vars['include_revoked'] = self.query_as_bool('include_revoked', False)
 
         if value := self.query_as_array('attack_id'):
             bind_vars['attack_ids'] = [v.lower() for v in value]
@@ -401,7 +221,7 @@ class ArangoDBHelper:
 
         query = """
             FOR doc in @@collection
-            FILTER doc.type IN @types AND doc._arango_cve_processor_note == 'cve-attack' AND (@include_revoked OR doc.revoked != TRUE) AND (@include_deprecated OR doc.x_mitre_deprecated != TRUE)
+            FILTER doc.type IN @types AND doc._arango_cve_processor_note == 'cve-attack'
             @filters
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
@@ -413,11 +233,6 @@ class ArangoDBHelper:
     def get_object_by_external_id(self, ext_id: str, note, relationship_mode=False, revokable=False, bundle=False):
         bind_vars={'@collection': self.collection, 'ext_id': ext_id.lower(), "note": note}
         filters = ['FILTER doc._is_latest']
-        for version_param in ['attack_version', 'cwe_version', 'capec_version']:
-            if q := self.query.get(version_param):
-                bind_vars['mitre_version'] = "version="+q.replace('.', '_').strip('v')
-                filters[0] = 'FILTER doc._stix2arango_note == @mitre_version'
-                break
         
         if revokable:
             bind_vars['include_deprecated'] = self.query_as_bool('include_deprecated', False)
@@ -431,62 +246,10 @@ class ArangoDBHelper:
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
             '''.replace('@filters', '\n'.join(filters))
-        if bundle:
-            return self.get_bundle(query, bind_vars)
+        # if bundle:
+        #     return self.get_bundle(query, bind_vars)
         # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=bind_vars, relationship_mode=relationship_mode)
-
-    def get_mitre_versions(self, stix_id=None):
-        query = """
-        FOR doc IN @@collection
-        FILTER STARTS_WITH(doc._stix2arango_note, "version=")
-        RETURN DISTINCT doc._stix2arango_note
-        """
-        bind_vars = {'@collection': self.collection}
-        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
-        versions = self.clean_and_sort_versions(versions)
-        return Response(dict(latest=versions[0] if versions else None, versions=versions))
-
-    def get_mitre_modified_versions(self, external_id: str=None, source_name='mitre-attack'):
-        query = """
-        FOR doc IN @@collection
-        FILTER doc.external_references[? ANY FILTER LOWER(CURRENT.external_id) == @matcher.external_id AND @matcher.source_name == CURRENT.source_name] AND STARTS_WITH(doc._stix2arango_note, "version=")
-        FILTER (@include_revoked OR NOT doc.revoked) AND (@include_deprecated OR NOT doc.x_mitre_deprecated) // for MITRE ATT&CK, check if revoked
-        COLLECT modified = doc.modified INTO group
-        SORT modified DESC
-        RETURN {modified, versions: UNIQUE(group[*].doc._stix2arango_note)}
-        """
-        bind_vars = {
-            '@collection': self.collection, 'matcher': dict(external_id=external_id.lower(), source_name=source_name),
-            # include_deprecated / include_revoked
-            'include_revoked': self.query_as_bool('include_revoked', False),
-            'include_deprecated': self.query_as_bool('include_deprecated', False),
-            }
-        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
-        for mod in versions:
-            mod['versions'] = self.clean_and_sort_versions(mod['versions'])
-        return Response(versions)
-    
-    def get_modified_versions(self, stix_id=None):
-        query = """
-        FOR doc IN @@collection
-        FILTER doc.id == @stix_id AND STARTS_WITH(doc._stix2arango_note, "version=")
-        COLLECT modified = doc.modified INTO group
-        SORT modified DESC
-        RETURN {modified, versions: UNIQUE(group[*].doc._stix2arango_note)}
-        """
-        bind_vars = {'@collection': self.collection, 'stix_id': stix_id}
-        versions = self.execute_query(query, bind_vars=bind_vars, paginate=False)
-        for mod in versions:
-            mod['versions'] = self.clean_and_sort_versions(mod['versions'])
-        return Response(versions)
-    
-    def clean_and_sort_versions(self, versions):
-        versions = sorted([
-            v.split("=")[1].replace('_', ".")
-            for v in versions
-        ], key=utils.split_mitre_version, reverse=True)
-        return [f"{v}" for v in versions]
 
     def get_weakness_or_capec_objects(self, note, cwe=True, types=CWE_TYPES, lookup_kwarg='cwe_id', more_binds={}, more_filters=[], forms={}):
         version_param = lookup_kwarg.replace('_id', '_version')
@@ -500,11 +263,8 @@ class ArangoDBHelper:
                 "note": note,
                 **more_binds
         }
-        if q := self.query.get(version_param):
-            bind_vars['mitre_version'] = "version="+q.replace('.', '_').strip('v')
-            filters.append('FILTER doc._stix2arango_note == @mitre_version')
-        else:
-            filters.append('FILTER doc._is_latest')
+        
+        filters.append('FILTER doc._is_latest')
 
         if value := self.query_as_array('id'):
             bind_vars['ids'] = value
@@ -547,10 +307,6 @@ class ArangoDBHelper:
     def get_object(self, stix_id, relationship_mode=False, version_param=None, bundle=False):
         bind_vars={'@collection': self.collection, 'stix_id': stix_id}
         filters = ['FILTER doc._is_latest']
-        if version_param and self.query.get(version_param):
-            bind_vars['mitre_version'] = "version="+self.query.get(version_param).replace('.', '_').strip('v')
-            filters[0] = 'FILTER doc._stix2arango_note == @mitre_version'
-
         query = '''
             FOR doc in @@collection
             FILTER doc.id == @stix_id
@@ -559,8 +315,8 @@ class ArangoDBHelper:
             RETURN KEEP(doc, KEYS(doc, true))
             '''.replace('@filters', '\n'.join(filters))
         
-        if bundle:
-            return self.get_bundle(query, bind_vars)
+        # if bundle:
+        #     return self.get_bundle(query, bind_vars)
 
         return self.execute_query(query, bind_vars=bind_vars, relationship_mode=relationship_mode)
 
@@ -622,29 +378,29 @@ class ArangoDBHelper:
         return self.execute_query(new_query, bind_vars=binds, container='relationships')
 
 
-    def get_bundle(self, docs_query, binds):
-        regex = r"KEEP\((\w+),\s*\w+\(.*?\)\)"
-        binds['@view'] = settings.VIEW_NAME
-        more_search_filters = []
+#     def get_bundle(self, docs_query, binds):
+#         regex = r"KEEP\((\w+),\s*\w+\(.*?\)\)"
+#         binds['@view'] = settings.VIEW_NAME
+#         more_search_filters = []
 
-        if not self.query_as_bool('include_embedded_refs', False):
-            more_search_filters.append('doc._is_ref != TRUE')
+#         if not self.query_as_bool('include_embedded_refs', False):
+#             more_search_filters.append('doc._is_ref != TRUE')
         
-        query = '''
-LET matched_ids = (@docs_query)[*]._id
+#         query = '''
+# LET matched_ids = (@docs_query)[*]._id
 
- LET bundle_ids = FLATTEN(
-     FOR doc IN @@view SEARCH doc.type == 'relationship' AND (doc._from IN matched_ids OR doc._to IN matched_ids) @@more_search_filters
-     RETURN [doc._id, doc._from, doc._to]
- ) 
+#  LET bundle_ids = FLATTEN(
+#      FOR doc IN @@view SEARCH doc.type == 'relationship' AND (doc._from IN matched_ids OR doc._to IN matched_ids) @@more_search_filters
+#      RETURN [doc._id, doc._from, doc._to]
+#  ) 
  
- FOR d IN @@view SEARCH d._id IN APPEND(bundle_ids, matched_ids)
- LIMIT @offset, @count
- RETURN KEEP(d, KEYS(d, TRUE))
-'''
-        query = query \
-                    .replace('@docs_query', re.sub(regex, lambda x: x.group(1), docs_query.replace('LIMIT @offset, @count', ''))) \
-                    .replace('@@more_search_filters', "" if not more_search_filters else f" AND {' and '.join(more_search_filters)}")
-        # return Response([query, binds])
-        return self.execute_query(query, bind_vars=binds)
+#  FOR d IN @@view SEARCH d._id IN APPEND(bundle_ids, matched_ids)
+#  LIMIT @offset, @count
+#  RETURN KEEP(d, KEYS(d, TRUE))
+# '''
+#         query = query \
+#                     .replace('@docs_query', re.sub(regex, lambda x: x.group(1), docs_query.replace('LIMIT @offset, @count', ''))) \
+#                     .replace('@@more_search_filters', "" if not more_search_filters else f" AND {' and '.join(more_search_filters)}")
+#         # return Response([query, binds])
+#         return self.execute_query(query, bind_vars=binds)
   

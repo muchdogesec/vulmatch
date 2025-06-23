@@ -1,17 +1,13 @@
-import re
-from django.shortcuts import render
-from rest_framework import viewsets, filters, status, decorators
+from rest_framework import viewsets, status, decorators
 
-from vulmatch.server.arango_helpers import ATLAS_TYPES, CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CPE_SORT_FIELDS, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, LOCATION_TYPES, TLP_TYPES, ArangoDBHelper, ATTACK_TYPES, CWE_TYPES, SOFTWARE_TYPES, CAPEC_TYPES
-from vulmatch.server.autoschema import DEFAULT_400_ERROR
-from vulmatch.server.utils import Pagination, Response, Ordering, split_mitre_version
+from vulmatch.server.arango_helpers import CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, VulmatchDBHelper
+from dogesec_commons.utils import Pagination, Ordering
 from vulmatch.worker.tasks import new_task
 from . import models
 from vulmatch.server import serializers
-from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter, DateTimeFilter
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample, OpenApiResponse
+from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, DateTimeFilter
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from textwrap import dedent
 
 
 import textwrap
@@ -60,7 +56,6 @@ class VulnerabilityStatus(models.models.TextChoices):
             * `ignore_embedded_relationships` (optional - default: `true`): Most objects contains embedded relationships inside them (e.g. `created_by_ref`). Setting this to `false` is not recommended as it will get stix2arango to generate SROs for these embedded relationships so they can be searched (this will create millions of additional relationships). `true` will ignore them. This is a stix2arango setting.
             * `ignore_embedded_relationships_sro` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SRO objects (`type` = `relationship`). Default is `true`. This is a stix2arango setting.
             * `ignore_embedded_relationships_smo` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SMO objects (`type` = `marking-definition`, `extension-definition`, `language-content`). Default is `true`. This is a stix2arango setting.
-            * `always_latest`: this is a stix2arango setting that defines how updates happen. Default is `true`, setting this to `false` will get stix2arango to bypass the check for updated objects. The only time you should ever set this to `false` is on first run AND when dates are between `1988-01-01` and `2024-12-31` (because of the way we generated cve2stix data).
 
             The data for updates is requested from `https://cve2stix.vulmatch.com` (managed by the [DOGESEC](https://www.dogesec.com/) team).
             """
@@ -88,8 +83,8 @@ class VulnerabilityStatus(models.models.TextChoices):
             If you want all the Objects related to this vulnerability you should use the bundle endpoint for the CVE.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+        responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
+        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
     retrieve_object_relationships=extend_schema(
         summary='Get Relationships for Vulnerability by CVE ID',
@@ -98,8 +93,8 @@ class VulnerabilityStatus(models.models.TextChoices):
             This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the CVE is related to.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+        responses={200: VulmatchDBHelper.get_paginated_response_schema('relationships', 'relationship')},
+        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
     bundle=extend_schema(
         summary='Get all objects for a Vulnerability by CVE ID',
@@ -124,8 +119,8 @@ class VulnerabilityStatus(models.models.TextChoices):
             * `relationship` (`vulnerability` (CVE) ->  `attack-pattern` (ATT&CK)) (source: arango_cve_processor, requires `cve-attack` mode to be run)
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters() + [
+        responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
+        parameters=VulmatchDBHelper.get_schema_operation_parameters() + [
             OpenApiParameter('object_type', description="The type of STIX object to be returned", enum=CVE_BUNDLE_TYPES, many=True, explode=False),
             OpenApiParameter('include_cpe', description="will show all `software` objects related to this vulnerability (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_cpe_vulnerable', description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
@@ -267,11 +262,11 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request).get_vulnerabilities()
+        return VulmatchDBHelper('', request).get_vulnerabilities()
     
     @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:cve_id>/bundle")
     def bundle(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('', request).get_cve_bundle(cve_id)
+        return VulmatchDBHelper('', request).get_cve_bundle(cve_id)
     
     @extend_schema(
             parameters=[
@@ -280,7 +275,7 @@ class CveView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
     
     @extend_schema(
             parameters=[
@@ -289,11 +284,11 @@ class CveView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id, relationship_mode=True)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id, relationship_mode=True)
     
     @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).get_cve_versions(cve_id)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cve_versions(cve_id)
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -318,8 +313,8 @@ class CveView(viewsets.ViewSet):
             If there is no KEV reported for the CVE, the response will be empty.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('objects', 'report')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+        responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'report')},
+        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
 )  
 class KevView(viewsets.ViewSet):
@@ -349,12 +344,12 @@ class KevView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request).list_kev_or_epss_objects(self.label)
+        return VulmatchDBHelper('', request).list_kev_or_epss_objects(self.label)
     
 
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return ArangoDBHelper('nvd_cve_vertex_collection', request).retrieve_kev_or_epss_object(cve_id, self.label)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).retrieve_kev_or_epss_object(cve_id, self.label)
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -442,8 +437,8 @@ class EPSSView(KevView):
             This endpoint will return all SROs where the Software (CPE) selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what CVEs the CPE is found in.
             """
         ),
-        responses={200: ArangoDBHelper.get_paginated_response_schema('relationships', 'relationship')},
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+        responses={200: VulmatchDBHelper.get_paginated_response_schema('relationships', 'relationship')},
+        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -508,11 +503,11 @@ class CpeView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
-        return ArangoDBHelper('', request).get_softwares()
+        return VulmatchDBHelper('', request).get_softwares()
 
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
+        return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
     
     @extend_schema(
             parameters=[
@@ -522,7 +517,7 @@ class CpeView(viewsets.ViewSet):
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
-        return ArangoDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
+        return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
 
 
 @extend_schema_view(

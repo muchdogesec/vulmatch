@@ -1,14 +1,4 @@
-import io
-import os
-import time
-from types import SimpleNamespace
-import unittest, pytest
-from urllib.parse import urljoin
-
-from tests.utils import remove_unknown_keys, wait_for_jobs
-
-base_url = os.environ["SERVICE_BASE_URL"]
-import requests
+import pytest
 
 
 @pytest.mark.parametrize(["path", "payload"], [
@@ -21,10 +11,12 @@ import requests
     pytest.param("arango-cve-processor/cve-epss", dict()),
     pytest.param("arango-cve-processor/cve-kev", dict()),
 ])
-def test_task(path, payload):
-    new_task_resp = requests.post(urljoin(base_url, f"api/v1/{path}/"), json=payload)
+def test_task(db, client, path, payload):
+    new_task_resp = client.post(f"/api/v1/{path}/", data=payload, content_type="application/json")
 
     assert new_task_resp.status_code == 201
     task_data = new_task_resp.json()
-
-    job_data = wait_for_jobs(task_data["id"])
+    job_id =  task_data['id']
+    job_resp = client.get(f"/api/v1/jobs/{job_id}/")
+    assert job_resp.status_code == 200
+    assert job_resp.data['state'] == 'completed'
