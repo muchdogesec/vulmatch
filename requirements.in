@@ -18,13 +18,5 @@ dogesec_commons @ https://github.com/muchdogesec/dogesec_commons/releases/downlo
 stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/use-transaction-for-uploads-2025-06-20-16-13-38/stix2arango-0.0.4rc0-py3-none-any.whl
 arango_cve_processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/update-deps-2025-06-20-15-48-04/arango_cve_processor-0.0.1-py3-none-any.whl
 
-## llms
-llama-index-core
-llama-index-llms-anthropic
-llama-index-llms-openai
-llama-index-llms-openrouter
-llama-index-llms-gemini
-llama-index-llms-deepseek
-
 ## production
 gunicorn==23.0.0
