@@ -8,7 +8,7 @@ amqp==5.3.1
     # via kombu
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango-cve-processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/update-deps-2025-06-20-15-48-04/arango_cve_processor-0.0.1-py3-none-any.whl
+arango-cve-processor @ https://github.com/muchdogesec/arango_cve_processor/releases/download/main-2025-06-26-05-17-46/arango_cve_processor-0.0.1-py3-none-any.whl
     # via -r requirements.in
 asgiref==3.8.1
     # via
@@ -67,7 +67,7 @@ djangorestframework==3.16.0
     #   -r requirements.in
     #   dogesec-commons
     #   drf-spectacular
-dogesec-commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-06-05-08-47-25/dogesec_commons-0.0.7rc1-py3-none-any.whl
+dogesec-commons @ https://github.com/muchdogesec/dogesec_commons/releases/download/main-2025-06-26-05-07-25/dogesec_commons-0.0.7rc1-py3-none-any.whl
     # via -r requirements.in
 drf-spectacular==0.28.0
     # via
@@ -165,7 +165,7 @@ stix2==3.0.1
     #   stix2arango
 stix2-patterns==2.0.0
     # via stix2
-stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/use-transaction-for-uploads-2025-06-20-16-13-38/stix2arango-0.0.4rc0-py3-none-any.whl
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-06-23-05-40-08/stix2arango-0.0.4rc0-py3-none-any.whl
     # via
     #   -r requirements.in
     #   arango-cve-processor
