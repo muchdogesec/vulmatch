@@ -19,6 +19,8 @@ import stix2
 from datetime import datetime, date, timedelta
 import typing
 from django.conf import settings
+
+from vulmatch.worker.utils import add_cvss_score_to_cve_object
 from .celery import app
 from stix2arango.stix2arango import Stix2Arango
 from arango_cve_processor.managers import RELATION_MANAGERS as CVE_RELATION_MANAGERS
@@ -146,24 +148,8 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         skip_default_indexes=True,
         **params
     )
-    data = json.loads(Path(filename).read_text())
-    modify_objects(data['objects'])
-    s2a.run(data=data)
-
-def modify_objects(objects):
-    for obj in objects:
-        if obj['type'] == 'vulnerability':
-            x_cvss = list(obj['x_cvss'].values())
-            if not x_cvss:
-                continue
-            primary_cvss = x_cvss[-1]
-            for cvss in reversed(x_cvss):
-                if cvss['type'].lower() == 'primary':
-                    primary_cvss = cvss
-                    break
-            if primary_cvss:
-                obj['_cvss_base_score'] = primary_cvss['base_score']
-        
+    s2a.add_object_alter_fn(add_cvss_score_to_cve_object)
+    s2a.run()
 
 @app.task(base=CustomTask)
 def acp_task(options, job_id=None):
