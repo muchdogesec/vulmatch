@@ -3,10 +3,12 @@ import sqlite3
 import atexit
 
 class VersionManager:
-    def __init__(self, db_name, table_name):
-        self.db_name = db_name
+    def __init__(self, table_name):
         self.table_name = table_name
-        
+
+
+    def init_manager(self, db_file_name):
+        self.db_name = str(db_file_name)
         # Connect to the SQLite database
         self.conn = sqlite3.connect(self.db_name)
         self.cursor = self.conn.cursor()

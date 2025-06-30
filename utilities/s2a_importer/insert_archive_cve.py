@@ -11,13 +11,13 @@ from manager import VersionManager
 from pathlib import Path
 from dotenv import load_dotenv
 import sys
-sys.path.append(Path(__file__).parent.parent)
-
+sys.path.append(str(Path(__file__).parent.parent.parent))
+print(Path(__file__).parent.parent)
 from vulmatch.worker.utils import add_cvss_score_to_cve_object
 
 load_dotenv()
 
-manager = VersionManager('utility_fails.db', 'cve_fails')
+manager = VersionManager('cve_fails')
 MAX_RETRIES = 7
 # Calculate the latest full year, month, and day
 yesterday = datetime.now() - timedelta(days=1)
@@ -41,6 +41,12 @@ for year in range(1988, latest_year + 1):
             version = f"{start_date}-00_00_00-{start_date}-23_59_59"
             all_versions.append((year, month, day, version))
 
+def parse_path(path):
+    path = Path(path)
+    assert not path.exists() or path.is_dir()
+    path.mkdir(exist_ok=True, parents=True)
+    return path
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Process NVD CVE versions.")
     parser.add_argument('--min_date', type=str, help='Start date in yyyy-mm-dd format.')
@@ -48,6 +54,7 @@ def parse_arguments():
     parser.add_argument('--ignore_embedded_relationships', action='store_true', help='Flag to ignore embedded relationships. Default is false.')
     parser.add_argument('--database', type=str, default="cti_knowledge_base_store", help='Name of the database to use. Default is "cti_knowledge_base_store".')
     parser.add_argument('--start_over', action='store_true', help='Delete database holding previous attempts.')
+    parser.add_argument('--download_path', type=parse_path, help='Path where the database is to be downloaded to. Default is `./cti_knowledge_base_store`', default='./cti_knowledge_base_store/')
     return parser.parse_args()
 
 def filter_versions_by_date(min_date, max_date):
@@ -101,6 +108,10 @@ def main():
     else:
         versions = all_versions  # If no filter is applied, process all versions.
 
+    script_path = os.path.dirname(os.path.abspath(__file__))
+    root_path = str(parse_path(args.download_path))
+    manager.init_manager(Path(root_path)/"backfills.db")
+
     if args.start_over:
         print("Recreating database tables...")
         manager.recreate_table()
@@ -119,8 +130,7 @@ def main():
     ignore_embedded_relationships = args.ignore_embedded_relationships
     database = args.database
     
-    script_path = os.path.dirname(os.path.abspath(__file__))
-    root_path = os.path.abspath(os.path.join(script_path, "../.."))
+
     
     base_url = "https://cve2stix.vulmatch.com/"
     download_errors = []
@@ -129,7 +139,7 @@ def main():
     for item in versions:
         year, month, day, version = item
         download_url = f"{base_url}{year}-{str(month).zfill(2)}/cve-bundle-{version}.json"
-        destination_path = os.path.join(root_path, "cti_knowledge_base_store", f"nvd-cve/{year}-{str(month).zfill(2)}", f"cve-bundle-{version}.json")
+        destination_path = os.path.join(root_path, f"nvd-cve/{year}-{str(month).zfill(2)}", f"cve-bundle-{version}.json")
 
         create_directory(Path(destination_path).parent)
         print(f"Processing: {download_url} -> {destination_path}")
