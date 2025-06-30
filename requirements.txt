@@ -165,7 +165,7 @@ stix2==3.0.1
     #   stix2arango
 stix2-patterns==2.0.0
     # via stix2
-stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/main-2025-06-23-05-40-08/stix2arango-0.0.4rc0-py3-none-any.whl
+stix2arango @ https://github.com/muchdogesec/stix2arango/releases/download/add-alter_fn-callbacks-2025-06-30-11-50-44/stix2arango-0.0.4rc0-py3-none-any.whl
     # via
     #   -r requirements.in
     #   arango-cve-processor
