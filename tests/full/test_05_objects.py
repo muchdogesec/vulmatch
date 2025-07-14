@@ -38,6 +38,4 @@ def test_object_retrieve(client, object_id):
     url = f'/api/v1/objects/{object_id}/'
     resp = client.get(url)
     assert resp.status_code == 200, url
-    data = resp.json()
-    assert data['total_results_count'] == 1, "object must return only 1 object"
-    assert data['objects'][0]['id'] == object_id, "unexpected stix object id"
+    assert resp.data['id'] == object_id, "unexpected stix object id"
