@@ -182,6 +182,7 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
         {"name": "Arango CVE Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
+        {"name": "Server Status", "description": "Checks health of the server."},
     ]
 }
 

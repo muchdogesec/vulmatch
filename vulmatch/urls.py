@@ -57,6 +57,7 @@ router.register("capec", ctibutler_views.CapecView, "capec-view")
 router.register("attack", ctibutler_views.AttackView, "attack-view")
 
 urlpatterns = [
+    path(f'api/healthcheck/', views.health_check),
     path(f'api/{API_VERSION}/', include(router.urls)),
     path(f'api/{API_VERSION}/objects/', include(obj_router.urls)),
     path('admin/', admin.site.urls),
