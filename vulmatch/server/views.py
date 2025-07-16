@@ -615,3 +615,20 @@ class JobView(viewsets.ModelViewSet):
         
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
+
+
+
+@extend_schema(
+    responses={204:{}},
+    tags=["Server Status"],
+    summary="Check if the service is running",
+    description=textwrap.dedent(
+        """
+        If this endpoint returns a 204, the service is running as expected.
+        """
+        ),
+    )
+@decorators.api_view(["GET"])
+def health_check(request):
+   return Response(status=status.HTTP_204_NO_CONTENT)
+
