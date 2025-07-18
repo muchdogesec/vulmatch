@@ -146,6 +146,7 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
         skip_default_indexes=True,
+        is_large_file=True,
         **params
     )
     s2a.add_object_alter_fn(add_cvss_score_to_cve_object)
