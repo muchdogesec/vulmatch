@@ -4,6 +4,7 @@ import logging
 import re
 import typing
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework.validators import ValidationError
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
