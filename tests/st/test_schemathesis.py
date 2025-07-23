@@ -54,18 +54,48 @@ object_ids_st = strategies.sampled_from(
 )
 
 
+@pytest.fixture(autouse=True)
+def override_transport(monkeypatch, client):
+    from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
 
-def make_wsgi_request(case: schemathesis.Case):
-    from django.test import Client
-    from schemathesis.transport.wsgi import WSGI_TRANSPORT
-    client = Client()
-    t = time.time()
-    serialized_request = WSGI_TRANSPORT.serialize_case(case)
-    serialized_request.update(QUERY_STRING=urlencode(serialized_request['query_string']))
-    response: DRFResponse = client.generic(**serialized_request)
-    elapsed = time.time() - t
-    return SchemathesisResponse(response.status_code, headers={k: [v] for k, v in response.headers.items()}, content=response.content, request=response.wsgi_request, elapsed=elapsed, verify=True)
+    class Transport(WSGITransport):
+        def __init__(self):
+            super().__init__()
+            self._copy_serializers_from(WSGI_TRANSPORT)
 
+        @staticmethod
+        def case_as_request(case):
+            from schemathesis.transport.requests import REQUESTS_TRANSPORT
+            import requests
+
+            r_dict = REQUESTS_TRANSPORT.serialize_case(
+                case,
+                base_url=case.operation.base_url,
+            )
+            return requests.Request(**r_dict).prepare()
+
+        def send(self, case: schemathesis.Case, *args, **kwargs):
+            t = time.time()
+            case.headers.pop("Authorization", "")
+            serialized_request = WSGI_TRANSPORT.serialize_case(case)
+            serialized_request.update(
+                QUERY_STRING=urlencode(serialized_request["query_string"])
+            )
+            response: DRFResponse = client.generic(**serialized_request)
+            elapsed = time.time() - t
+            return SchemathesisResponse(
+                response.status_code,
+                headers={k: [v] for k, v in response.headers.items()},
+                content=response.content,
+                request=self.case_as_request(case),
+                elapsed=elapsed,
+                verify=True,
+            )
+
+    ## patch transport.get
+    from schemathesis import transport
+
+    monkeypatch.setattr(transport, "get", lambda _: Transport())
 
 @pytest.mark.django_db(transaction=True)
 @schema.given(
@@ -81,13 +111,11 @@ def test_api(case: schemathesis.Case, **kwargs):
     for k, v in kwargs.items():
         if k in case.path_parameters:
             case.path_parameters[k] = v
-    call_resp = make_wsgi_request(case)
-    case.validate_response(call_resp, excluded_checks=[negative_data_rejection, positive_data_acceptance])
+    case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])
 
 
 @pytest.mark.django_db(transaction=True)
 @schema.include(method="POST").parametrize()
 @patch('celery.app.task.Task.run')
 def test_imports(mock, case: schemathesis.Case):
-    call_resp = make_wsgi_request(case)
-    case.validate_response(call_resp, excluded_checks=[negative_data_rejection, positive_data_acceptance])
+    case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])
