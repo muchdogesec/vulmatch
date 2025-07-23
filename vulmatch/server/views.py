@@ -548,6 +548,7 @@ class ACPView(viewsets.ViewSet):
     ]
 
     def create(self, request, *args, **kwargs):
+        serializers.ACPSerializer(data=request.data).is_valid(raise_exception=True)
         serializer = serializers.ACPSerializerWithMode(data={**request.data, **kwargs})
         serializer.is_valid(raise_exception=True)
         data = serializer.data.copy()

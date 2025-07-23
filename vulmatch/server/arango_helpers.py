@@ -164,18 +164,19 @@ CVE_BUNDLE_DEFAULT_OBJECTS = [
 ]
 
 
-def positive_int(integer_string, cutoff=None, default=1):
+def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
     """
-    Cast a string to a strictly positive integer.
+    Cast a string to a number.
     """
     with contextlib.suppress(ValueError, TypeError):
-        ret = int(integer_string)
-        if ret <= 0:
-            return default
-        if cutoff:
-            return min(ret, cutoff)
+        ret = type(integer_string)
+        if min_value:
+            return max(min_value, ret)
+        if max_value:
+            return min(ret, max_value)
         return ret
     return default
+
 
 
 class VulmatchDBHelper(DCHelper):
@@ -258,9 +259,9 @@ class VulmatchDBHelper(DCHelper):
         binds = {"label": label}
         binds["cve_ids"] = [qq.upper() for qq in self.query_as_array("cve_id")] or None
         filters = []
-        if min_score := self.query.get("epss_min_score"):
+        if min_score := as_number(self.query.get("epss_min_score"), default=None, type=float):
             filters.append("FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score")
-            binds["epss_min_score"] = float(min_score)
+            binds["epss_min_score"] = min_score
 
         query = """
 FOR doc IN nvd_cve_vertex_collection
@@ -305,8 +306,8 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
-        if q := self.query.get("cvss_base_score_min"):
-            binds["cvss_base_score_min"] = float(q)
+        if q := as_number(self.query.get("cvss_base_score_min"), default=None, type=float):
+            binds["cvss_base_score_min"] = q
             filters.append("FILTER doc._cvss_base_score >= @cvss_base_score_min")
 
         if value := self.query_as_array("stix_id"):
@@ -400,12 +401,12 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
 
         ### epss  matches should happen later
         epss_filters = []
-        if q := self.query.get("epss_score_min"):
-            binds["epss_score_min"] = float(q)
+        if epss_score_min := as_number(self.query.get("epss_score_min"), default=None, type=float):
+            binds["epss_score_min"] = epss_score_min
             epss_filters.append("FILTER TO_NUMBER(last_epss.epss) >= @epss_score_min")
 
-        if q := self.query.get("epss_percentile_min"):
-            binds["epss_percentile_min"] = float(q)
+        if epss_percentile_min := as_number(self.query.get("epss_percentile_min"), default=None, type=float):
+            binds["epss_percentile_min"] = epss_percentile_min
             epss_filters.append(
                 "FILTER TO_NUMBER(last_epss.percentile) >= @epss_percentile_min"
             )
