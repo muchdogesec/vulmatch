@@ -61,20 +61,6 @@ CAPEC_TYPES = set([
 )
 
 
-
-def positive_int(integer_string, cutoff=None, default=1):
-    """
-    Cast a string to a strictly positive integer.
-    """
-    with contextlib.suppress(ValueError, TypeError):
-        ret = int(integer_string)
-        if ret <= 0:
-            return default
-        if cutoff:
-            return min(ret, cutoff)
-        return ret
-    return default
-
 class AttachedDBHelper(DCHelper):
 
     @classmethod
@@ -376,31 +362,3 @@ class AttachedDBHelper(DCHelper):
             .replace('@include_embedded_refs', embedded_refs_query)
 
         return self.execute_query(new_query, bind_vars=binds, container='relationships')
-
-
-#     def get_bundle(self, docs_query, binds):
-#         regex = r"KEEP\((\w+),\s*\w+\(.*?\)\)"
-#         binds['@view'] = settings.VIEW_NAME
-#         more_search_filters = []
-
-#         if not self.query_as_bool('include_embedded_refs', False):
-#             more_search_filters.append('doc._is_ref != TRUE')
-        
-#         query = '''
-# LET matched_ids = (@docs_query)[*]._id
-
-#  LET bundle_ids = FLATTEN(
-#      FOR doc IN @@view SEARCH doc.type == 'relationship' AND (doc._from IN matched_ids OR doc._to IN matched_ids) @@more_search_filters
-#      RETURN [doc._id, doc._from, doc._to]
-#  ) 
- 
-#  FOR d IN @@view SEARCH d._id IN APPEND(bundle_ids, matched_ids)
-#  LIMIT @offset, @count
-#  RETURN KEEP(d, KEYS(d, TRUE))
-# '''
-#         query = query \
-#                     .replace('@docs_query', re.sub(regex, lambda x: x.group(1), docs_query.replace('LIMIT @offset, @count', ''))) \
-#                     .replace('@@more_search_filters', "" if not more_search_filters else f" AND {' and '.join(more_search_filters)}")
-#         # return Response([query, binds])
-#         return self.execute_query(query, bind_vars=binds)
-  
