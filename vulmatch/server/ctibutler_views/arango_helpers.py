@@ -316,17 +316,13 @@ class AttachedDBHelper(DCHelper):
             binds['rel_relationship_type'] = term.lower()
             other_filters.append("FILTER CONTAINS(LOWER(d.relationship_type), @rel_relationship_type)")
 
-        if term := self.query.get('_arango_cti_processor_note'):
-            binds['rel_acp_note'] = term.lower()
-            other_filters.append("FILTER CONTAINS(LOWER(d._arango_cti_processor_note), @rel_acp_note)")
-
         if term := self.query_as_array('source_ref'):
             binds['rel_source_ref'] = term
             other_filters.append('FILTER d.source_ref IN @rel_source_ref')
 
         if terms := self.query_as_array('source_ref_type'):
             binds['rel_source_ref_type'] = terms
-            other_filters.append('FILTER SPLIT(d.source_ref, "--")[0] IN @rel_source_ref_type')
+            other_filters.append('FILTER d._source_type IN @rel_source_ref_type')
 
         if term := self.query_as_array('target_ref'):
             binds['rel_target_ref'] = term
@@ -334,7 +330,7 @@ class AttachedDBHelper(DCHelper):
 
         if terms := self.query_as_array('target_ref_type'):
             binds['rel_target_ref_type'] = terms
-            other_filters.append('FILTER SPLIT(d.target_ref, "--")[0] IN @rel_target_ref_type')
+            other_filters.append('FILTER d._target_type IN @rel_target_ref_type')
 
         match self.query.get('relationship_direction'):
             case 'source_ref':

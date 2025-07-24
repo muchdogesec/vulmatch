@@ -48,7 +48,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'dogesec_commons.objects',
     'drf_spectacular',
     'django.contrib.postgres',
     'vulmatch.server',
@@ -179,14 +178,13 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         {"name": "ATT&CK", "description": "Search and filter MITRE ATT&CK objects."},
         {"name": "CAPEC", "description": "Search and filter MITRE CAPEC objects."},
         {"name": "CWE", "description": "Search and filter MITRE CWE objects."},
-        {"name": "Objects", "description": "Explore all STIX Objects stored in Vulmatch."},
         {"name": "Arango CVE Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
         {"name": "Server Status", "description": "Checks health of the server."},
     ]
 }
 
-VIEW_NAME = "vulmatch_view"
+VIEW_NAME = "vulmatch_view_v2"
 ARANGODB_USERNAME   = os.getenv('ARANGODB_USERNAME')
 ARANGODB_PASSWORD   = os.getenv('ARANGODB_PASSWORD')
 ARANGODB_HOST_URL   = os.getenv("ARANGODB_HOST_URL")
