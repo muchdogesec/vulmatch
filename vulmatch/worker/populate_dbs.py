@@ -219,7 +219,7 @@ def create_bundle_view(db: StandardDatabase):
     print(f"created {settings.VIEW_NAME}")
 
 
-def create_collections(db):
+def create_collections():
     # create db/collections
     for c in find_missing(collections_to_create):
         print(f"creating collection: {c}")
