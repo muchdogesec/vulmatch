@@ -232,12 +232,13 @@ def create_collections(db):
             host_url=settings.ARANGODB_HOST_URL,
             skip_default_indexes=True,
         )
+    db = get_db()
     create_indexes(db)
+    return db
 
 
 def setup_arangodb():
-    db = get_db()
-    create_collections(db)
+    db = create_collections()
     create_bundle_view(db)
 
 
