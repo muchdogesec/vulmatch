@@ -22,7 +22,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 
 from vulmatch.server import views
 from vulmatch.server.ctibutler_views import ctibutler_views
-import dogesec_commons.objects.views as arango_views
 
 from django.http import JsonResponse
 def handler404(*args, **kwargs):
@@ -44,13 +43,7 @@ router.register("cpe", views.CpeView, "cpe-view")
 
 router.register("kev", views.KevView, "kev-view")
 router.register("epss", views.EPSSView, "epss-view")
-## objects
-obj_router = routers.SimpleRouter(use_regex_path=True)
-obj_router.register("", arango_views.SingleObjectView, "object-view-orig")
-obj_router.register('smos', arango_views.SMOView, "object-view-smo")
-obj_router.register('scos', arango_views.SCOView, "object-view-sco")
-obj_router.register('sros', arango_views.SROView, "object-view-sro")
-obj_router.register('sdos', arango_views.SDOView, "object-view-sdo")
+
 ### more views
 router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
@@ -59,7 +52,6 @@ router.register("attack", ctibutler_views.AttackView, "attack-view")
 urlpatterns = [
     path(f'api/healthcheck/', views.health_check),
     path(f'api/{API_VERSION}/', include(router.urls)),
-    path(f'api/{API_VERSION}/objects/', include(obj_router.urls)),
     path('admin/', admin.site.urls),
     # YOUR PATTERNS
     path('api/schema/', views.SchemaViewCached.as_view(), name='schema'),
