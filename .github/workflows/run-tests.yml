@@ -13,7 +13,7 @@ on:
       - synchronize
 
 jobs:
-  test-schema-thesis:
+  test-pipeline:
     runs-on: ubuntu-latest
     environment: vulmatch_tests
     
@@ -46,7 +46,8 @@ jobs:
               echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
               cat "$GITHUB_OUTPUT"
 
-      - id: Setup environment
+      - name: Setup environment
+        id: setup_environment
         run: |
           pip install -r requirements.txt -r tests/requirements.txt
           echo ARANGODB_HOST_URL="http://${{ steps.get_ip.outputs.IP_ADDRESS }}:18529" >> tests/tests.env
@@ -56,24 +57,28 @@ jobs:
           echo "CTIBUTLER_BASE_URL=${{ secrets.CTIBUTLER_BASE_URL }}" >> tests/tests.env
           echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> tests/tests.env
 
-      - name: Test Endpoints
+      - name: Unit tests
+        id: unit_tests
         run: |
           set -a; source tests/tests.env; set +a
           pytest --cov --cov-branch --cov-report=xml --junitxml=unittest.junit.xml -o junit_family=legacy tests/
       
-      - name: Test Schema
+      - name: Schema tests
+        id: schema_tests
         if: ${{ failure() || success() }}
         run: |
           set -a; source tests/tests.env; set +a
           pytest --cov --cov-branch --cov-append --cov-report=xml --junitxml=schemathesis.junit.xml -o junit_family=legacy tests/st/test_schemathesis.py
 
       - name: Upload coverage reports to Codecov
+        id: upload_unit_test_coverage
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
+        id: upload_unit_test_results
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
@@ -82,6 +87,7 @@ jobs:
           flags: unittest
       
       - name: Upload schemathesis test results to Codecov
+        id: upload_schema_test_results
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
