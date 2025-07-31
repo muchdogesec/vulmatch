@@ -120,13 +120,13 @@ def create_indexes(db: StandardDatabase):
     vertex_collection.add_index(
         dict(
             type="inverted",
-            name="cve_search_inv_v2",
+            name="cve_search_inv",
             sparse=True,
             fields=[
                 "name",
                 "id",
-                dict(name="modified", analyzer="date_transform"),
-                dict(name="created", analyzer="date_transform"),
+                "modified",
+                "created",
                 dict(name="description", analyzer="norm_en"),
                 "type",
                 "_cvss_base_score",
