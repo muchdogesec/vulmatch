@@ -328,12 +328,12 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             vmax = vmin = 0
 
             if vmin := date_ts(self.query.get(key_min)):
-                binds[key_min] = vmin
-                filters.append(f"FILTER doc.{v} >= @{key_min}")
+                binds[key_min] = vmin - 1
+                filters.append(f"FILTER doc.{v} > @{key_min}")
 
             if vmax := date_ts(self.query.get(key_max)):
-                binds[key_max] = vmax
-                filters.append(f"FILTER doc.{v} <= @{key_max}")
+                binds[key_max] = vmax + 1
+                filters.append(f"FILTER doc.{v} < @{key_max}")
 
 
             if vmin and vmax and vmax < vmin:
