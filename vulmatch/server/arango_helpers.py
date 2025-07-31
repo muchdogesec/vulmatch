@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from rest_framework.validators import ValidationError
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
+from dateutil.parser import parse as parse_date
 
 
 if typing.TYPE_CHECKING:
@@ -178,7 +179,12 @@ def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
         return ret
     return default
 
-
+def date_ts(date):
+    if not date:
+        return 0
+    if isinstance(date, str):
+        date = parse_date(date)
+    return date.timestamp() * 1_000_000
 
 class VulmatchDBHelper(DCHelper):
     @classmethod
@@ -321,11 +327,11 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             key_min, key_max = f"{v}_min", f"{v}_max"
             vmax = vmin = 0
 
-            if vmin := self.query.get(key_min):
+            if vmin := date_ts(self.query.get(key_min)):
                 binds[key_min] = vmin
                 filters.append(f"FILTER doc.{v} >= @{key_min}")
 
-            if vmax := self.query.get(key_max):
+            if vmax := date_ts(self.query.get(key_max)):
                 binds[key_max] = vmax
                 filters.append(f"FILTER doc.{v} <= @{key_max}")
 
@@ -433,7 +439,7 @@ FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "eps
 RETURN {[doc.object_refs[0]]: last_epss}
 )
 
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt

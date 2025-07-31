@@ -12,6 +12,7 @@ django-filter>=24.2
 django-cors-headers
 django-storages[s3]
 django-cleanup
+python-dateutil
 
 ## dogesec
 dogesec-commons
