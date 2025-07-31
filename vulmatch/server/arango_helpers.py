@@ -233,7 +233,9 @@ class VulmatchDBHelper(DCHelper):
         paginate=True,
         relationship_mode=False,
         result_key=None,
+        aql_options=None,
     ):
+        aql_options = aql_options or {}
         if relationship_mode:
             return self.get_relationships(query, bind_vars)
         if paginate:
@@ -241,7 +243,7 @@ class VulmatchDBHelper(DCHelper):
                 self.count, self.page
             )
         cursor = self.db.aql.execute(
-            query, bind_vars=bind_vars, count=True, full_count=True
+            query, bind_vars=bind_vars, count=True, full_count=True, **aql_options,
         )
         logging.info("AQL stat: %s", cursor.statistics())
         if paginate:
@@ -454,7 +456,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             )
         )
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
-        return self.execute_query(query, bind_vars=binds)
+        return self.execute_query(query, bind_vars=binds, aql_options=dict(optimizer_rules=['-use-index-for-sort']))
 
     def get_cve_bundle(self, cve_id: str):
         cve_id = cve_id.upper()
