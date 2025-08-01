@@ -53,48 +53,11 @@ object_ids_st = strategies.sampled_from(
     object_ids
 )
 
-
 @pytest.fixture(autouse=True)
-def override_transport(monkeypatch, client):
-    from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
-
-    class Transport(WSGITransport):
-        def __init__(self):
-            super().__init__()
-            self._copy_serializers_from(WSGI_TRANSPORT)
-
-        @staticmethod
-        def case_as_request(case):
-            from schemathesis.transport.requests import REQUESTS_TRANSPORT
-            import requests
-
-            r_dict = REQUESTS_TRANSPORT.serialize_case(
-                case,
-                base_url=case.operation.base_url,
-            )
-            return requests.Request(**r_dict).prepare()
-
-        def send(self, case: schemathesis.Case, *args, **kwargs):
-            t = time.time()
-            case.headers.pop("Authorization", "")
-            serialized_request = WSGI_TRANSPORT.serialize_case(case)
-            serialized_request.update(
-                QUERY_STRING=urlencode(serialized_request["query_string"])
-            )
-            response: DRFResponse = client.generic(**serialized_request)
-            elapsed = time.time() - t
-            return SchemathesisResponse(
-                response.status_code,
-                headers={k: [v] for k, v in response.headers.items()},
-                content=response.content,
-                request=self.case_as_request(case),
-                elapsed=elapsed,
-                verify=True,
-            )
-
+def override_transport(monkeypatch):
     ## patch transport.get
     from schemathesis import transport
-
+    from tests.utils import Transport
     monkeypatch.setattr(transport, "get", lambda _: Transport())
 
 @pytest.mark.django_db(transaction=True)
