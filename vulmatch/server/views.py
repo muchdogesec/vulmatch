@@ -1,3 +1,6 @@
+import os
+from urllib.parse import urljoin
+import requests
 from rest_framework import viewsets, status, decorators
 
 from vulmatch.server.arango_helpers import CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, VulmatchDBHelper
@@ -600,7 +603,7 @@ class JobView(viewsets.ModelViewSet):
 
             choices.sort(key=lambda x: x[0])
             return choices
-        
+
         type = ChoiceFilter(
             help_text='Filter the results by the type of Job',
             choices=get_type_choices(), method='filter_type'
@@ -613,23 +616,53 @@ class JobView(viewsets.ModelViewSet):
                 type, mode = value.split('--')
                 query.update({field_name: type, "parameters__mode":mode})
             return qs.filter(**query)
-        
+
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
 
-
-@extend_schema(
-    responses={204:{}},
-    tags=["Server Status"],
-    summary="Check if the service is running",
-    description=textwrap.dedent(
-        """
+@extend_schema_view(
+    list=extend_schema(
+        responses={204: {}},
+        summary="Check if the service is running",
+        description=textwrap.dedent(
+            """
         If this endpoint returns a 204, the service is running as expected.
         """
         ),
-    )
-@decorators.api_view(["GET"])
-def health_check(request):
-   return Response(status=status.HTTP_204_NO_CONTENT)
+    ),
+    service=extend_schema(
+        responses={200: serializers.HealthCheckSerializer},
+        summary="Check the status of all external dependencies",
+        description="Check the status of all external dependencies",
+    ),
+)
+class HealthCheck(viewsets.ViewSet):
+    openapi_tags = ["Server Status"]
 
+    def list(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @decorators.action(detail=False)
+    def service(self, request, *args, **kwargs):
+        return Response(status=200, data=dict(ctibutler=self.check_ctibutler()))
+
+    @staticmethod
+    def check_ctibutler():
+        base_url = os.getenv("CTIBUTLER_BASE_URL")
+        if not base_url:
+            return "not-configured"
+        try:
+            resp = requests.get(
+                urljoin(base_url, "v1/location/versions/available/"),
+                headers={"API-KEY": os.getenv("CTIBUTLER_API_KEY")},
+            )
+            match resp.status_code:
+                case 401 | 403:
+                    return "unauthorized"
+                case 200:
+                    return "authorized"
+                case _:
+                    return "unknown"
+        except:
+            return "offline"

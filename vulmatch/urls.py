@@ -49,8 +49,11 @@ router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
 router.register("attack", ctibutler_views.AttackView, "attack-view")
 
+healthcheck = routers.SimpleRouter(use_regex_path=False)
+healthcheck.register('', views.HealthCheck, "service-status-view")
+
 urlpatterns = [
-    path(f'api/healthcheck/', views.health_check),
+    path(f'api/healthcheck/', include(healthcheck.urls)),
     path(f'api/{API_VERSION}/', include(router.urls)),
     path('admin/', admin.site.urls),
     # YOUR PATTERNS

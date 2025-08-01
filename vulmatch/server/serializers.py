@@ -1,3 +1,4 @@
+from enum import StrEnum, auto
 from .models import Job
 from rest_framework import serializers, validators
 
@@ -46,3 +47,14 @@ class ACPSerializer(serializers.Serializer):
 
 class ACPSerializerWithMode(ACPSerializer):
     mode = serializers.ChoiceField(choices=list(ACP_MODES.items()))
+
+class HealthCheckChoices(StrEnum):
+    AUTHORIZED = auto()
+    UNAUTHORIZED = auto()
+    UNSUPPORTED = auto()
+    NOT_CONFIGURED = "not-configured"
+    UNKNOWN = auto()
+    OFFLINE = auto()
+
+class HealthCheckSerializer(serializers.Serializer):
+    ctibutler = serializers.ChoiceField(choices=[m.value for m in HealthCheckChoices])
