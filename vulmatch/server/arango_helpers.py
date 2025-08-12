@@ -317,21 +317,15 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             binds["stix_ids"] = value
             filters.append("FILTER doc.id in @stix_ids")
 
-        for v in ["created", "modified"]:
-            key_min, key_max = f"{v}_min", f"{v}_max"
-            vmax = vmin = 0
+        created_min, created_max = self.query.get('created_min', ''), self.query.get('created_max', '')
+        if created_min or created_max:
+            filters.append('FILTER IN_RANGE(doc.created, @created[0], @created[1], true, true)')
+            binds['created'] = created_min, created_max
 
-            if vmin := self.query.get(key_min):
-                binds[key_min] = vmin
-                filters.append(f"FILTER doc.{v} >= @{key_min}")
-
-            if vmax := self.query.get(key_max):
-                binds[key_max] = vmax
-                filters.append(f"FILTER doc.{v} <= @{key_max}")
-
-
-            if vmin and vmax and vmax < vmin:
-                raise ValidationError(f"{key_min} must not be greater than {key_max}")
+        modified_min, modified_max = self.query.get('modified_min', ''), self.query.get('modified_max', '')
+        if modified_min or modified_max:
+            filters.append('FILTER IN_RANGE(doc.modified, @modified[0], @modified[1], true, true)')
+            binds['modified'] = modified_min, modified_max
 
         ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
         union = None

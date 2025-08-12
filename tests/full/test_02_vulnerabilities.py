@@ -276,9 +276,6 @@ def minmax_test(client, param_name, param_min, param_max):
 
     url = f"/api/v1/cve/objects/"
     resp = client.get(url, query_params=filters)
-    if param_max and param_min and param_min > param_max:
-        assert resp.status_code == 400, "bad parameters"
-        return
     assert resp.status_code == 200
     resp_data = resp.json()
     for d in resp_data["objects"]:
@@ -294,13 +291,12 @@ def minmax_test(client, param_name, param_min, param_max):
 
 
 def test_extra_created_filters(client, subtests):
-    for dmin, dmax in more_created_filters(client, "created", 20):
+    for dmin, dmax in more_created_filters(client, "created", 50) + more_created_filters(client, "modified", 50):
         with subtests.test(
             "randomly_generated created_* query", created_min=dmin, created_max=dmax
         ):
             minmax_test(client, "created", dmin, dmax)
 
-    for dmin, dmax in more_created_filters(client, "modified", 20):
         with subtests.test(
             "randomly_generated modified_* query", modified_min=dmin, modified_max=dmax
         ):
