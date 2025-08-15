@@ -40,7 +40,7 @@ REVOKED_AND_DEPRECATED_PARAMS = [
     retrieve_object_relationships=extend_schema(
         responses={200: AttachedDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_relationship_schema_operation_parameters(),
-        summary="Get ATT&CK Relationship using ATT&CK ID",
+        summary="Get the Relationships linked to the MITRE ATT&CK Object",
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
@@ -52,12 +52,10 @@ REVOKED_AND_DEPRECATED_PARAMS = [
     retrieve_object_bundle=extend_schema(
         responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
-        summary="Get ATT&CK Bundle using ATT&CK ID",
+        summary="Get a Bundle of Objects linked to the MITRE ATT&CK Object",
         description=textwrap.dedent(
             """
-            This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
-
-            MITRE ATT&CK objects can also be `target_ref` from MITRE CAPEC objects. Requires POST arango-cti-processor request using `capec-attack` mode for this data to show.
+            This endpoint will return all the STIX objects linked to the specified ATT&CK object. It will also include all the `relationship` STIX objects linking them together.
             """
         ),
     ),
@@ -129,7 +127,7 @@ class AttackView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_object_relationships=extend_schema(
-        summary='Get the Relationships linked to MITRE CWE Object',
+        summary='Get the Relationships linked to the MITRE CWE Object',
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the CWE object is found as a `source_ref` or a `target_ref`.
@@ -145,12 +143,10 @@ class AttackView(viewsets.ViewSet):
     retrieve_object_bundle=extend_schema(
         responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
-        summary="Get Bundle of Objects linked to MITRE CWE Object",
+        summary="Get a Bundle of Objects linked to the MITRE CWE Object",
         description=textwrap.dedent(
             """
-            This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
-
-            MITRE ATT&CK objects can also be `target_ref` from MITRE CAPEC objects. Requires POST arango-cti-processor request using `capec-attack` mode for this data to show.
+            This endpoint will return all the STIX objects linked to the specified CWE object. It will also include all the `relationship` STIX objects linking them together.
             """
         ),
     ),
@@ -219,7 +215,7 @@ class CweView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_object_relationships=extend_schema(
-        summary='Get the Relationships linked to MITRE CAPEC Object',
+        summary='Get the Relationships linked to the MITRE CAPEC Object',
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the CAPEC object is found as a `source_ref` or a `target_ref`.
@@ -235,12 +231,10 @@ class CweView(viewsets.ViewSet):
     retrieve_object_bundle=extend_schema(
         responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
-        summary="Get Bundle of Objects linked to MITRE CAPEC Object",
+        summary="Get a Bundle of Objects linked to the MITRE CAPEC Object",
         description=textwrap.dedent(
             """
-            This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
-
-            MITRE ATT&CK objects can also be `target_ref` from MITRE CAPEC objects. Requires POST arango-cti-processor request using `capec-attack` mode for this data to show.
+            This endpoint will return all the STIX objects linked to the specified CAPEC object. It will also include all the `relationship` STIX objects linking them together.
             """
         ),
     ),
