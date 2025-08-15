@@ -40,12 +40,22 @@ REVOKED_AND_DEPRECATED_PARAMS = [
     retrieve_object_relationships=extend_schema(
         responses={200: AttachedDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_relationship_schema_operation_parameters(),
-        summary="Get ATT&CK Relationship using ATT&CK ID",
+        summary="Get the Relationships linked to the MITRE ATT&CK Object",
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the ATT&CK object is found as a `source_ref` or a `target_ref`.
 
             MITRE ATT&CK objects can also be `target_ref` from MITRE CAPEC objects. Requires POST arango-cti-processor request using `capec-attack` mode for this data to show.
+            """
+        ),
+    ),
+    retrieve_object_bundle=extend_schema(
+        responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
+        parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
+        summary="Get a Bundle of Objects linked to the MITRE ATT&CK Object",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the STIX objects linked to the specified ATT&CK object. It will also include all the `relationship` STIX objects linking them together.
             """
         ),
     ),
@@ -88,6 +98,10 @@ class AttackView(viewsets.ViewSet):
     def retrieve_object_relationships(self, request, *args, attack_id=None, **kwargs):
         return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', relationship_mode=True, revokable=True)
     
+    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/bundle", detail=False)
+    def retrieve_object_bundle(self, request, *args, attack_id=None, **kwargs):
+        return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', bundle=True, revokable=True)
+    
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -113,7 +127,7 @@ class AttackView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_object_relationships=extend_schema(
-        summary='Get the Relationships linked to MITRE CWE Object',
+        summary='Get the Relationships linked to the MITRE CWE Object',
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the CWE object is found as a `source_ref` or a `target_ref`.
@@ -125,6 +139,16 @@ class AttackView(viewsets.ViewSet):
         ),
         responses={200: AttachedDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_relationship_schema_operation_parameters(),
+    ),
+    retrieve_object_bundle=extend_schema(
+        responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
+        parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
+        summary="Get a Bundle of Objects linked to the MITRE CWE Object",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the STIX objects linked to the specified CWE object. It will also include all the `relationship` STIX objects linking them together.
+            """
+        ),
     ),
 )  
 class CweView(viewsets.ViewSet):
@@ -161,7 +185,11 @@ class CweView(viewsets.ViewSet):
 
     @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cwe_id=None, **kwargs):
-        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', relationship_mode=True)        
+        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', relationship_mode=True)
+    
+    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/bundle", detail=False)
+    def retrieve_object_bundle(self, request, *args, cwe_id=None, **kwargs):
+        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', bundle=True)     
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -187,7 +215,7 @@ class CweView(viewsets.ViewSet):
         responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_ERROR},
     ),
     retrieve_object_relationships=extend_schema(
-        summary='Get the Relationships linked to MITRE CAPEC Object',
+        summary='Get the Relationships linked to the MITRE CAPEC Object',
         description=textwrap.dedent(
             """
             This endpoint will return all the STIX relationship objects where the CAPEC object is found as a `source_ref` or a `target_ref`.
@@ -199,6 +227,16 @@ class CweView(viewsets.ViewSet):
         ),
         responses={200: AttachedDBHelper.get_paginated_response_schema('relationships', 'relationship'), 400: DEFAULT_400_ERROR},
         parameters=AttachedDBHelper.get_relationship_schema_operation_parameters(),
+    ),
+    retrieve_object_bundle=extend_schema(
+        responses={200: AttachedDBHelper.get_paginated_response_schema('objects'), 400: DEFAULT_400_ERROR},
+        parameters=AttachedDBHelper.get_bundle_schema_operation_parameters(),
+        summary="Get a Bundle of Objects linked to the MITRE CAPEC Object",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the STIX objects linked to the specified CAPEC object. It will also include all the `relationship` STIX objects linking them together.
+            """
+        ),
     ),
 )
 class CapecView(viewsets.ViewSet):
@@ -236,4 +274,8 @@ class CapecView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, capec_id=None, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(capec_id, 'cve-capec', relationship_mode=True)
+
+    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/bundle", detail=False)
+    def retrieve_object_bundle(self, request, *args, capec_id=None, **kwargs):
+        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(capec_id, 'cve-capec', bundle=True)
        
