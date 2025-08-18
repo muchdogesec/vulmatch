@@ -132,6 +132,7 @@ class VulnerabilityStatus(models.models.TextChoices):
             OpenApiParameter('include_kev', description="will show `sighting` objects related to this vulnerability, if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_capec', description="will show CAPEC `attack-pattern` objects related to this vulnerability, if exist  (and the SROS linking cwe-capec)\n * note this mode will also show `include_cwe` outputs, due to the way CAPEC is linked to CVE", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_attack', description="will show ATT&CK `attack-pattern` objects (for Techniques/Sub-techniques) related to this vulnerability, if exist (and the SROS linking capec-attack)\n * note this mode will also show `include_capec` and `include_cwe` outputs, due to the way ATT&CK is linked to CVE", type=OpenApiTypes.BOOL),
+            OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Filter vulnerability by `modified`")
         ],
     ),
     versions=extend_schema(
@@ -269,7 +270,7 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:cve_id>/bundle")
     def bundle(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper('', request).get_cve_bundle(cve_id)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cve_bundle(cve_id)
     
     @extend_schema(
             parameters=[

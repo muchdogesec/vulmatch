@@ -5,7 +5,7 @@ import re
 import typing
 from django.conf import settings
 from django.http import HttpResponse
-from rest_framework.validators import ValidationError
+from rest_framework.exceptions import NotFound
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
 
@@ -451,8 +451,41 @@ RETURN KEEP(doc, KEYS(doc, true))
         )
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds, aql_options=dict(optimizer_rules=['-use-index-for-sort']))
+    
+    def get_cve_or_cpe_object(self, cve_id, mode='cve'):
+        bind_vars = {"@collection": self.collection, "obj_name": cve_id,}
+        version_param = f'{mode}_version'
+        match mode:
+            case 'cve':
+                bind_vars.update(var='name', types = ['vulnerability', 'indicator'],)
+            case 'cpe':
+                bind_vars.update(var='cpe', types = ['software'],)
+            case _:
+                raise ValueError(f'unsupported mode: {mode}')
+        filters = ["FILTER doc._is_latest == TRUE"]
+        if version_value := self.query.get(version_param):
+            bind_vars["stix_modified"] = version_value
+            filters[0] = "FILTER doc.modified == @stix_modified"
+
+        query = """
+            FOR doc in @@collection
+            FILTER doc.type IN @types AND doc[@var] == @obj_name
+            @filters
+            RETURN doc
+            """.replace(
+            "@filters", "\n".join(filters)
+        )
+
+        cves = self.execute_query(query, bind_vars=bind_vars, paginate=False)
+        if len(cves) < 1:
+            msg = f"No object with {mode}_id = {cve_id}"
+            if version_value:
+                msg += f', version = {version_value}'
+            raise NotFound(msg)
+        return cves
 
     def get_cve_bundle(self, cve_id: str):
+        primary_objects = self.get_cve_or_cpe_object(cve_id)
         cve_id = cve_id.upper()
         cve_rels_types = ["detects"]
         binds = dict(
@@ -480,7 +513,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             cve_rels_types.append("cve-cwe")
 
         docnames = [cve_id]
-        doctypes = ["indicator", "vulnerability"]
+        doctypes = []
         binds.update(docnames=docnames, doctypes=doctypes)
         if self.query_as_bool("include_epss", True):
             docnames.append(f"EPSS Scores: {cve_id}")
@@ -494,13 +527,13 @@ RETURN KEEP(doc, KEYS(doc, true))
         types = self.query_as_array("object_type") or CVE_BUNDLE_TYPES
         binds["types"] = list(CVE_BUNDLE_TYPES.intersection(types))
         binds["@view"] = settings.VIEW_NAME
-
+        binds.update(primary_keys=[d['_id'] for d in primary_objects])
         query = """
-LET cve_data_ids = (
+LET cve_data_ids = UNION(@primary_keys, (
   FOR doc IN nvd_cve_vertex_collection
   FILTER (doc.name IN @docnames AND doc.type IN @doctypes) AND doc._is_latest == TRUE
   RETURN doc._id
-)
+))
 
 LET default_object_ids = (
   FOR doc IN nvd_cve_vertex_collection
