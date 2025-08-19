@@ -10,6 +10,7 @@ import pytest
     pytest.param("arango-cve-processor/cve-attack", dict(created_min="2024-12-31")),
     pytest.param("arango-cve-processor/cve-epss", dict()),
     pytest.param("arango-cve-processor/cve-kev", dict()),
+    pytest.param("arango-cve-processor/cve-vulncheck-kev", dict(created_min="2024-01-12", modified_min="2024-12-31")),
 ])
 def test_task(db, client, path, payload):
     new_task_resp = client.post(f"/api/v1/{path}/", data=payload, content_type="application/json")

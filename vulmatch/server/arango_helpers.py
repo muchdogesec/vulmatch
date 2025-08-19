@@ -147,6 +147,7 @@ CVE_BUNDLE_TYPES = set(
         "report",
         "software",
         "weakness",
+        "exploit",
         "attack-pattern",
         # default objects
         "extension-definition",
@@ -513,14 +514,15 @@ RETURN KEEP(doc, KEYS(doc, true))
             cve_rels_types.append("cve-cwe")
 
         docnames = [cve_id]
-        doctypes = []
+        doctypes = ["exploit"]
         binds.update(docnames=docnames, doctypes=doctypes)
         if self.query_as_bool("include_epss", True):
             docnames.append(f"EPSS Scores: {cve_id}")
             cve_rels_types.append("object")
             doctypes.append("report")
         if self.query_as_bool("include_kev", True):
-            docnames.append(f"CISA KEV: {cve_id}")
+            docnames.append(f"CISA KEV: {cve_id}") #cisa
+            docnames.append(f"KEV: {cve_id}") # vulncheck
             cve_rels_types.append("object")
             doctypes.append("report")
 

@@ -442,7 +442,8 @@ class AttachedDBHelper(DCHelper):
         )
 
         rels = self.execute_query(new_query, bind_vars=binds, paginate=False)
-        rels = tuple(set(itertools.chain(*rels)))
+        rels = tuple(set(itertools.chain(obj_ids, *rels)))
+        print(rels, binds)
         return self.execute_query("FOR d IN @@view SEARCH d._id IN @object_ids LIMIT @offset, @count RETURN KEEP(d, KEYS(d, TRUE))", bind_vars={
             'object_ids': rels,
             '@view': settings.VIEW_NAME

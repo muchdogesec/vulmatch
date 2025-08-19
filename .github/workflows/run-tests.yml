@@ -56,6 +56,7 @@ jobs:
           echo PYTHONPATH=. >> tests/tests.env
           echo "CTIBUTLER_BASE_URL=${{ secrets.CTIBUTLER_BASE_URL }}" >> tests/tests.env
           echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> tests/tests.env
+          echo "VULNCHECK_API_KEY=${{ secrets.VULNCHECK_API_KEY }}" >> tests/tests.env
 
       - name: Unit tests
         id: unit_tests
