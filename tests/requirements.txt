@@ -6,3 +6,4 @@ pytest
 pytest-cov
 pytest-django
 schemathesis==4.0.0
+pytest_timeout
