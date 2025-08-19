@@ -1,11 +1,29 @@
-## arango_cve_processor
+## s2a_importer
+
+```shell
+python3 -m venv vulmatch-venv
+source vulmatch-venv/bin/activate
+# install requirements
+pip3 install -r requirements.txt
+cd utilities/s2a_importer
+````
+
+```
+## ArangoDB settings
+ARANGODB_HOST=host.docker.internal
+ARANGODB_PORT=8529
+ARANGODB_USERNAME=root
+ARANGODB_PASSWORD=
+##IS LATEST
+ALWAYS_LATEST=0 # change to 1 on first backfill for dates up to 2024-12-21
+```
 
 Downloads and imports files to ArangoDB used as the base data for arango_cve_processor.
 
 To run these scripts, from the root of stix2arango;
 
 ```shell
-python3 utilities/arango_cve_processor/insert_archive_cve.py
+python3 utilities/s2a_importer/insert_archive_cve.py
 ```
 
 Where:
@@ -18,20 +36,11 @@ Where:
 
 e.g.
 
-Download all CVE data
-
-```shell
-python3 utilities/arango_cve_processor/insert_archive_cve.py \
-	--database cti_knowledge_base_store \
-	--ignore_embedded_relationships \
-	--start_over
-```
-
 Download only CVE data on `2025-01-09` through to, and including `2025-01-31`
 
 ```shell
-python3 utilities/arango_cve_processor/insert_archive_cve.py \
-	--database cti_knowledge_base_store \
+python3 utilities/s2a_importer/insert_archive_cve.py \
+	--database vulmatch \
 	--min_date 2025-01-09 \
 	--max_date 2025-01-31 \
 	--ignore_embedded_relationships \
