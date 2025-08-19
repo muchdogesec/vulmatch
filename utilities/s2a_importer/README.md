@@ -8,8 +8,11 @@ pip3 install -r requirements.txt
 cd utilities/s2a_importer
 ````
 
+```shell
+vi .env
 ```
-## ArangoDB settings
+
+```
 ARANGODB_HOST=host.docker.internal
 ARANGODB_PORT=8529
 ARANGODB_USERNAME=root
