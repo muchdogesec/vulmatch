@@ -1,6 +1,7 @@
-
 ## s2a_importer
+
 ### clone the repo and setup virtual environment
+
 ```shell
 git clone https://github.com/muchdogesec/vulmatch
 cd vulmatch
@@ -12,19 +13,23 @@ source vulmatch-venv/bin/activate
 # install requirements
 pip3 install stix2arango
 ````
+
 ### modify `.env` file
+
 ```shell
 vi .env
 ```
 
+Add these to the bottom of the file
+
 ```
-ARANGODB_HOST=host.docker.internal
+# UTILITIES
+ARANGODB_HOST=127.0.0.1
 ARANGODB_PORT=8529
-ARANGODB_USERNAME=root
-ARANGODB_PASSWORD=
-##IS LATEST
 ALWAYS_LATEST=0 # change to 1 on first backfill for dates up to 2024-12-21
 ```
+
+### run
 
 Downloads and imports files to ArangoDB used as the base data for arango_cve_processor.
 
