@@ -9,6 +9,8 @@ from drf_spectacular.types import OpenApiTypes
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
 
+from vulmatch.server.arango_helpers import CVE_BUNDLE_TYPES
+
 if typing.TYPE_CHECKING:
     from .. import settings
 
@@ -151,6 +153,7 @@ class AttachedDBHelper(DCHelper):
     @classmethod
     def get_bundle_schema_operation_parameters(cls):
         return cls.get_schema_operation_parameters() + [
+            OpenApiParameter('type', enum=CVE_BUNDLE_TYPES, many=True, explode=False)
         ]
 
     def __init__(self, collection, request, container="objects") -> None:
@@ -441,10 +444,15 @@ class AttachedDBHelper(DCHelper):
             .replace("@other_filters", "\n".join(other_filters))
         )
 
+
         rels = self.execute_query(new_query, bind_vars=binds, paginate=False)
         rels = tuple(set(itertools.chain(obj_ids, *rels)))
-        print(rels, binds)
-        return self.execute_query("FOR d IN @@view SEARCH d._id IN @object_ids LIMIT @offset, @count RETURN KEEP(d, KEYS(d, TRUE))", bind_vars={
+        new_binds = {
             'object_ids': rels,
-            '@view': settings.VIEW_NAME
-        })
+            '@view': settings.VIEW_NAME,
+            'types': None,
+        }
+        if new_types := self.query_as_array("type"):
+            new_binds['types'] = new_types
+
+        return self.execute_query("FOR d IN @@view SEARCH d._id IN @object_ids FILTER NOT @types OR d.type IN @types LIMIT @offset, @count RETURN KEEP(d, KEYS(d, TRUE))", bind_vars=new_binds)

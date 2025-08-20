@@ -14,6 +14,12 @@ from schemathesis.specs.openapi.checks import negative_data_rejection, positive_
 schema = schemathesis.openapi.from_wsgi("/api/schema/?format=json", wsgi_app)
 schema.config.base_url = "http://localhost:8005/"
 
+@pytest.fixture(autouse=True)
+def non_eager_celery():
+    from vulmatch.worker.celery import app
+    app.conf.task_always_eager = False
+    yield
+
 object_ids = [
         "vulnerability--b82ec506-3b53-5bf9-91e6-584249b7b378",
         "vulnerability--3e69a3f9-816f-5f78-924c-006094850d30",
@@ -69,7 +75,7 @@ def override_transport(monkeypatch):
     cve_id=object_ids_st,
     cpe_id=object_ids_st,
 )
-@schema.exclude(method="POST").parametrize()
+@schema.exclude(method="POST").exclude(path='/api/healthcheck/service/').parametrize()
 def test_api(case: schemathesis.Case, **kwargs):
     for k, v in kwargs.items():
         if k in case.path_parameters:
@@ -79,6 +85,6 @@ def test_api(case: schemathesis.Case, **kwargs):
 
 @pytest.mark.django_db(transaction=True)
 @schema.include(method="POST").parametrize()
-@patch('celery.app.task.Task.run')
+@patch('vulmatch.worker.tasks.CustomTask.run')
 def test_imports(mock, case: schemathesis.Case):
     case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])

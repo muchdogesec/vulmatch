@@ -4,7 +4,6 @@ import pytest
 def eager_celery():
     from vulmatch.worker.celery import app
     app.conf.task_always_eager = True
-    app.conf.broker_url = 'redis://goog.ls:1235/0/1/'
     yield
     app.conf.task_always_eager = False
 

@@ -9,3 +9,5 @@ media/
 www/
 vulmatch-venv/
 .hypothesis
+cti_knowledge_base_store/
+db_loader_tempfiles/

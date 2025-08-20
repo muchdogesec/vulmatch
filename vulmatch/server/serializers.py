@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from enum import StrEnum, auto
 from .models import Job
 from rest_framework import serializers, validators
@@ -24,14 +25,19 @@ class JobSerializer(serializers.ModelSerializer):
 
 class NVDTaskSerializer(serializers.Serializer):
     last_modified_earliest = serializers.DateField(help_text="(`YYYY-MM-DD`): earliest date")
-    last_modified_latest = serializers.DateField(help_text="(`YYYY-MM-DD`): latest date \n* default is `1980-01-01`")
+    last_modified_latest = serializers.DateField(help_text="(`YYYY-MM-DD`): latest date")
     ignore_embedded_relationships = serializers.BooleanField(default=True)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
 
     def validate(self, attrs):
-        if attrs.get('last_modified_earliest') and attrs.get('last_modified_latest') and attrs['last_modified_earliest'] > attrs['last_modified_latest']:
+        min_date: date = attrs['last_modified_earliest']
+        max_date: date = attrs['last_modified_latest']
+        if min_date > max_date:
             raise serializers.ValidationError(f'last_modified_earliest cannot be greater than last_modified_latest')
+        time_difference = max_date - min_date
+        if time_difference > timedelta(31):
+            raise serializers.ValidationError(f'a maximum of 31 days difference allowed, last_modified_latest - last_modified_earliest = {time_difference.days} days')
         return super().validate(attrs)
 
 class StixVersionsSerializer(serializers.Serializer):
