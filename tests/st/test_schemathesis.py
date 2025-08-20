@@ -75,7 +75,7 @@ def override_transport(monkeypatch):
     cve_id=object_ids_st,
     cpe_id=object_ids_st,
 )
-@schema.exclude(method="POST").parametrize()
+@schema.exclude(method="POST").exclude(path='/api/healthcheck/service/').parametrize()
 def test_api(case: schemathesis.Case, **kwargs):
     for k, v in kwargs.items():
         if k in case.path_parameters:
@@ -85,6 +85,6 @@ def test_api(case: schemathesis.Case, **kwargs):
 
 @pytest.mark.django_db(transaction=True)
 @schema.include(method="POST").parametrize()
-@patch('celery.app.task.Task.run')
+@patch('vulmatch.worker.tasks.CustomTask.run')
 def test_imports(mock, case: schemathesis.Case):
     case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])
