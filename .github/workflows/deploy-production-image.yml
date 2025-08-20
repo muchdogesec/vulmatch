@@ -7,6 +7,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}_web_production
+  PACKAGE_NAME: ${{ github.event.repository.name }}_web_production
 
 jobs:
   build-and-push-image:
@@ -56,6 +57,6 @@ jobs:
         uses: actions/delete-package-versions@v5
         with:
           owner: ${{ github.repository_owner }}
-          package-name: ${{ env.IMAGE_NAME }}
+          package-name: ${{ env.PACKAGE_NAME }}
           package-type: container
           min-versions-to-keep: 5
