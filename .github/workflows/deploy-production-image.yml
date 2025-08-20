@@ -2,7 +2,7 @@ name: Create and publish the Docker image for Vulmatch Web Production
 
 on:
   push:
-    branches: ['main']
+    branches: ['testing-action']
 
 env:
   REGISTRY: ghcr.io
@@ -52,3 +52,10 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+      - name: Cleanup old GHCR image versions (keep 5 newest)
+        uses: actions/delete-package-versions@v5
+        with:
+          owner: ${{ github.repository_owner }}
+          package-name: ${{ env.IMAGE_NAME }}
+          package-type: container
+          min-versions-to-keep: 5
