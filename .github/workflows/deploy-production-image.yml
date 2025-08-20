@@ -2,7 +2,7 @@ name: Create and publish the Docker image for Vulmatch Web Production
 
 on:
   push:
-    branches: ['testing-action']
+    branches: ['main']
 
 env:
   REGISTRY: ghcr.io
