@@ -103,23 +103,9 @@ class VulnerabilityStatus(models.models.TextChoices):
         summary='Get all objects for a Vulnerability by CVE ID',
         description=textwrap.dedent(
             """
-            This endpoint will return the vulnerability itself and all objects related to the Vulnerability. Use this endpoint to get the complete intelligence graph for this Vulnerability.
+            This endpoint will return the vulnerability itself and all objects related to the Vulnerability.
 
-            The results can include the following:
-
-            * `vulnerability`: Represents the CVE (source: cve2stix)
-            * `indicator`: Contains a pattern identifying products affected by the CVE (source: cve2stix)
-            * `relationship` (`indicator`->`vulnerability`) (source: cve2stix)
-            * `report`: Represents EPSS scores for the Vulnerability (source: cve2stix)
-            * `report`: Represents CISA KEVs for the Vulnerability (source: cve2stix)
-            * `software`: Represents the products listed in the pattern (source: cve2stix)
-            * `relationship` (`indicator`->`software`) (source: cve2stix)
-            * `weakness` (CWE): represents CWEs linked to the Vulnerability (source: arango_cve_processor, requires `cve-cwe` mode to be run)
-            * `relationship` (`vulnerability` (CVE) -> `weakness` (CWE)) (source: arango_cve_processor, requires `cve-cwe` mode to be run)
-            * `attack-pattern` (CAPEC): represents CAPECs linked to the Vulnerability (source: arango_cve_processor, requires `cve-capec` mode to be run)
-            * `relationship` (`vulnerability` (CVE) -> `attack-pattern` (CAPEC)) (source: arango_cve_processor, requires `cve-capec` mode to be run)
-            * `attack-pattern` (ATT&CK Enterprise): represents ATT&CKs linked to the Vulnerability (source: arango_cve_processor, requires `cve-attack` mode to be run)
-            * `relationship` (`vulnerability` (CVE) ->  `attack-pattern` (ATT&CK)) (source: arango_cve_processor, requires `cve-attack` mode to be run)
+            Use this endpoint to get the complete intelligence graph for this Vulnerability.
             """
         ),
         responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
@@ -127,11 +113,12 @@ class VulnerabilityStatus(models.models.TextChoices):
             OpenApiParameter('object_type', description="The type of STIX object to be returned", enum=CVE_BUNDLE_TYPES, many=True, explode=False),
             OpenApiParameter('include_cpe', description="will show all `software` objects related to this vulnerability (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_cpe_vulnerable', description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
-            OpenApiParameter('include_cwe', description="will show `weakness` objects related to this vulnerability, if exist (and the SROS linking cve-cwe)", type=OpenApiTypes.BOOL),
-            OpenApiParameter('include_epss', description="will show `note` objects related to this vulnerability, if exist", type=OpenApiTypes.BOOL),
-            OpenApiParameter('include_kev', description="will show `sighting` objects related to this vulnerability, if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_cwe', description="will show `weakness` objects related to this vulnerability, if exists (and the SROS linking cve-cwe)", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_epss', description="will show `report` objects related to this vulnerability (with `label` = `epss`), if exist", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_kev', description="will show `report` objects related to this vulnerability (with `label` = `kev`), if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_capec', description="will show CAPEC `attack-pattern` objects related to this vulnerability, if exist  (and the SROS linking cwe-capec)\n * note this mode will also show `include_cwe` outputs, due to the way CAPEC is linked to CVE", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_attack', description="will show ATT&CK `attack-pattern` objects (for Techniques/Sub-techniques) related to this vulnerability, if exist (and the SROS linking capec-attack)\n * note this mode will also show `include_capec` and `include_cwe` outputs, due to the way ATT&CK is linked to CVE", type=OpenApiTypes.BOOL),
+            OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Filter vulnerability by `modified`")
         ],
     ),
     versions=extend_schema(
@@ -269,11 +256,11 @@ class CveView(viewsets.ViewSet):
     
     @decorators.action(methods=['GET'], detail=False, url_path="objects/<str:cve_id>/bundle")
     def bundle(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper('', request).get_cve_bundle(cve_id)
+        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cve_bundle(cve_id)
     
     @extend_schema(
             parameters=[
-                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only objects where `modified` value matches query. In format `YYYY-MM-DDThh:mm:ss.sssZ`")
             ]
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
@@ -282,7 +269,7 @@ class CveView(viewsets.ViewSet):
     
     @extend_schema(
             parameters=[
-                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only vulnerability object where `modified` value matches query")
+                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only objects where `modified` value matches query. In format `YYYY-MM-DDThh:mm:ss.sssZ`")
             ]
     )
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
