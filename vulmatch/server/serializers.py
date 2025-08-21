@@ -3,6 +3,8 @@ from enum import StrEnum, auto
 from .models import Job
 from rest_framework import serializers, validators
 
+from vulmatch.server import models
+
 
 ACP_MODES = {
     "cve-epss": "Add EPSS Report(s) for CVE objects",
@@ -43,6 +45,16 @@ class NVDTaskSerializer(serializers.Serializer):
 class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField(required=False, allow_null=True)
     versions = serializers.ListField(child=serializers.DateTimeField())
+
+class VendorSerializer(serializers.Serializer):
+    vendor = serializers.CharField()
+    products_count  = serializers.IntegerField()
+    softwares_count = serializers.IntegerField()
+
+class ProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.Products
+        exclude = ['id']
 
 
 class ACPSerializer(serializers.Serializer):

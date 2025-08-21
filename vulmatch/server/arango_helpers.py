@@ -644,9 +644,9 @@ RETURN KEEP(d, KEYS(d, TRUE))
             "other",
         ]:
             if v := self.query.get(k):
-                struct_match[k] = self.like_string(v).lower()
+                struct_match[k] = str(v).lower()
                 filters.append(
-                    f"FILTER doc.x_cpe_struct.`{k}` LIKE @struct_match.`{k}`"
+                    f"FILTER doc.x_cpe_struct.`{k}` == @struct_match.`{k}`"
                 )
 
         if struct_match:

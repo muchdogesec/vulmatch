@@ -2,11 +2,11 @@ import logging
 import os
 from urllib.parse import urljoin
 import requests
-from rest_framework import viewsets, status, decorators
+from rest_framework import viewsets, status, decorators, mixins
 
 from vulmatch.server.arango_helpers import CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, VulmatchDBHelper
 from dogesec_commons.utils import Pagination, Ordering
-from vulmatch.worker.tasks import new_task
+from vulmatch.worker.tasks import new_task, refresh_products_cache
 from . import models
 from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, DateTimeFilter
@@ -457,12 +457,12 @@ class CpeView(viewsets.ViewSet):
         ))
         vendor = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc. (this is the 3ed value in the CPE URI).
+            Filters CPEs returned by vendor name. Is exact search so `goog` will NOT match `google`, `googe`, etc. (this is the 3ed value in the CPE URI).
             """
         ))
         product = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc. (this is the 4th value in the CPE URI).
+            Filters CPEs returned by product name. Is exact search so `chrom` will NOT match `chrome`, `chromium`, etc. (this is the 4th value in the CPE URI).
             """
         ))
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
@@ -509,7 +509,6 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
-
 
 @extend_schema_view(
     create=extend_schema(
@@ -607,6 +606,53 @@ class JobView(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
+
+@extend_schema(description='Look up software vendors', summary='Look up software vendors')
+class VendorView(mixins.ListModelMixin, viewsets.GenericViewSet):
+    openapi_tags = ["CPE"]
+    serializer_class = serializers.VendorSerializer
+    pagination_class = Pagination("vendors")
+    ordering_fields = ["vendor", "products_count", "softwares_count"]
+    ordering = "vendor_ascending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        q = CharFilter(field_name='vendor', lookup_expr='icontains', help_text='Wildcard search on `vendor` name')
+
+    def get_queryset(self):
+        from django.db.models import Count, Sum
+        return (
+            models.Products.objects.all()
+            .values("vendor")
+            .annotate(
+                products_count=Count("vendor"),
+                softwares_count=Sum("softwares_count"),
+            )
+            .distinct()
+        )
+
+@extend_schema(description='Look up software products', summary='Look up software products')
+class ProductView(mixins.ListModelMixin, viewsets.GenericViewSet):
+    openapi_tags = ["CPE"]
+    serializer_class = serializers.ProductSerializer
+    pagination_class = Pagination("products")
+    ordering_fields = ["product", "softwares_count", "vendor"]
+    ordering = "product_ascending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        vendor = CharFilter(help_text='Filter by `vendor`, must be exact match. `microsof` will not match `microsoft`')
+        q = CharFilter(field_name='product', method='semantic_search', help_text='Searches on both `vendor` and `product` fields. must be exact match. `micros code` will match `product=code vendor=microsoft`')
+
+        def semantic_search(self, queryset, name, text):
+            from django.contrib.postgres.search import SearchQuery, SearchVector
+            queryset = queryset.annotate(
+                text=SearchVector("product", "vendor"),
+            )
+            return queryset.filter(text=SearchQuery(text, search_type="websearch"))
+
+    def get_queryset(self):
+        return models.Products.objects.all()
 
 
 @extend_schema_view(
