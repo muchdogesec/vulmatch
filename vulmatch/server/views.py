@@ -1,3 +1,4 @@
+import logging
 import os
 from urllib.parse import urljoin
 import requests
@@ -632,7 +633,7 @@ class HealthCheck(viewsets.ViewSet):
 
     @decorators.action(detail=False)
     def service(self, request, *args, **kwargs):
-        return Response(status=200, data=dict(ctibutler=self.check_ctibutler()))
+        return Response(status=200, data=dict(ctibutler=self.check_ctibutler(), vulncheck=self.check_vulncheck()))
 
     @staticmethod
     def check_ctibutler():
@@ -653,3 +654,17 @@ class HealthCheck(viewsets.ViewSet):
                     return "unknown"
         except:
             return "offline"
+        
+    @staticmethod
+    def check_vulncheck():
+        from arango_cve_processor.managers import VulnCheckKevManager
+        from types import SimpleNamespace
+        try:
+            VulnCheckKevManager(SimpleNamespace(_client=None))
+            return "authorized"
+        except ValueError as e:
+            logging.exception(e)
+            return "unauthorized"
+        except BaseException as e:
+            logging.exception(e)
+            return "unknown"

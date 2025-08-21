@@ -5,8 +5,9 @@ from rest_framework import serializers, validators
 
 
 ACP_MODES = {
-    "cve-epss": "Add EPSS Note(s) for CVE objects",
-    "cve-kev": "Add EPSS Note(s) for CVE objects",
+    "cve-epss": "Add EPSS Report(s) for CVE objects",
+    "cve-kev": "Add KEV Report(s) for CVE objects",
+    "cve-vulncheck-kev": "Add KEV Report(s) for CVE objects",
     ###
     "cve-cwe": "Relate CVE objects to CWE objects",
     "cve-capec": "Relate CWE objects to CAPEC objects",
@@ -64,3 +65,4 @@ class HealthCheckChoices(StrEnum):
 
 class HealthCheckSerializer(serializers.Serializer):
     ctibutler = serializers.ChoiceField(choices=[m.value for m in HealthCheckChoices])
+    vulncheck = serializers.ChoiceField(choices=[m.value for m in HealthCheckChoices])

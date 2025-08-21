@@ -446,8 +446,7 @@ class AttachedDBHelper(DCHelper):
 
 
         rels = self.execute_query(new_query, bind_vars=binds, paginate=False)
-        rels = tuple(set(itertools.chain(*rels)))
-
+        rels = tuple(set(itertools.chain(obj_ids, *rels)))
         new_binds = {
             'object_ids': rels,
             '@view': settings.VIEW_NAME,
