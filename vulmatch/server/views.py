@@ -12,6 +12,7 @@ from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, DateTimeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from dogesec_commons.utils.schemas import DEFAULT_400_RESPONSE
 
 
 import textwrap
@@ -411,6 +412,7 @@ class EPSSView(KevView):
             """
         ),
         filters=True,
+        responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_RESPONSE}
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
@@ -443,7 +445,6 @@ class CpeView(viewsets.ViewSet):
         OpenApiParameter('cpe_name', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full CPE name. e.g. `cpe:2.3:a:slicewp:affiliate_program_suite:1.0.13:*:*:*:*:wordpress:*:*`'),
     ]
 
-    
     class filterset_class(FilterSet):
         id = BaseCSVFilter(help_text=textwrap.dedent(
             """
@@ -455,16 +456,22 @@ class CpeView(viewsets.ViewSet):
             Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
             """
         ))
-        vendor = CharFilter(help_text=textwrap.dedent(
-            """
+        vendor = CharFilter(
+            help_text=textwrap.dedent(
+                """
             Filters CPEs returned by Vendor name. Is exact search so `goog` will NOT match `google`, `googe`, etc. You can obtain a list of Vendor names from the GET Vendors endpoint. (this is the 3rd value in the CPE URI).
             """
-        ))
-        product = CharFilter(help_text=textwrap.dedent(
-            """
+            ),
+            required=True,
+        )
+        product = CharFilter(
+            help_text=textwrap.dedent(
+                """
             Filters CPEs returned by product name. Is exact search so `chrom` will NOT match `chrome`, `chromium`, etc. You can obtain a list of Product names from the GET Products endpoint. (this is the 4th value in the CPE URI).
             """
-        ))
+            ),
+            required=True,
+        )
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
                         help_text=textwrap.dedent(
             """
@@ -491,7 +498,7 @@ class CpeView(viewsets.ViewSet):
         target_sw = CharFilter(help_text='Characterises the software computing environment within which the product operates (this is the 10th value in the CPE URI).')
         target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
         other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
-    
+
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return VulmatchDBHelper('', request).get_softwares()
@@ -499,7 +506,7 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
-    
+
     @extend_schema(
             parameters=[
                 OpenApiParameter('relationship_type', enum=CPE_RELATIONSHIP_TYPES, allow_blank=False, description="either `vulnerable-to` or `in-pattern` (default is both)."),
