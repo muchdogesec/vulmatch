@@ -106,3 +106,50 @@ def test_sort(client, path, sort_param: str):
     assert is_sorted(
         resp_data["objects"], key=key_fn, reverse=reversed
     ), "object not sorted"
+
+@pytest.mark.parametrize(
+    "sort_param",
+    [
+        "name_ascending",
+        "name_descending",
+        "modified_ascending",
+        "modified_descending",
+        "created_descending",
+        "created_ascending",
+    ],
+)
+def test_sort_exploits(client, sort_param: str):
+    url = f"/api/v1/kev/exploits/"
+    resp = client.get(url, query_params=dict(sort=sort_param))
+    resp_data = resp.json()
+    assert (
+        len({cpe["id"] for cpe in resp_data["objects"]})
+        == resp_data["page_results_count"]
+    ), "response contains duplicates"
+    param, _, direction = sort_param.rpartition("_")
+
+    def key_fn(obj):
+        return obj[param]
+
+    reversed = direction == "descending"
+    assert is_sorted(
+        resp_data["objects"], key=key_fn, reverse=reversed
+    ), "object not sorted"
+
+
+@pytest.mark.parametrize(
+    ['cve_ids', 'expected_ids'],
+    [
+        [None, {'exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1', 'exploit--42d4dee3-2645-581a-89b2-73b0245776c8', 'exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48', 'exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802'}],
+        [['CVE-2024-3393', 'CVE-2024-11972'], {'exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1', 'exploit--42d4dee3-2645-581a-89b2-73b0245776c8', 'exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48', 'exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802'}],
+        [['CVE-2024-3393'], {'exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1'}],
+        [['CVE-2024-11972'], {'exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802', 'exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48', 'exploit--42d4dee3-2645-581a-89b2-73b0245776c8'}],
+    ]
+)
+def test_list_exploits(client, cve_ids, expected_ids):
+    url = f"/api/v1/kev/exploits/"
+    resp = client.get(url, query_params=dict(cve_id=','.join(cve_ids or [])))
+    resp_data = resp.json()
+    print({obj["id"] for obj in resp_data["objects"]})
+    print({obj["name"] for obj in resp_data["objects"]})
+    assert {obj["id"] for obj in resp_data["objects"]} == set(expected_ids)

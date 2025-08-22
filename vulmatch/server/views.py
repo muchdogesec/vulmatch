@@ -342,6 +342,16 @@ class KevView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         return VulmatchDBHelper('nvd_cve_vertex_collection', request).retrieve_kev_or_epss_object(cve_id, self.label)
+    
+    @extend_schema(
+            parameters=[
+                OpenApiParameter('sort', enum=KEV_SORT_FIELDS, description="Sort results by"),
+            ]
+    )
+    @decorators.action(methods=['GET'], url_path="exploits", detail=False)
+    def list_exploits(self, request, *args, **kwargs):
+        return VulmatchDBHelper('', request).list_exploits()
+
 
 @extend_schema_view(
     list_objects=extend_schema(

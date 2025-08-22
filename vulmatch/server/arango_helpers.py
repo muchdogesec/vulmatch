@@ -301,6 +301,31 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             """
 
         return self.execute_query(query, bind_vars=bind_vars)
+    
+    def list_exploits(self):
+        filters = []
+        binds = {}
+        if cve_ids := self.query_as_array('cve_id'):
+            binds['cve_ids'] = [cve_id.upper() for cve_id in cve_ids]
+            filters.append('FILTER doc.name IN @cve_ids')
+        query = ("""
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
+@filters
+@sort_stmt
+LIMIT @offset, @count
+RETURN KEEP(doc, KEYS(doc, true))
+    """.replace(
+                "@filters", "\n".join(filters)
+            )
+            .replace(
+                "@sort_stmt",
+                self.get_sort_stmt(
+                    CVE_SORT_FIELDS,
+                ),
+            )
+        )
+        return self.execute_query(query, bind_vars=binds, aql_options=dict(optimizer_rules=['-use-index-for-sort']))
 
     def get_vulnerabilities(self):
         binds = {}
