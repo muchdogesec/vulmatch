@@ -1,3 +1,4 @@
+import random
 import pytest
 
 
@@ -157,5 +158,27 @@ def test_relationships(client, cpe_name, relationship_type, expected_count):
         assert any([obj['relationship_type'] == should for obj in resp_data["relationships"] if obj['type'] == 'relationship'])
         assert all([obj['relationship_type'] != shouldnt for obj in resp_data["relationships"] if obj['type'] == 'relationship'])
 
+
+@pytest.mark.parametrize(
+    "page,page_size",
+    [
+        (random.randint(1, 10), random.choice([None, 13, 50, 105, 1000])) for _ in range(10)
+    ]
+)
+
+def test_paging(client, settings, page, page_size):
+    url = f"/api/v1/cpe/objects/"
+    params = dict(page=page, page_size=page_size, product='zoom', vendor='zoom')
+    if not page_size:
+        del params["page_size"]
+    resp = client.get(url, query_params=params)
+    resp_data = resp.json()
+    assert resp_data["page_number"] == page
+    if page_size:
+        assert resp_data["page_size"] == min(
+            settings.MAXIMUM_PAGE_SIZE, page_size
+        )
+    assert resp_data["total_results_count"] >= resp_data["page_results_count"]
+    assert resp_data["page_results_count"] <= resp_data["page_size"]
 
         
