@@ -516,7 +516,7 @@ class CpeView(viewsets.ViewSet):
             OpenApiParameter(
                 "include_cves_not_vulnerable",
                 type=bool,
-                description="(default is true). This is the same as cpes_in_pattern and cpes_vulnerable on cve endpoint (but in reverse)",
+                description="If `false` will only show `vulnerability` objects vulnerable to this vulnerability (and the SROS), if exist. If set to `true` will return Vulnerabilities that are both vulnerable and rely on the `software` object.",
             ),
         ],
         filters=False
