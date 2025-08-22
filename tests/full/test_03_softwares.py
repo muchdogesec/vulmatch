@@ -157,6 +157,33 @@ def test_bundle(client, cpe_name, include_cves_not_vulnerable, expected_count):
     if not include_cves_not_vulnerable:
         assert all([obj['relationship_type'] != 'relies-on' for obj in resp_data["objects"] if obj['type'] == 'relationship'])
 
+@pytest.mark.parametrize(
+    'types,expected_count',
+    [
+        [('software',), 1],
+        [('vulnerability',), 1],
+        [('indicator',), 1],
+        [('relationship',), 2],
+        [('software','indicator'), 2],
+        [('software','vulnerability'), 2],
+        [('relationship', "vulnerability"), 3],
+        [None, 5],
+        [('software', 'relationship', 'indicator', 'vulnerability'), 5],
+    ]
+)
+def test_bundle_types(client, types, expected_count):
+    url = f"/api/v1/cpe/objects/cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*/bundle/"
+    filters = {}
+    if types:
+        filters.update(types=','.join(types))
+        types = set(types)
+    else:
+        types = {'software', 'relationship', 'indicator', 'vulnerability'}
+    resp = client.get(url, query_params=filters)
+    assert resp.status_code == 200, resp.json()
+    resp_data = resp.json()
+    assert types.issuperset({r['type'] for r in resp_data['objects']})
+    assert resp_data["total_results_count"] == expected_count
 
 @pytest.mark.parametrize(
     "page,page_size",

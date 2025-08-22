@@ -518,6 +518,7 @@ class CpeView(viewsets.ViewSet):
                 type=bool,
                 description="If `false` will only show `vulnerability` objects vulnerable to this vulnerability (and the SROS), if exist. If set to `true` will return Vulnerabilities that are both vulnerable and rely on the `software` object.",
             ),
+            OpenApiParameter('types', description="The types of STIX object to be returned", enum=['software', 'relationship', 'indicator', 'vulnerability'], many=True, explode=False)
         ],
         filters=False
     )

@@ -583,6 +583,8 @@ RETURN KEEP(d, KEYS(d, TRUE))
             if type_part== 'indicator':
                 indicator_ids.append('vulnerability--'+uuid_part)
             types.add(type_part)
+        if t := self.query_as_array('types'):
+            types.intersection_update(t)
         indicator_ids.extend([p['id'] for p in primary_objects])
         return self.execute_query(
             """
