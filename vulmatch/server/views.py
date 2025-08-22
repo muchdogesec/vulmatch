@@ -457,12 +457,12 @@ class CpeView(viewsets.ViewSet):
         ))
         vendor = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by vendor name. Is exact search so `goog` will NOT match `google`, `googe`, etc. (this is the 3ed value in the CPE URI).
+            Filters CPEs returned by Vendor name. Is exact search so `goog` will NOT match `google`, `googe`, etc. You can obtain a list of Vendor names from the GET Vendors endpoint. (this is the 3rd value in the CPE URI).
             """
         ))
         product = CharFilter(help_text=textwrap.dedent(
             """
-            Filters CPEs returned by product name. Is exact search so `chrom` will NOT match `chrome`, `chromium`, etc. (this is the 4th value in the CPE URI).
+            Filters CPEs returned by product name. Is exact search so `chrom` will NOT match `chrome`, `chromium`, etc. You can obtain a list of Product names from the GET Products endpoint. (this is the 4th value in the CPE URI).
             """
         ))
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
@@ -607,7 +607,16 @@ class JobView(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
-@extend_schema(description='Look up software vendors', summary='Look up software vendors')
+@extend_schema(
+        description=textwrap.dedent(
+            """
+            This endpoint will return a unique list of Vendors found in CPEs.
+
+            It will also show the count of products and product combinations (i.e. different versions) available for that Vendor.
+            """
+        ),
+        summary="Get all a list of all Vendors",
+    )
 class VendorView(mixins.ListModelMixin, viewsets.GenericViewSet):
     openapi_tags = ["CPE"]
     serializer_class = serializers.VendorSerializer
@@ -631,7 +640,18 @@ class VendorView(mixins.ListModelMixin, viewsets.GenericViewSet):
             .distinct()
         )
 
-@extend_schema(description='Look up software products', summary='Look up software products')
+@extend_schema(
+        description=textwrap.dedent(
+            """
+            This endpoint will return a unique list of Products found in CPEs.
+
+            It will also show product combinations (i.e. different versions) available for that Product.
+
+            This endpoint can also be useful if you know the Product name, but not the exact Vendor product.
+            """
+        ),
+        summary="Get all a list of all Products",
+    )
 class ProductView(mixins.ListModelMixin, viewsets.GenericViewSet):
     openapi_tags = ["CPE"]
     serializer_class = serializers.ProductSerializer
