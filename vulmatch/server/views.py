@@ -641,8 +641,8 @@ class ProductView(mixins.ListModelMixin, viewsets.GenericViewSet):
     filter_backends = [DjangoFilterBackend, Ordering]
 
     class filterset_class(FilterSet):
-        vendor = CharFilter(help_text='Filter by `vendor`, must be exact match. `microsof` will not match `microsoft`')
-        q = CharFilter(field_name='product', method='semantic_search', help_text='Searches on both `vendor` and `product` fields. must be exact match. `micros code` will match `product=code vendor=microsoft`')
+        vendor = CharFilter(help_text='Filter by `vendor`, must be exact match. `microsof` will not match `microsoft`. Use the GET Vendor endpoint to get a full list of Vendors.')
+        q = CharFilter(field_name='product', method='semantic_search', help_text='Searches on both `vendor` and `product` fields as a wildcard. `micros code` will match `product=code vendor=microsoft`. Useful if you don\'t know the exact `vendor` name.')
 
         def semantic_search(self, queryset, name, text):
             from django.contrib.postgres.search import SearchQuery, SearchVector
