@@ -3,9 +3,11 @@ import logging
 import os
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 from urllib.parse import urljoin
 
 import requests
+from vulmatch.server.arango_helpers import VulmatchDBHelper
 from vulmatch.server.models import Job, JobType
 from vulmatch.server import models
 # from vulmatch.web import models
@@ -100,6 +102,7 @@ class CustomTask(Task):
             logging.info(f'directory `{path}` removed')
         except Exception as e:
             logging.error(f'delete dir failed: {e}')
+        refresh_products_cache.si().apply_async() #build cache after failure
         return super().on_failure(exc, task_id, args, kwargs, einfo)
     
     def before_start(self, task_id, args, kwargs):
@@ -152,6 +155,35 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
     s2a.add_object_alter_fn(add_cvss_score_to_cve_object)
     s2a.run()
 
+@app.task
+def refresh_products_cache():
+    collection = 'nvd_cve_vertex_collection'
+    helper = VulmatchDBHelper(collection, SimpleNamespace(GET=dict(), query_params=SimpleNamespace(dict=dict)))
+    new_rev = helper.db.collection(collection).revision()
+    old_rev = models.ProductRevision.get_revision()
+    if new_rev == old_rev:
+        return False
+    logging.info(f"revision has changed ({old_rev} -> {new_rev}), rebuilding products cache")
+    query = """
+        FOR doc in nvd_cve_vertex_collection OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
+        FILTER doc.type == 'software'
+        FILTER doc._is_latest == TRUE
+        LET id = 0
+        COLLECT vendor = doc.x_cpe_struct.vendor, product = doc.x_cpe_struct.product INTO ids KEEP id
+        SORT NULL
+        RETURN [vendor, product, LENGTH(ids)]
+    """
+    results = helper.execute_query(query, paginate=False)
+    products: list[models.Products] = []
+    for p in results:
+        products.append(models.Products(vendor=p[0], product=p[1], softwares_count=p[2]))
+        products[-1].set_id()
+    models.Products.objects.bulk_create(products, ignore_conflicts=True)
+    models.Products.objects.bulk_update(products, fields=['softwares_count'])
+    models.ProductRevision.set_revision(new_rev)
+    return True
+
+
 @app.task(base=CustomTask)
 def acp_task(options, job_id=None):
     job = Job.objects.get(pk=job_id)
@@ -165,13 +197,12 @@ def remove_temp_and_set_completed(path: str, job_id: str=None):
     job = Job.objects.get(pk=job_id)
     job.state = models.JobState.COMPLETED
     job.save()
+    refresh_products_cache() # build cache after task completion
+
 
 
 from celery import signals
 @signals.worker_ready.connect
-def mark_old_jobs_as_failed(**kwargs):
+def mark_old_jobs_as_failed_and_rebuild_cache(**kwargs):
     Job.objects.filter(state=models.JobState.PENDING).update(state = models.JobState.FAILED, errors=["marked as failed on startup"])
-
-@app.task
-def log(*args):
-    logging.info(*args)
+    refresh_products_cache() # build cache on program start

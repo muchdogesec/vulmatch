@@ -11,7 +11,6 @@ import pytest
         "cwe",
         "kev",
         "cve",
-        "cpe",
     ]
 )
 @pytest.mark.parametrize(

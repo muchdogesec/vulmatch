@@ -2,16 +2,17 @@ import logging
 import os
 from urllib.parse import urljoin
 import requests
-from rest_framework import viewsets, status, decorators
+from rest_framework import viewsets, status, decorators, mixins
 
 from vulmatch.server.arango_helpers import CPE_REL_SORT_FIELDS, CPE_RELATIONSHIP_TYPES, CVE_BUNDLE_TYPES, CVE_SORT_FIELDS, EPSS_SORT_FIELDS, KEV_SORT_FIELDS, VulmatchDBHelper
 from dogesec_commons.utils import Pagination, Ordering
-from vulmatch.worker.tasks import new_task
+from vulmatch.worker.tasks import new_task, refresh_products_cache
 from . import models
 from vulmatch.server import serializers
 from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, DateTimeFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from dogesec_commons.utils.schemas import DEFAULT_400_RESPONSE
 
 
 import textwrap
@@ -411,6 +412,7 @@ class EPSSView(KevView):
             """
         ),
         filters=True,
+        responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_RESPONSE}
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
@@ -443,7 +445,6 @@ class CpeView(viewsets.ViewSet):
         OpenApiParameter('cpe_name', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='The full CPE name. e.g. `cpe:2.3:a:slicewp:affiliate_program_suite:1.0.13:*:*:*:*:wordpress:*:*`'),
     ]
 
-    
     class filterset_class(FilterSet):
         id = BaseCSVFilter(help_text=textwrap.dedent(
             """
@@ -455,16 +456,22 @@ class CpeView(viewsets.ViewSet):
             Filter CPEs that contain a full or partial CPE Match String. Search is a wildcard to support partial match strings (e.g. `cpe:2.3:o:microsoft:windows` will match `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
             """
         ))
-        vendor = CharFilter(help_text=textwrap.dedent(
+        vendor = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filters CPEs returned by Vendor name. Is exact search so `goog` will NOT match `google`, `googe`, etc. You can obtain a list of Vendor names from the GET Vendors endpoint. (this is the 3rd value in the CPE URI).
             """
-            Filters CPEs returned by vendor name. Is wildcard search so `goog` will match `google`, `googe`, etc. (this is the 3ed value in the CPE URI).
+            ),
+            required=True,
+        )
+        product = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filters CPEs returned by product name. Is exact search so `chrom` will NOT match `chrome`, `chromium`, etc. You can obtain a list of Product names from the GET Products endpoint. (this is the 4th value in the CPE URI).
             """
-        ))
-        product = CharFilter(help_text=textwrap.dedent(
-            """
-            Filters CPEs returned by product name. Is wildcard search so `chrom` will match `chrome`, `chromium`, etc. (this is the 4th value in the CPE URI).
-            """
-        ))
+            ),
+            required=True,
+        )
         product_type = ChoiceFilter(choices=[('operating-system', 'Operating System'), ('application', 'Application'), ('hardware', 'Hardware')],
                         help_text=textwrap.dedent(
             """
@@ -491,7 +498,7 @@ class CpeView(viewsets.ViewSet):
         target_sw = CharFilter(help_text='Characterises the software computing environment within which the product operates (this is the 10th value in the CPE URI).')
         target_hw = CharFilter(help_text='Characterises the instruction set architecture (e.g., x86) on which the product being described or identified operates (this is the 11th value in the CPE URI).')
         other = CharFilter(help_text='Capture any other general descriptive or identifying information which is vendor- or product-specific and which does not logically fit in any other attribute value (this is the 12th value in the CPE URI).')
-    
+
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return VulmatchDBHelper('', request).get_softwares()
@@ -499,7 +506,7 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
-    
+
     @extend_schema(
             parameters=[
                 OpenApiParameter('relationship_type', enum=CPE_RELATIONSHIP_TYPES, allow_blank=False, description="either `vulnerable-to` or `in-pattern` (default is both)."),
@@ -509,7 +516,6 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
     def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
-
 
 @extend_schema_view(
     create=extend_schema(
@@ -607,6 +613,73 @@ class JobView(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
+
+@extend_schema(
+        description=textwrap.dedent(
+            """
+            This endpoint will return a unique list of Vendors found in CPEs.
+
+            It will also show the count of products and product combinations (i.e. different versions) available for that Vendor.
+            """
+        ),
+        summary="Get all a list of all Vendors",
+    )
+class VendorView(mixins.ListModelMixin, viewsets.GenericViewSet):
+    openapi_tags = ["CPE"]
+    serializer_class = serializers.VendorSerializer
+    pagination_class = Pagination("vendors")
+    ordering_fields = ["vendor", "products_count", "softwares_count"]
+    ordering = "vendor_ascending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        q = CharFilter(field_name='vendor', lookup_expr='icontains', help_text='Wildcard search on `vendor` name')
+
+    def get_queryset(self):
+        from django.db.models import Count, Sum
+        return (
+            models.Products.objects.all()
+            .values("vendor")
+            .annotate(
+                products_count=Count("vendor"),
+                softwares_count=Sum("softwares_count"),
+            )
+            .distinct()
+        )
+
+@extend_schema(
+        description=textwrap.dedent(
+            """
+            This endpoint will return a unique list of Products found in CPEs.
+
+            It will also show product combinations (i.e. different versions) available for that Product.
+
+            This endpoint can also be useful if you know the Product name, but not the exact Vendor product.
+            """
+        ),
+        summary="Get all a list of all Products",
+    )
+class ProductView(mixins.ListModelMixin, viewsets.GenericViewSet):
+    openapi_tags = ["CPE"]
+    serializer_class = serializers.ProductSerializer
+    pagination_class = Pagination("products")
+    ordering_fields = ["product", "softwares_count", "vendor"]
+    ordering = "product_ascending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        vendor = CharFilter(help_text='Filter by `vendor`, must be exact match. `microsof` will not match `microsoft`. Use the GET Vendor endpoint to get a full list of Vendors.')
+        q = CharFilter(field_name='product', method='semantic_search', help_text='Searches on both `vendor` and `product` fields as a wildcard. `micros code` will match `product=code vendor=microsoft`. Useful if you don\'t know the exact `vendor` name.')
+
+        def semantic_search(self, queryset, name, text):
+            from django.contrib.postgres.search import SearchQuery, SearchVector
+            queryset = queryset.annotate(
+                text=SearchVector("product", "vendor"),
+            )
+            return queryset.filter(text=SearchQuery(text, search_type="websearch"))
+
+    def get_queryset(self):
+        return models.Products.objects.all()
 
 
 @extend_schema_view(

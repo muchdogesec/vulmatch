@@ -29,3 +29,26 @@ class Job(models.Model):
             self.completion_time = datetime.now(timezone.utc)
         return super().save(*args, **kwargs)
     
+
+class Products(models.Model):
+    id = models.CharField(max_length=512, primary_key=True)
+    product = models.CharField(max_length=256)
+    vendor  = models.CharField(max_length=256)
+    softwares_count = models.IntegerField(default=1)
+
+    def save(self, *args, **kwargs):
+        self.set_id()
+        return super().save(*args, **kwargs)
+
+    def set_id(self):
+        self.id = self.id or f"{self.product}+++{self.vendor}"
+
+class ProductRevision(models.Model):
+    revision = models.CharField(max_length=24, null=True)
+    @classmethod
+    def get_revision(cls):
+        return cls.objects.get_or_create(id=0, defaults=dict(revision=None))[0].revision
+    
+    @classmethod
+    def set_revision(cls, revision):
+        cls.objects.update_or_create(id=0, defaults=dict(revision=revision))
