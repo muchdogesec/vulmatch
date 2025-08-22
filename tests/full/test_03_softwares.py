@@ -114,49 +114,48 @@ def test_retrieve_cpe(client, cpe_name):
     assert resp_data["objects"][0]["cpe"] == cpe_name
 
 @pytest.mark.parametrize(
-    ["cpe_name", 'relationship_type', 'expected_count'],
+    ["cpe_name", 'include_cves_not_vulnerable', 'expected_count'],
     [
-        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", None, 4],
-        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", None, 36],
-        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", None, 4],
-        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", None, 4],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", None, 4],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", None, 4],
+        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", None, 5],
+        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", None, 41],
+        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", None, 5],
+        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", None, 5],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", None, 5],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", None, 5],
         ####
-        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", 'in-pattern', 3],
-        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", 'in-pattern', 21],
-        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", 'in-pattern', 3],
-        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", 'in-pattern', 3],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", 'in-pattern', 3],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", 'in-pattern', 3],
+        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", True, 5],
+        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", True, 41],
+        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", True, 5],
+        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", True, 5],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", True, 5],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", True, 5],
         #####
-        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", 'vulnerable-to', 3],
-        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", 'vulnerable-to', 21],
-        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", 'vulnerable-to', 3],
-        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", 'vulnerable-to', 3],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", 'vulnerable-to', 3],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", 'vulnerable-to', 3],
+        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", False, 4],
+        ["cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*", False, 26],
+        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", False, 4],
+        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", False, 4],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", False, 4],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", False, 4],
     ],
 )
-def test_relationships(client, cpe_name, relationship_type, expected_count):
-    url = f"/api/v1/cpe/objects/{cpe_name}/relationships/"
+def test_bundle(client, cpe_name, include_cves_not_vulnerable, expected_count):
+    url = f"/api/v1/cpe/objects/{cpe_name}/bundle/"
     filters = {}
-    if relationship_type:
-        filters.update(relationship_type=relationship_type)
+    if include_cves_not_vulnerable != None:
+        filters.update(include_cves_not_vulnerable=include_cves_not_vulnerable)
+    else:
+        include_cves_not_vulnerable = True
+    
     resp = client.get(url, query_params=filters)
+    assert resp.status_code == 200, resp.json()
     resp_data = resp.json()
     assert (
-        len({cpe["id"] for cpe in resp_data["relationships"]})
+        len({cpe["id"] for cpe in resp_data["objects"]})
         == resp_data["page_results_count"]
     ), "response contains duplicates"
     assert resp_data["total_results_count"] == expected_count
-    if relationship_type:
-        if relationship_type == 'vulnerable-to':
-            should, shouldnt = 'exploits', 'relies-on'
-        else:
-            should, shouldnt = 'relies-on', 'exploits'
-        assert any([obj['relationship_type'] == should for obj in resp_data["relationships"] if obj['type'] == 'relationship'])
-        assert all([obj['relationship_type'] != shouldnt for obj in resp_data["relationships"] if obj['type'] == 'relationship'])
+    if not include_cves_not_vulnerable:
+        assert all([obj['relationship_type'] != 'relies-on' for obj in resp_data["objects"] if obj['type'] == 'relationship'])
 
 
 @pytest.mark.parametrize(

@@ -412,7 +412,7 @@ class EPSSView(KevView):
             """
         ),
         filters=True,
-        responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_RESPONSE}
+        responses={200: serializers.StixObjectsSerializer(many=True), 400: DEFAULT_400_RESPONSE},
     ),
     retrieve_objects=extend_schema(
         summary='Get a CPE object by STIX ID',
@@ -508,14 +508,24 @@ class CpeView(viewsets.ViewSet):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
 
     @extend_schema(
-            parameters=[
-                OpenApiParameter('relationship_type', enum=CPE_RELATIONSHIP_TYPES, allow_blank=False, description="either `vulnerable-to` or `in-pattern` (default is both)."),
-                OpenApiParameter('sort', enum=CPE_REL_SORT_FIELDS, description="Sort results by"),
-            ]
+        responses={
+            200: serializers.StixObjectsSerializer(many=True),
+            400: DEFAULT_400_RESPONSE,
+        },
+        parameters=[
+            OpenApiParameter(
+                "include_cves_not_vulnerable",
+                type=bool,
+                description="(default is true). This is the same as cpes_in_pattern and cpes_vulnerable on cve endpoint (but in reverse)",
+            ),
+        ],
+        filters=False
     )
-    @decorators.action(methods=['GET'], url_path="objects/<str:cpe_name>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, cpe_name=None, **kwargs):
-        return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe', relationship_mode=True)
+    @decorators.action(
+        methods=["GET"], url_path="objects/<str:cpe_name>/bundle", detail=False
+    )
+    def retrieve_object_bundle(self, request, *args, cpe_name=None, **kwargs):
+        return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cpe_bundle(cpe_name)
 
 @extend_schema_view(
     create=extend_schema(
