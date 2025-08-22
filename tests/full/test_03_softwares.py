@@ -5,21 +5,21 @@ import pytest
 @pytest.mark.parametrize(
     ["filters", "expected_count"],
     [
-        [dict(vendor="zoom"), 165],
-        [dict(vendor="zoo"), 165],
-        [dict(vendor="zoom", version="3.5.14940.0430"), 1],
-        [dict(target_sw="windows", version="3.5.14940.0430"), 1],
-        [dict(target_sw="windows", vendor="zoom"), 164],
-        [dict(product_type="hardware"), 87],
-        [dict(product_type="hardware", product="qfx5130"), 1],
-        [dict(product_type="application"), 1575],
-        [dict(product_type="operating-system"), 332],
+        [dict(vendor="zoom", product="zoom"), 151],
+        [dict(vendor="zoom", product='meeting_software_development_kit'), 7],
+        [dict(vendor="zoom", product='meeting_software_development_kit', target_sw='windows'), 7],
+        [dict(vendor="zoom", product='meeting_software_development_kit', target_sw='linux'), 0],
+        [dict(vendor="zoom", product="zoom", version="3.5.14940.0430"), 1],
+        [dict(product_type="hardware", vendor='juniper', product="junos"), 0],
+        [dict(product_type="operating-system", vendor='juniper', product="junos"), 139],
+        [dict(vendor="zoom", product='meeting_software_development_kit', product_type="application"), 7],
     ],
 )
 def test_struct_filter(client, filters, expected_count):
     url = f"/api/v1/cpe/objects/"
     resp = client.get(url, query_params=filters)
     resp_data = resp.json()
+    assert resp.status_code == 200, resp_data
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be software"
@@ -34,24 +34,42 @@ def test_struct_filter(client, filters, expected_count):
                 filter_key, filter_value = "part", filter_value[:1]
             assert filter_value in obj["x_cpe_struct"][filter_key]
 
+@pytest.mark.parametrize(
+    "filters",
+    [
+        dict(vendor="zoom"),
+        dict(vendor="zoo"),
+        dict(vendor="zoom", version="3.5.14940.0430"),
+        dict(target_sw="windows", version="3.5.14940.0430"),
+        dict(target_sw="windows", vendor="zoom"),
+        dict(product_type="hardware"),
+        dict(product_type="hardware", product="qfx5130"),
+        dict(product_type="application"),
+        dict(product_type="operating-system"),
+    ],
+)
+def test_endpoint_fails_if_no_vendor_product(client, filters):
+    url = f"/api/v1/cpe/objects/"
+    resp = client.get(url, query_params=filters)
+    assert resp.status_code == 400, "request should fail"
+
 
 @pytest.mark.parametrize(
     ["cpe_match_string", "expected_count"],
     [
-        ["cpe:2.3:h:juniper", 69],
-        ["cpe:2.3:h:juniper:srx320", 1],
-        ["zoom", 165],
-        ["zoo", 165],
+        ["zoom", 151],
+        ["zoo", 151],
         ["3.5.14940.0430", 1],
-        ["windows", 167],
-        ["linux", 29],
-        ["qfx5130", 1],
+        ["windows", 151],
+        ["linux", 0],
+        ["qfx5130", 0],
     ],
 )
 def test_cpe_match_string(client, cpe_match_string, expected_count):
     url = f"/api/v1/cpe/objects/"
-    resp = client.get(url, query_params=dict(cpe_match_string=cpe_match_string))
+    resp = client.get(url, query_params=dict(cpe_match_string=cpe_match_string, product='zoom', vendor='zoom'))
     resp_data = resp.json()
+    assert resp.status_code == 200, resp_data
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be software"
@@ -87,6 +105,7 @@ def test_retrieve_cpe(client, cpe_name):
     url = f"/api/v1/cpe/objects/{cpe_name}/"
     resp = client.get(url)
     resp_data = resp.json()
+    assert resp.status_code == 200, resp_data
     assert all(
         cve["type"] == "software" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be software"

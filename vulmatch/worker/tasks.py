@@ -102,7 +102,7 @@ class CustomTask(Task):
             logging.info(f'directory `{path}` removed')
         except Exception as e:
             logging.error(f'delete dir failed: {e}')
-        refresh_products_cache.delay() #build cache after failure
+        refresh_products_cache.si().apply_async() #build cache after failure
         return super().on_failure(exc, task_id, args, kwargs, einfo)
     
     def before_start(self, task_id, args, kwargs):
@@ -197,12 +197,12 @@ def remove_temp_and_set_completed(path: str, job_id: str=None):
     job = Job.objects.get(pk=job_id)
     job.state = models.JobState.COMPLETED
     job.save()
-    refresh_products_cache.delay() # build cache after task completion
+    refresh_products_cache() # build cache after task completion
 
 
 
 from celery import signals
 @signals.worker_ready.connect
-def mark_old_jobs_as_failed(**kwargs):
+def mark_old_jobs_as_failed_and_rebuild_cache(**kwargs):
     Job.objects.filter(state=models.JobState.PENDING).update(state = models.JobState.FAILED, errors=["marked as failed on startup"])
     refresh_products_cache() # build cache on program start
