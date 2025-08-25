@@ -423,15 +423,26 @@ class EPSSView(KevView):
         ),
         filters=False,
     ),
-    retrieve_object_relationships=extend_schema(
-        summary='Get Relationships for Object',
+    retrieve_object_bundle=extend_schema(
+        summary='Get Bundle for CPE',
         description=textwrap.dedent(
             """
-            This endpoint will return all SROs where the Software (CPE) selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what CVEs the CPE is found in.
+            This endpoint will return all objects related to the Software (CPE), This includes the `indicator`, `vulnerability`, `relationship`, and `software` objects . This allows you to quickly find out what CVEs the CPE is found in.
             """
         ),
-        responses={200: VulmatchDBHelper.get_paginated_response_schema('relationships', 'relationship')},
-        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
+        responses={
+            200: serializers.StixObjectsSerializer(many=True),
+            400: DEFAULT_400_RESPONSE,
+        },
+        parameters=[
+            OpenApiParameter(
+                "include_cves_not_vulnerable",
+                type=bool,
+                description="If `false` will only show `vulnerability` objects vulnerable to this vulnerability (and the SROS), if exist. If set to `true` will return Vulnerabilities that are both vulnerable and rely on the `software` object.",
+            ),
+            OpenApiParameter('types', description="The types of STIX object to be returned", enum=['software', 'relationship', 'indicator', 'vulnerability'], many=True, explode=False)
+        ],
+        filters=False
     ),
 ) 
 class CpeView(viewsets.ViewSet):
@@ -507,21 +518,6 @@ class CpeView(viewsets.ViewSet):
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f'nvd_cve_vertex_collection', request).get_cxe_object(cpe_name, type='software', var='cpe')
 
-    @extend_schema(
-        responses={
-            200: serializers.StixObjectsSerializer(many=True),
-            400: DEFAULT_400_RESPONSE,
-        },
-        parameters=[
-            OpenApiParameter(
-                "include_cves_not_vulnerable",
-                type=bool,
-                description="If `false` will only show `vulnerability` objects vulnerable to this vulnerability (and the SROS), if exist. If set to `true` will return Vulnerabilities that are both vulnerable and rely on the `software` object.",
-            ),
-            OpenApiParameter('types', description="The types of STIX object to be returned", enum=['software', 'relationship', 'indicator', 'vulnerability'], many=True, explode=False)
-        ],
-        filters=False
-    )
     @decorators.action(
         methods=["GET"], url_path="objects/<str:cpe_name>/bundle", detail=False
     )

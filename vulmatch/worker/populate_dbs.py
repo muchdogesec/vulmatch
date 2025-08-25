@@ -214,13 +214,15 @@ def create_bundle_view(db: StandardDatabase):
             name=settings.VIEW_NAME, view_type="arangosearch", properties=view
         )
         time.sleep(1)
-        job.result()
+        if job.status() == 'done':
+            job.result()
     except arango.exceptions.ViewCreateError:
         print(f"updating {settings.VIEW_NAME}")
         job = adb.update_view(settings.VIEW_NAME, properties=view)
         time.sleep(1)
-        job.result()
-    print(f"created {settings.VIEW_NAME}")
+        if job.status() == 'done':
+            job.result()
+    print(f"creating {settings.VIEW_NAME} in background")
 
 
 def create_collections():
