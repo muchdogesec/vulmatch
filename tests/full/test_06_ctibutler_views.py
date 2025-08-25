@@ -6,11 +6,12 @@ import pytest
 @pytest.mark.parametrize(
     "path",
     [
-        "attack",
-        "capec",
-        "cwe",
-        "kev",
-        "cve",
+        "attack/objects",
+        "capec/objects",
+        "cwe/objects",
+        "kev/objects",
+        "cve/objects",
+        "kev/exploits"
     ]
 )
 @pytest.mark.parametrize(
@@ -21,7 +22,7 @@ import pytest
 )
 
 def test_paging_generic(client, settings, path, page, page_size):
-    url = f"/api/v1/{path}/objects/"
+    url = f"/api/v1/{path}/"
     params = dict(page=page, page_size=page_size)
     if not page_size:
         del params["page_size"]

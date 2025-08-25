@@ -282,9 +282,11 @@ class CveView(viewsets.ViewSet):
     def versions(self, request, *args, cve_id=None, **kwargs):
         return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cve_versions(cve_id)
 
+
 @extend_schema_view(
     list_objects=extend_schema(
-        responses={200: serializers.StixObjectsSerializer(many=True)}, filters=True,
+        responses={200: serializers.StixObjectsSerializer(many=True)},
+        filters=True,
         summary="Get KEV Objects for CVEs",
         description=textwrap.dedent(
             """
@@ -297,7 +299,7 @@ class CveView(viewsets.ViewSet):
         ),
     ),
     retrieve_objects=extend_schema(
-        summary='Get a KEV Report by CVE ID',
+        summary="Get a KEV Report by CVE ID",
         description=textwrap.dedent(
             """
             Use this endpoint to get a KEV `report` object using the CVE ID.
@@ -305,10 +307,27 @@ class CveView(viewsets.ViewSet):
             If there is no KEV reported for the CVE, the response will be empty.
             """
         ),
-        responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'report')},
+        responses={
+            200: VulmatchDBHelper.get_paginated_response_schema("objects", "report")
+        },
         parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
-)  
+    list_exploits=extend_schema(
+        summary="List all Exploit Objects linked to KEVs",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to search through all captured Exploits.
+
+            This endpoint is useful to browse all Exploits (rather then retrieve them on a per KEV basis).
+            """
+        ),
+        parameters=[
+            OpenApiParameter(
+                "sort", enum=KEV_SORT_FIELDS, description="Sort results by"
+            ),
+        ],
+    ),
+)
 class KevView(viewsets.ViewSet):
 
     openapi_tags = ["KEV"]
@@ -342,6 +361,11 @@ class KevView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         return VulmatchDBHelper('nvd_cve_vertex_collection', request).retrieve_kev_or_epss_object(cve_id, self.label)
+    
+    @decorators.action(methods=['GET'], url_path="exploits", detail=False)
+    def list_exploits(self, request, *args, **kwargs):
+        return VulmatchDBHelper('', request).list_exploits()
+
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -374,6 +398,7 @@ class KevView(viewsets.ViewSet):
 class EPSSView(KevView):
     openapi_tags = ["EPSS"]
     label = "epss"
+    list_exploits = None
 
 
 @extend_schema_view(
