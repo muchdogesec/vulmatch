@@ -1,9 +1,11 @@
 from datetime import datetime
+import time
 import typing
 import arango
 from django.conf import settings
 from arango.client import ArangoClient
 from arango.database import StandardDatabase
+from arango.job import AsyncJob
 import arango.exceptions
 
 if typing.TYPE_CHECKING:
@@ -177,10 +179,7 @@ def create_bundle_view(db: StandardDatabase):
                 "fields": {
                     "type": {},
                     "_id": {},
-                    "_from": {},
-                    "_to": {},
-                    "_is_ref": {},
-                    "relationship_type": {},
+                    "id": {},
                 },
                 "includeAllFields": False,
                 "storeValues": "none",
@@ -190,6 +189,7 @@ def create_bundle_view(db: StandardDatabase):
             "nvd_cve_edge_collection": {
                 "analyzers": ["identity"],
                 "fields": {
+                    "id": {},
                     "type": {},
                     "_id": {},
                     "_from": {},
@@ -208,15 +208,21 @@ def create_bundle_view(db: StandardDatabase):
         "writebufferIdle": 64,
     }
     print(f"create {settings.VIEW_NAME}")
-    db = db.begin_async_execution()
+    adb = db.begin_async_execution()
     try:
-        db.create_view(
+        job: AsyncJob = adb.create_view(
             name=settings.VIEW_NAME, view_type="arangosearch", properties=view
         )
+        time.sleep(1)
+        if job.status() == 'done':
+            job.result()
     except arango.exceptions.ViewCreateError:
         print(f"updating {settings.VIEW_NAME}")
-        db.update_view(settings.VIEW_NAME, properties=view)
-    print(f"created {settings.VIEW_NAME}")
+        job = adb.update_view(settings.VIEW_NAME, properties=view)
+        time.sleep(1)
+        if job.status() == 'done':
+            job.result()
+    print(f"creating {settings.VIEW_NAME} in background")
 
 
 def create_collections():

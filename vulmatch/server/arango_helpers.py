@@ -562,6 +562,40 @@ RETURN KEEP(d, KEYS(d, TRUE))
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
 
+    def get_cpe_bundle(self, cve_id: str):
+        primary_objects = self.get_cve_or_cpe_object(cve_id, mode='cpe')
+        filters = []
+        if not self.query_as_bool('include_cves_not_vulnerable', True):
+            filters.append('FILTER doc.relationship_type != "relies-on"')
+
+        indicator_ids = self.execute_query(
+            """
+            FOR doc IN nvd_cve_edge_collection
+            FILTER doc._to IN @matched_ids
+            #filters
+            FOR d IN [doc.source_ref, doc.target_ref, doc.id]
+            RETURN d
+            """.replace('#filters', '\n'.join(filters)), bind_vars={'matched_ids': [p['_id'] for p in primary_objects]}, paginate=False
+        )
+        types = {'vulnerability'}
+        for indicator_id in indicator_ids[:]:
+            type_part, _, uuid_part = indicator_id.partition('--')
+            if type_part== 'indicator':
+                indicator_ids.append('vulnerability--'+uuid_part)
+            types.add(type_part)
+        if t := self.query_as_array('types'):
+            types.intersection_update(t)
+        indicator_ids.extend([p['id'] for p in primary_objects])
+        return self.execute_query(
+            """
+            FOR doc IN @@view
+            SEARCH doc.id IN @matched_ids AND doc.type IN @types
+            FILTER doc._is_latest == TRUE
+            LIMIT @offset, @count
+            RETURN KEEP(doc, KEYS(doc, true))
+            """, bind_vars={'matched_ids': sorted(indicator_ids), "@view": settings.VIEW_NAME, 'types': list(types)}
+        )
+        
     def get_cxe_object(
         self,
         cve_id,
@@ -592,9 +626,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
             "@filters", "\n".join(filters)
         )
 
-        if var == "cpe" and relationship_mode:
-            return self.get_cpe_relationships(query, bind_vars)
-        elif relationship_mode:
+        if relationship_mode:
             return self.get_relationships(query, bind_vars)
 
         return self.execute_query(query, bind_vars=bind_vars)
@@ -724,40 +756,4 @@ RETURN KEEP(d, KEYS(d, TRUE))
                 docs_query.replace("LIMIT @offset, @count", ""),
             ),
         )
-        return self.execute_query(new_query, bind_vars=binds, result_key="relationships")
-
-    def get_cpe_relationships(self, docs_query, binds):
-        regex = r"KEEP\((\w+),\s*\w+\(.*?\)\)"
-        binds["@view"] = settings.VIEW_NAME
-        if reftypes := self.query_as_array("relationship_type"):
-            binds["relationship_types"] = []
-            for t in reftypes:
-                if qt := CPE_RELATIONSHIP_TYPES.get(t):
-                    binds["relationship_types"].append(qt)
-        else:
-            binds["relationship_types"] = tuple(CPE_RELATIONSHIP_TYPES.values())
-        new_query = """
-        LET matched_ids = (@docs_query)[*]._id
-        FOR d3 IN FLATTEN(
-            FOR d2 IN @@view
-            SEARCH d2.type == 'relationship' AND d2.relationship_type IN @relationship_types AND (d2._from IN matched_ids OR d2._to IN matched_ids)
-            RETURN [DOCUMENT(d2._from), d2, DOCUMENT(d2._to)]
-        )
-
-        COLLECT rel = d3
-        @sort_stmt
-
-        LIMIT @offset, @count
-        RETURN KEEP(rel, KEYS(rel, TRUE))
-        """.replace(
-            "@docs_query",
-            re.sub(
-                regex,
-                lambda x: x.group(1),
-                docs_query.replace("LIMIT @offset, @count", "LIMIT 1"),
-            ),
-        ).replace(
-            "@sort_stmt", self.get_sort_stmt(CPE_REL_SORT_FIELDS, doc_name="rel")
-        )
-
         return self.execute_query(new_query, bind_vars=binds, result_key="relationships")
