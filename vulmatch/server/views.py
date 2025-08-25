@@ -313,10 +313,12 @@ class CveView(viewsets.ViewSet):
         parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
     list_exploits=extend_schema(
-        summary="List `exploit` objects",
+        summary="List all Exploit Objects linked to KEVs",
         description=textwrap.dedent(
             """
-            Use this endpoint to get lookup exploits
+            Use this endpoint to search through all captured Exploits.
+
+            This endpoint is useful to browse all Exploits (rather then retrieve them on a per KEV basis).
             """
         ),
         parameters=[
