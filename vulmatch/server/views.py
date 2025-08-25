@@ -396,6 +396,7 @@ class KevView(viewsets.ViewSet):
 class EPSSView(KevView):
     openapi_tags = ["EPSS"]
     label = "epss"
+    list_exploits = None
 
 
 @extend_schema_view(
