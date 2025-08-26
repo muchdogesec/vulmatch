@@ -45,9 +45,10 @@ class Products(models.Model):
 
 class ProductRevision(models.Model):
     revision = models.CharField(max_length=24, null=True)
+    updated  = models.DateTimeField(auto_now_add=True, null=True)
     @classmethod
     def get_revision(cls):
-        return cls.objects.get_or_create(id=0, defaults=dict(revision=None))[0].revision
+        return cls.objects.get_or_create(id=0, defaults=dict(revision=None))[0]
     
     @classmethod
     def set_revision(cls, revision):
