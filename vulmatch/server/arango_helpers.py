@@ -236,13 +236,10 @@ class VulmatchDBHelper(DCHelper):
         query,
         bind_vars={},
         paginate=True,
-        relationship_mode=False,
         result_key=None,
         aql_options=None,
     ):
         aql_options = aql_options or {}
-        if relationship_mode:
-            return self.get_relationships(query, bind_vars)
         if paginate:
             bind_vars["offset"], bind_vars["count"] = self.get_offset_and_count(
                 self.count, self.page
@@ -644,7 +641,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
         if t := self.query_as_array('types'):
             types.intersection_update(t)
         indicator_ids.extend(itertools.chain(*groupings.values()))
-        print(indicator_ids, types)
         return self.execute_query(
             """
             FOR doc IN @@view
@@ -661,7 +657,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
         type="vulnerability",
         var="name",
         version_param="cve_version",
-        relationship_mode=False,
     ):
         bind_vars = {
             "@collection": self.collection,
@@ -684,10 +679,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
             """.replace(
             "@filters", "\n".join(filters)
         )
-        print(query)
-
-        if relationship_mode:
-            return self.get_relationships(query, bind_vars)
 
         return self.execute_query(query, bind_vars=bind_vars)
 
@@ -797,22 +788,3 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
         # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""")
         return self.execute_query(query, bind_vars=bind_vars)
-
-    def get_relationships(self, docs_query, binds):
-        regex = r"KEEP\((\w+),\s*\w+\(.*?\)\)"
-        binds["@view"] = settings.VIEW_NAME
-        new_query = """
-        LET matched_ids = (@docs_query)[*]._id
-        FOR d IN @@view
-        SEARCH d.type == 'relationship' AND (d._from IN matched_ids OR d._to IN matched_ids)
-        LIMIT @offset, @count
-        RETURN KEEP(d, KEYS(d, TRUE))
-        """.replace(
-            "@docs_query",
-            re.sub(
-                regex,
-                lambda x: x.group(1),
-                docs_query.replace("LIMIT @offset, @count", ""),
-            ),
-        )
-        return self.execute_query(new_query, bind_vars=binds, result_key="relationships")

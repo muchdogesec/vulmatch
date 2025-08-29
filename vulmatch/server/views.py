@@ -91,16 +91,6 @@ class VulnerabilityStatus(models.models.TextChoices):
         responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
         parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
-    retrieve_object_relationships=extend_schema(
-        summary='Get Relationships for Vulnerability by CVE ID',
-        description=textwrap.dedent(
-            """
-            This endpoint will return all SROs where the Vulnerability selected is either a `source_ref` or a `target_ref`. This allows you to quickly find out what objects the CVE is related to.
-            """
-        ),
-        responses={200: VulmatchDBHelper.get_paginated_response_schema('relationships', 'relationship')},
-        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
-    ),
     bundle=extend_schema(
         summary='Get all objects for a Vulnerability by CVE ID',
         description=textwrap.dedent(
@@ -268,15 +258,6 @@ class CveView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id)
-    
-    @extend_schema(
-            parameters=[
-                OpenApiParameter("cve_version", type=OpenApiTypes.DATETIME, description="Return only objects where `modified` value matches query. In format `YYYY-MM-DDThh:mm:ss.sssZ`")
-            ]
-    )
-    @decorators.action(methods=['GET'], url_path="objects/<str:cve_id>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper('nvd_cve_vertex_collection', request).get_cxe_object(cve_id, relationship_mode=True)
     
     @decorators.action(detail=False, url_path="objects/<str:cve_id>/versions", methods=["GET"], pagination_class=Pagination('versions'))
     def versions(self, request, *args, cve_id=None, **kwargs):
