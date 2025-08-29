@@ -360,7 +360,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         if pattern_group or vulnerable_group:
             query = """
                 FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
-                FILTER (d.relationship_type == 'vulnerable-match-string' AND d._to IN @vulnerable_group) OR (d.relationship_type == 'pattern-match-string' AND d._to IN @pattern_group)
+                FILTER (d.relationship_type == 'x-cpes-vulnerable' AND d._to IN @vulnerable_group) OR (d.relationship_type == 'x-cpes-not-vulnerable' AND d._to IN @pattern_group)
                 RETURN SUBSTITUTE(d.source_ref, "indicator", "vulnerability", 1)
                 """
             cpe_matches = self.execute_query(query, dict(vulnerable_group=list(vulnerable_group), pattern_group=list(pattern_group)), aql_options=dict(cache=True), paginate=False)
