@@ -659,7 +659,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
     def get_cve_versions(self, cve_id: str):
         query = """
         FOR doc IN @@collection
-        FILTER doc.name == @cve_id
+        FILTER doc.name == @cve_id AND doc.type == 'vulnerability'
         SORT doc.modified DESC
         RETURN DISTINCT doc.modified
         """
