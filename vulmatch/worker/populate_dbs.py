@@ -120,6 +120,29 @@ def create_indexes(db: StandardDatabase):
         )
     )
     vertex_collection.add_index(
+        {
+            "type": "inverted",
+            "name": "vulmatch_cpe_grouping",
+            "inBackground": True,
+            "analyzer": "identity",
+            "fields": [
+                {"name": "type"},
+                {
+                    "name": "name",
+                    "analyzer": "norm_en",
+                    "features": [],
+                },
+                {"name": "id"},
+                {"name": "object_refs[*]"},
+            ],
+            "primarySort": {
+                "fields": [],
+                "compression": "lz4",
+            },
+            "storedValues": [{"fields": ["_id"], "compression": "lz4"}],
+        }
+    )
+    vertex_collection.add_index(
         dict(
             type="inverted",
             name="cve_search_inv",
@@ -214,13 +237,13 @@ def create_bundle_view(db: StandardDatabase):
             name=settings.VIEW_NAME, view_type="arangosearch", properties=view
         )
         time.sleep(1)
-        if job.status() == 'done':
+        if job.status() == "done":
             job.result()
     except arango.exceptions.ViewCreateError:
         print(f"updating {settings.VIEW_NAME}")
         job = adb.update_view(settings.VIEW_NAME, properties=view)
         time.sleep(1)
-        if job.status() == 'done':
+        if job.status() == "done":
             job.result()
     print(f"creating {settings.VIEW_NAME} in background")
 
