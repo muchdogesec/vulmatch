@@ -571,7 +571,7 @@ RETURN KEEP(doc, KEYS(doc, true))
     def get_cve_bundle(self, cve_id: str):
         primary_objects = self.get_cve_or_cpe_object(cve_id)
         cve_id = cve_id.upper()
-        cve_rels_types = ["detects"]
+        cve_rels_types = ["x-cpe-match"]
         binds = dict(
             cve_edge_types=cve_rels_types, default_imports_and_groupings=CVE_BUNDLE_DEFAULT_OBJECTS.copy()
         )
