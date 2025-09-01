@@ -171,8 +171,10 @@ def create_indexes(db: StandardDatabase):
                 "external_references[*].external_id",
                 "relationship_type",
                 "_arango_cve_processor_note",
+                "_to",
+                "_from"
+
             ],
-            storedValues=["_from", "_to"],
             inBackground=True,
         )
     )

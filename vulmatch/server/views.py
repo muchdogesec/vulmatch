@@ -160,12 +160,12 @@ class CveView(viewsets.ViewSet):
             Optionally filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
             """
         ))
-        cpes_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
+        x_cpes_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
             """
             Filter Vulnerabilities that are vulnerable to a full CPE Match String (e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.)
             """
         ))
-        cpes_in_pattern = BaseCSVFilter(help_text=textwrap.dedent(
+        x_cpes_not_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
             """
             Filter Vulnerabilities that contain a full CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). (e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.)
             """

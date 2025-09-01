@@ -186,6 +186,7 @@ def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
 
 
 class VulmatchDBHelper(DCHelper):
+    NULL_LIST = ["NULL_LIST"]
     @classmethod
     def like_string(cls, string: str):
         return "%" + cls.get_like_literal(string) + "%"
@@ -355,16 +356,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         prefetched_matches = []
 
         ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
-        pattern_group = self.cpes_to_grouping(self.query_as_array("cpes_in_pattern"))
-        vulnerable_group = self.cpes_to_grouping(self.query_as_array("cpes_vulnerable"))
-        if pattern_group or vulnerable_group:
-            query = """
-                FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
-                FILTER (d.relationship_type == 'x-cpes-vulnerable' AND d._to IN @vulnerable_group) OR (d.relationship_type == 'x-cpes-not-vulnerable' AND d._to IN @pattern_group)
-                RETURN SUBSTITUTE(d.source_ref, "indicator", "vulnerability", 1)
-                """
-            cpe_matches = self.execute_query(query, dict(vulnerable_group=list(vulnerable_group), pattern_group=list(pattern_group)), aql_options=dict(cache=True), paginate=False)
-            prefetched_matches.append(set(cpe_matches))
+        pattern_cpes = self.query_as_array("x_cpes_not_vulnerable")
+        vuln_cpes = self.query_as_array("x_cpes_vulnerable")
+        if vuln_cpes or pattern_cpes:
+            prefetched_matches.append(self.cpes_to_vulnerability(pattern_cpes, vuln_cpes))
 
         ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
 
@@ -389,10 +384,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         attack_ids = self.query_as_array("attack_id")
         capec_ids = self.query_as_array("capec_id")
         if attack_ids or capec_ids:
-            prefetched_matches.append(self.capec_attack_matches(capec_ids=capec_ids, attack_ids=attack_ids))
+            prefetched_matches.append(self.capec_attack_to_vulnerability(capec_ids=capec_ids, attack_ids=attack_ids))
 
         if prefetched_matches:
-            binds['id_matches'] = list(set.intersection(*prefetched_matches))
+            binds['id_matches'] = list(set.intersection(*prefetched_matches)) or self.NULL_LIST
             filters.append('FILTER doc.id IN @id_matches')
 
         ### epss  matches should happen later
@@ -449,8 +444,30 @@ RETURN KEEP(doc, KEYS(doc, true))
         )
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds, aql_options=dict(optimizer_rules=['-use-index-for-sort']))
+
+    def cpes_to_vulnerability(self, not_vulnerable_cpes, vulnerable_cpes):
+        pattern_group = self.cpes_to_grouping(not_vulnerable_cpes)
+        vulnerable_group = self.cpes_to_grouping(vulnerable_cpes)
+        query = """
+                FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
+                FILTER (d.relationship_type == 'x-cpes-vulnerable' AND d._to IN @vulnerable_group) OR (d.relationship_type == 'x-cpes-not-vulnerable' AND d._to IN @pattern_group)
+                RETURN [d.relationship_type, d.source_ref]
+                """
+        vuln_matches = set()
+        pattern_matches = set()
+        binds2 = dict(vulnerable_group=list(vulnerable_group) or self.NULL_LIST, pattern_group=list(pattern_group) or self.NULL_LIST)
+        for rtype, target in self.execute_query(query, binds2, aql_options=dict(cache=True), paginate=False):
+            target = target.replace('indicator', 'vulnerability')
+            if rtype ==  'x-cpes-vulnerable':
+                vuln_matches.add(target)
+            if rtype == 'x-cpes-not-vulnerable':
+                pattern_matches.add(target)
+        cpe_matches = vuln_matches or pattern_matches
+        if vulnerable_cpes and not_vulnerable_cpes:
+            cpe_matches = vuln_matches.intersection(pattern_matches)
+        return cpe_matches
     
-    def capec_attack_matches(self, capec_ids, attack_ids):
+    def capec_attack_to_vulnerability(self, capec_ids, attack_ids):
         query = """
         FOR d IN nvd_cve_edge_collection
             OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
@@ -517,7 +534,6 @@ RETURN KEEP(doc, KEYS(doc, true))
         """
         software_ids = self.execute_query(software_query, bind_vars=dict(grouping_ids=list(grouping_ids)), aql_options=dict(cache=True), paginate=False)
         return tuple(set(itertools.chain(*software_ids)))
-
 
     def get_cve_or_cpe_object(self, cve_id, mode='cve'):
         bind_vars = {"@collection": self.collection, "obj_name": cve_id,}
@@ -772,8 +788,8 @@ RETURN KEEP(d, KEYS(d, TRUE))
         if in_cve_pattern or cve_vulnerable:
             filters.append('FILTER doc.id IN @cve_matches')
             # because this filter fails with `arango.exceptions.AQLQueryExecuteError: [HTTP 500][ERR 1577] could not use index hint to serve query; {"indexHint":{"forced":true,"lookahead":1,"type":"simple","hint":["cpe_search_inv"]}}` 
-            # if there are no matches, we'll use ["aaaa"] instead to simulate emptiness
-            bind_vars['cve_matches'] = self.cves_to_softwares(cve_vulnerable, in_cve_pattern) or ["aaaa"]
+            # if there are no matches, we'll use NULL_LIST instead to simulate emptiness
+            bind_vars['cve_matches'] = self.cves_to_softwares(cve_vulnerable, in_cve_pattern) or self.NULL_LIST
 
         ######################## in_cve_pattern and cve_vulnerable filters ##############################
 
