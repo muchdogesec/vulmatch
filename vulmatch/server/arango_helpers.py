@@ -451,9 +451,8 @@ RETURN KEEP(doc, KEYS(doc, true))
         return self.execute_query(query, bind_vars=binds, aql_options=dict(optimizer_rules=['-use-index-for-sort']))
     
     def capec_attack_matches(self, capec_ids, attack_ids):
-        t  = time.time()
         query = """
-        FOR d IN nvd_cve_edge_collection 
+        FOR d IN nvd_cve_edge_collection
             OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
         FILTER d.relationship_type == 'exploited-using'
             AND d._arango_cve_processor_note in ["cve-attack", "cve-capec"]
@@ -470,7 +469,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             if ext_id in attack_ids:
                 attack_matches.add(stix_id)
         if attack_ids and capec_ids:
-            return capec_matches.intersection(attack_ids)
+            return capec_matches.intersection(attack_matches)
         elif attack_ids:
             return attack_matches
         else:
@@ -492,6 +491,70 @@ RETURN KEEP(doc, KEYS(doc, true))
         """
         grouping = dict(self.execute_query(query, bind_vars=dict(cpes=list(cpes)), aql_options=dict(cache=True), paginate=False))
         return grouping
+    
+    def cves_to_grouping_old(self, vulnerable_cve_ids, not_vulnerable_cve_ids):
+        cve_ids = set(vulnerable_cve_ids).union(not_vulnerable_cve_ids)
+        if not cve_ids:
+            return {}
+        if vulnerable_cve_ids:
+            query = 'FILTER '
+        query = """
+        FOR d IN nvd_cve_vertex_collection 
+            OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} 
+        FILTER d.relationship_type IN ['x-cpes-not-vulnerable', 'x-cpes-vulnerable']
+            AND d.external_references[*].external_id IN @cve_ids
+        RETURN [d.external_references[0].external_id, d.relationship_type, d.target_ref]
+        """
+        result = self.execute_query(query, bind_vars=dict(cve_ids=list(cve_ids)), aql_options=dict(cache=True), paginate=False)
+        vulnerable_groupings = set()
+        not_vulnerable_groupings = set()
+        for cve_id, rtype, grouping in result:
+            if rtype == 'x-cpes-vulnerable' and cve_id in vulnerable_cve_ids:
+                vulnerable_groupings.add(grouping)
+            elif rtype == 'x-cpes-not-vulnerable' and cve_id in not_vulnerable_cve_ids:
+                not_vulnerable_groupings.add(grouping)
+        matched_groupings = []
+        if vulnerable_cve_ids and not_vulnerable_cve_ids:
+            matched_groupings = vulnerable_groupings.intersection(not_vulnerable_groupings)
+        elif vulnerable_cve_ids:
+            matched_groupings = vulnerable_groupings
+        else:
+            matched_groupings = not_vulnerable_groupings
+
+        software_query = """
+        FOR d IN nvd_cve_vertex_collection
+        FILTER d.relationship_type IN ['x-cpes-not-vulnerable', 'x-cpes-vulnerable']
+            AND d.external_references[*].external_id IN @cve_ids
+        RETURN [d.external_references[0].external_id, d.relationship_type, d.target_ref]
+        """
+        return grouping
+    
+    def cves_to_softwares(self, vulnerable_cve_ids, not_vulnerable_cve_ids):
+        grouping_query = """
+        FOR doc IN nvd_cve_vertex_collection
+        FILTER doc.type == 'indicator' AND doc._is_latest == TRUE AND doc.name IN @cpe_names
+        RETURN [doc.name, doc.x_cpes.vulnerable[*].matchCriteriaId, doc.x_cpes.not_vulnerable[*].matchCriteriaId]
+        """
+        cve_xcpes = self.execute_query(grouping_query, bind_vars=dict(cpe_names=list(vulnerable_cve_ids+not_vulnerable_cve_ids)), aql_options=dict(cache=True), paginate=False)
+        vulnerable_groupings = []
+        not_vulnerable_groupings = []
+        for cve_id, vulerable_criteria_ids, not_vulerable_criteria_ids in cve_xcpes:
+            if cve_id in vulnerable_cve_ids:
+                vulnerable_groupings.extend(map(generate_grouping_id, vulerable_criteria_ids))
+            if cve_id in not_vulnerable_cve_ids:
+                not_vulnerable_groupings.extend(map(generate_grouping_id, not_vulerable_criteria_ids))
+        if vulnerable_cve_ids and not_vulnerable_cve_ids:
+            grouping_ids = set(vulnerable_groupings).union(not_vulnerable_groupings)
+        else:
+            grouping_ids = vulnerable_groupings or not_vulnerable_groupings
+        software_query = """
+        FOR doc IN nvd_cve_vertex_collection
+        FILTER doc.id IN @grouping_ids
+        RETURN doc.object_refs
+        """
+        software_ids = self.execute_query(software_query, bind_vars=dict(grouping_ids=list(grouping_ids)), aql_options=dict(cache=True), paginate=False)
+        return tuple(set(itertools.chain(*software_ids)))
+
 
     def get_cve_or_cpe_object(self, cve_id, mode='cve'):
         bind_vars = {"@collection": self.collection, "obj_name": cve_id,}
@@ -740,33 +803,13 @@ RETURN KEEP(d, KEYS(d, TRUE))
             bind_vars["struct_match"] = struct_match
 
         ######################## in_cve_pattern and cve_vulnerable filters ##############################
-        union = None
-        if in_cve_pattern := self.query_as_array("in_cve_pattern"):
-            bind_vars["in_cve_pattern"] = in_cve_pattern
-            filters.append(
-                """LET in_cve_pattern = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'relies-on' AND d.external_references[*].external_id IN @in_cve_pattern RETURN d.target_ref)"""
-            )
-        if cve_vulnerable := self.query_as_array("cve_vulnerable"):
-            bind_vars["cve_vulnerable"] = cve_vulnerable
-            filters.append(
-                """LET cve_vulnerable = (FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} FILTER d.relationship_type == 'exploits' AND d.external_references[*].external_id IN @cve_vulnerable RETURN d.target_ref)"""
-            )
-
-        if in_cve_pattern and cve_vulnerable:
-            union = "INTERSECTION(in_cve_pattern, cve_vulnerable)"
-        elif in_cve_pattern:
-            union = "in_cve_pattern"
-        elif cve_vulnerable:
-            union = "cve_vulnerable"
-
-        if union:
-            filters.append(
-                """
-            FILTER doc.id IN #{union}
-            """.replace(
-                    "#{union}", union
-                )
-            )
+        in_cve_pattern = self.query_as_array("in_cve_not_vulnerable")
+        cve_vulnerable = self.query_as_array("in_cve_vulnerable")
+        if in_cve_pattern or cve_vulnerable:
+            filters.append('FILTER doc.id IN @cve_matches')
+            # because this filter fails with `arango.exceptions.AQLQueryExecuteError: [HTTP 500][ERR 1577] could not use index hint to serve query; {"indexHint":{"forced":true,"lookahead":1,"type":"simple","hint":["cpe_search_inv"]}}` 
+            # if there are no matches, we'll use ["aaaa"] instead to simulate emptiness
+            bind_vars['cve_matches'] = self.cves_to_softwares(cve_vulnerable, in_cve_pattern) or ["aaaa"]
 
         ######################## in_cve_pattern and cve_vulnerable filters ##############################
 

@@ -495,12 +495,12 @@ class CpeView(viewsets.ViewSet):
             Filters CPEs returned by product type (this is the 2nd value in the CPE URI).
             """
         ))
-        cve_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
+        in_cve_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
             """
             Filters CPEs returned to those vulnerable to CVE ID specified. e.g. `CVE-2023-22518`.
             """
         ))
-        in_cve_pattern = BaseCSVFilter(help_text=textwrap.dedent(
+        in_cve_not_vulnerable = BaseCSVFilter(help_text=textwrap.dedent(
             """
             Filters CPEs returned to those referenced CVE ID specified (if you want to only filter by vulnerable CPEs, use the `cve_vulnerable` parameter. e.g. `CVE-2023-22518`.
             """
