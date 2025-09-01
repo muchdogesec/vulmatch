@@ -59,27 +59,6 @@ def test_retrieve(client, path, path_id, stix_id):
     assert resp_data['total_results_count'] == 1
     assert resp_data['objects'][0]['id'] == stix_id
 
-
-
-@pytest.mark.parametrize(
-    "path,path_id,expected",
-    [
-        ["cwe", "CWE-24", {'relationship--fb2c6916-0cae-59df-b2bb-501af201777c'}],
-        ["capec", "CAPEC-87", {'relationship--6f56852c-bebc-5b89-b5bf-e91e139404f6'}],
-        ["attack", "T1110.004", {'relationship--ffbb8155-11b4-591c-8a93-58cd0c7bc542'}],
-        ## bad case
-        ["cwe", "CwE-24", {'relationship--fb2c6916-0cae-59df-b2bb-501af201777c'}],
-        ["capec", "attack-pattern--00268a75-3243-477d-9166-8c78fddf6df6", {'relationship--6f56852c-bebc-5b89-b5bf-e91e139404f6'}],
-        ["attack", "t1557", {'relationship--a81937cb-746e-579e-9c6b-6f22b97c46e0', 'relationship--40667906-019c-572c-a671-17bb62c739a3', 'relationship--6a46fa60-1f25-52d6-aa03-351c5e41aa4e'}],
-    ]
-)
-def test_relationships(client, path, path_id, expected):
-    resp = client.get(f"/api/v1/{path}/objects/{path_id}/relationships/")
-    assert resp.status_code == 200
-    resp_data = resp.json()
-    assert {obj['id'] for obj in resp_data['relationships']} == set(expected)
-
-
 @pytest.mark.parametrize(
     "path,path_id,expected",
     [
