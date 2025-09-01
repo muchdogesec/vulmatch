@@ -507,7 +507,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             if cve_id in not_vulnerable_cve_ids:
                 not_vulnerable_groupings.extend(map(generate_grouping_id, not_vulerable_criteria_ids))
         if vulnerable_cve_ids and not_vulnerable_cve_ids:
-            grouping_ids = set(vulnerable_groupings).union(not_vulnerable_groupings)
+            grouping_ids = set(vulnerable_groupings).intersection(not_vulnerable_groupings)
         else:
             grouping_ids = vulnerable_groupings or not_vulnerable_groupings
         software_query = """
