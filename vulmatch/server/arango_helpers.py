@@ -551,10 +551,13 @@ RETURN KEEP(doc, KEYS(doc, true))
             raise NotFound(msg)
         return cves
     
-    def get_groupings_for_indicator(self, indicator):
+    def get_groupings_for_indicator(self, indicator, include_x_cpes_vulnerable, include_x_cpes_not_vulnerable):
         grouping_ids = set()
-        for entry in itertools.chain(*indicator['x_cpes'].values()):
-            grouping_ids.add(generate_grouping_id(entry['matchCriteriaId']))
+        generate_id = lambda c:generate_grouping_id(c['matchCriteriaId'])
+        if include_x_cpes_not_vulnerable:
+            grouping_ids.update(map(generate_id,  indicator['x_cpes']['not_vulnerable']))
+        if include_x_cpes_vulnerable:
+            grouping_ids.update(map(generate_id,  indicator['x_cpes']['vulnerable']))
         all_ids = self.execute_query(
         """
         FOR doc IN nvd_cve_vertex_collection
@@ -570,11 +573,15 @@ RETURN KEEP(doc, KEYS(doc, true))
         cve_id = cve_id.upper()
         cve_rels_types = ["detects"]
         binds = dict(
-            cve_edge_types=cve_rels_types, default_imports_and_groupings=CVE_BUNDLE_DEFAULT_OBJECTS
+            cve_edge_types=cve_rels_types, default_imports_and_groupings=CVE_BUNDLE_DEFAULT_OBJECTS.copy()
         )
         indicators = [p for p in primary_objects if p['type'] == 'indicator']
+        if include_x_cpes_not_vulnerable := self.query_as_bool("include_x_cpes_not_vulnerable", True):
+            cve_rels_types.append("x-cpes-not-vulnerable")
+        if include_x_cpes_vulnerable := self.query_as_bool("include_x_cpes_vulnerable", True):
+            cve_rels_types.append("x-cpes-vulnerable")
         if indicators:
-            grouping_ids = self.get_groupings_for_indicator(indicators[0])
+            grouping_ids = self.get_groupings_for_indicator(indicators[0], include_x_cpes_vulnerable, include_x_cpes_not_vulnerable)
             binds['default_imports_and_groupings'].extend(grouping_ids)
 
         include_attack = self.query_as_bool("include_attack", True)
@@ -583,14 +590,8 @@ RETURN KEEP(doc, KEYS(doc, true))
 
         if include_capec:
             cve_rels_types.append("cve-capec")
-
         if include_attack:
             cve_rels_types.append("cve-attack")
-
-        if self.query_as_bool("include_cpe", True):
-            cve_rels_types.append("relies-on")
-        if self.query_as_bool("include_cpe_vulnerable", True):
-            cve_rels_types.append("exploits")
 
         if include_cwe:
             cve_rels_types.append("cve-cwe")

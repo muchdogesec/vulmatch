@@ -103,8 +103,8 @@ class VulnerabilityStatus(models.models.TextChoices):
         responses={200: VulmatchDBHelper.get_paginated_response_schema('objects', 'vulnerability')},
         parameters=VulmatchDBHelper.get_schema_operation_parameters() + [
             OpenApiParameter('object_type', description="The type of STIX object to be returned", enum=CVE_BUNDLE_TYPES, many=True, explode=False),
-            OpenApiParameter('include_cpe', description="will show all `software` objects related to this vulnerability (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
-            OpenApiParameter('include_cpe_vulnerable', description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_x_cpes_not_vulnerable', description="will show all `software` objects related to this vulnerability (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
+            OpenApiParameter('include_x_cpes_vulnerable', description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_cwe', description="will show `weakness` objects related to this vulnerability, if exists (and the SROS linking cve-cwe)", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_epss', description="will show `report` objects related to this vulnerability (with `label` = `epss`), if exist", type=OpenApiTypes.BOOL),
             OpenApiParameter('include_kev', description="will show `report` objects related to this vulnerability (with `label` = `kev`), if exist (and the SROS linking cve-sighting)", type=OpenApiTypes.BOOL),
