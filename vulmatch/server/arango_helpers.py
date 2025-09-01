@@ -492,43 +492,6 @@ RETURN KEEP(doc, KEYS(doc, true))
         grouping = dict(self.execute_query(query, bind_vars=dict(cpes=list(cpes)), aql_options=dict(cache=True), paginate=False))
         return grouping
     
-    def cves_to_grouping_old(self, vulnerable_cve_ids, not_vulnerable_cve_ids):
-        cve_ids = set(vulnerable_cve_ids).union(not_vulnerable_cve_ids)
-        if not cve_ids:
-            return {}
-        if vulnerable_cve_ids:
-            query = 'FILTER '
-        query = """
-        FOR d IN nvd_cve_vertex_collection 
-            OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true} 
-        FILTER d.relationship_type IN ['x-cpes-not-vulnerable', 'x-cpes-vulnerable']
-            AND d.external_references[*].external_id IN @cve_ids
-        RETURN [d.external_references[0].external_id, d.relationship_type, d.target_ref]
-        """
-        result = self.execute_query(query, bind_vars=dict(cve_ids=list(cve_ids)), aql_options=dict(cache=True), paginate=False)
-        vulnerable_groupings = set()
-        not_vulnerable_groupings = set()
-        for cve_id, rtype, grouping in result:
-            if rtype == 'x-cpes-vulnerable' and cve_id in vulnerable_cve_ids:
-                vulnerable_groupings.add(grouping)
-            elif rtype == 'x-cpes-not-vulnerable' and cve_id in not_vulnerable_cve_ids:
-                not_vulnerable_groupings.add(grouping)
-        matched_groupings = []
-        if vulnerable_cve_ids and not_vulnerable_cve_ids:
-            matched_groupings = vulnerable_groupings.intersection(not_vulnerable_groupings)
-        elif vulnerable_cve_ids:
-            matched_groupings = vulnerable_groupings
-        else:
-            matched_groupings = not_vulnerable_groupings
-
-        software_query = """
-        FOR d IN nvd_cve_vertex_collection
-        FILTER d.relationship_type IN ['x-cpes-not-vulnerable', 'x-cpes-vulnerable']
-            AND d.external_references[*].external_id IN @cve_ids
-        RETURN [d.external_references[0].external_id, d.relationship_type, d.target_ref]
-        """
-        return grouping
-    
     def cves_to_softwares(self, vulnerable_cve_ids, not_vulnerable_cve_ids):
         grouping_query = """
         FOR doc IN nvd_cve_vertex_collection
