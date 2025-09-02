@@ -433,7 +433,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             filters.append("FILTER doc.id in @stix_ids")
 
         created_min, created_max = self.query.get("created_min", ""), self.query.get(
-            "created_max", ""
+            "created_max", "2099"
         )
         if created_min or created_max:
             filters.append(
@@ -442,7 +442,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["created"] = created_min, created_max
 
         modified_min, modified_max = self.query.get("modified_min", ""), self.query.get(
-            "modified_max", ""
+            "modified_max", "2099"
         )
         if modified_min or modified_max:
             filters.append(
