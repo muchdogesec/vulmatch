@@ -93,10 +93,6 @@ class AttackView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
     def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
         return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', revokable=True)
-
-    @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, attack_id=None, **kwargs):
-        return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', relationship_mode=True, revokable=True)
     
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, attack_id=None, **kwargs):
@@ -170,9 +166,6 @@ class CweView(viewsets.ViewSet):
         cwe_id = BaseCSVFilter(help_text='Filter the results by the CWE ID of the object. e.g. `CWE-242` `CWE-250`.')
         description = CharFilter(help_text='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         name = CharFilter(help_text='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
-        # type = ChoiceFilter(choices=[(f,f) for f in CWE_TYPES], help_text='Filter the results by STIX Object type.')
-
-
     
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
@@ -181,11 +174,6 @@ class CweView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>", detail=False)
     def retrieve_objects(self, request, *args, cwe_id=None, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe')
-        
-
-    @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, cwe_id=None, **kwargs):
-        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', relationship_mode=True)
     
     @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, cwe_id=None, **kwargs):
@@ -269,11 +257,6 @@ class CapecView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>", detail=False)
     def retrieve_objects(self, request, *args, capec_id=None, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(capec_id, 'cve-capec')
-    
-
-    @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/relationships", detail=False)
-    def retrieve_object_relationships(self, request, *args, capec_id=None, **kwargs):
-        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(capec_id, 'cve-capec', relationship_mode=True)
 
     @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, capec_id=None, **kwargs):
