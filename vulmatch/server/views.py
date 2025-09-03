@@ -990,6 +990,7 @@ class CpeMatchView(viewsets.ViewSet):
             """
             )
         )
+        name = CharFilter(help_text="search match criteria by criteria pattern, e.g `google`, `microsoft`")
         sort = ChoiceFilter(
             choices=[
                 (v, v)

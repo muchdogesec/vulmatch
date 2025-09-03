@@ -343,6 +343,9 @@ RETURN KEEP(doc, KEYS(doc, true))
                 for criteria_id in criteria_ids
             ]
             filters.append("FILTER doc.id IN @criteria_ids")
+        if name := self.query.get('name'):
+            binds['name'] = self.like_string(name).lower()
+            filters.append('FILTER doc.name LIKE @name')
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
@@ -485,7 +488,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         if attack_ids or capec_ids:
             prefetched_matches.append(
                 self.capec_attack_to_vulnerability(
-                    capec_ids=capec_ids, attack_ids=attack_ids
+                    capec_ids=list(map(str.upper, capec_ids)), attack_ids=list(map(str.upper, attack_ids))
                 )
             )
 
@@ -845,6 +848,11 @@ RETURN KEEP(d, KEYS(d, TRUE))
             bind_vars={"matched_ids": list(groupings)},
             paginate=False,
         )
+        # if not self.query_as_bool('include_cves_vulnerable', True):
+        #     filters.append('FILTER doc.relationship_type != "x-cpe-vulnerable"')
+        # if not self.query_as_bool('include_cves_not_vulnerable', True):
+        #     filters.append('FILTER doc.relationship_type != "x-cpe-not-vulnerable"')
+
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
             type_part, _, uuid_part = indicator_id.partition("--")

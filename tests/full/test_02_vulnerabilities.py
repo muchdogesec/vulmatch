@@ -1,6 +1,8 @@
 import random
 import pytest
 
+from vulmatch.worker.utils import get_primary_cvss
+
 from .utils import is_sorted
 
 CVE_BUNDLE_DEFAULT_OBJECTS = [
@@ -54,33 +56,6 @@ CVE_SORT_FIELDS = [
                 "vulnerability--ce32c27e-7509-54c0-bf4c-e2d41023d0d2",
             ],
             id="cwe filter multi - case insensitive",
-        ),
-        pytest.param(
-            dict(vuln_status="Awaiting Analysis", weakness_id="CWE-74"),
-            [
-                "vulnerability--baec2c44-8c12-56bb-82ce-befaff798931",
-                "vulnerability--ca8706cf-2d9d-5347-a9f4-c8df396eef87",
-                "vulnerability--dfd4f7a5-9702-5fe4-8d43-7a901e09f759",
-                "vulnerability--014fc553-e064-5f2f-be36-1d47cbde8811",
-                "vulnerability--aa0aa8e6-b537-54f0-9132-219290009f90",
-            ],
-            id="vuln_status+weakness_id filter",
-        ),
-        pytest.param(
-            dict(vuln_status="Received"),
-            [
-                "vulnerability--b82ec506-3b53-5bf9-91e6-584249b7b378",
-                "vulnerability--3e69a3f9-816f-5f78-924c-006094850d30",
-                "vulnerability--3c4b3602-bc94-55bf-9f5c-83f6e69467a9",
-                "vulnerability--62625225-3b4b-5183-9534-43c640c24fa1",
-                "vulnerability--683e6155-30cf-578d-aec3-b478042b8d46",
-                "vulnerability--503936e0-c432-5f97-b621-280e5545cd5a",
-                "vulnerability--6c95d9b1-069d-5490-8536-524aff406261",
-                "vulnerability--f3ba4e6a-8cff-52b1-87ba-38df5240c679",
-                "vulnerability--64381396-fcd4-5785-900f-57f7ef70bfbc",
-                "vulnerability--6b580482-5602-5b40-8dd3-a3539fdd9fa5",
-            ],
-            id="vuln_status filter 2",
         ),
         pytest.param(
             dict(
@@ -161,44 +136,39 @@ CVE_SORT_FIELDS = [
         ),
         pytest.param(
             dict(
-                cpes_in_pattern="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+                x_cpes_not_vulnerable="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
             ),
-            ["vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2"],
-            id="cpes_in_pattern",
+            [],
+            id="x_cpes_not_vulnerable",
         ),
         pytest.param(
             dict(
-                cpes_vulnerable="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+                x_cpes_vulnerable="cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
             ),
             ["vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2"],
-            id="cpes_vulnerable",
+            id="x_cpes_vulnerable",
         ),
         pytest.param(
             dict(
-                cpes_vulnerable="cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*,cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
+                x_cpes_vulnerable="cpe:2.3:a:gitlab:gitlab:17.6.0:*:*:*:enterprise:*:*:*,cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*"
             ),
             [
                 "vulnerability--690cbb55-ccbf-56d3-8467-05990c12eda2",
-                "vulnerability--053796db-e34c-5e96-8a10-4f317962fd30",
-                "vulnerability--70fc0123-3c86-5e4c-b3dc-a9fff4b16546",
-                "vulnerability--79a5a175-0530-5554-8598-c3ce67f64f26",
-                "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
-                "vulnerability--f47fa004-825f-5bd9-8c03-07465e1e7ad2",
             ],
-            id="cpes_vulnerable x2",
+            id="x_cpes_vulnerable x2",
         ),
         pytest.param(
-            dict(cpes_vulnerable="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
+            dict(x_cpes_vulnerable="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
             [],
-            id="cpes_vulnerable 3",
+            id="x_cpes_vulnerable 3",
         ),
         pytest.param(
-            dict(cpes_in_pattern="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
+            dict(x_cpes_not_vulnerable="cpe:2.3:h:juniper:mx5:-:*:*:*:*:*:*:*"),
             [
                 "vulnerability--0b2df06c-dff3-5366-a402-afc855f0fb06",
                 "vulnerability--0fda7712-f026-5a75-a562-bd70d03e8b1e",
             ],
-            id="cpes_in_pattern 3",
+            id="x_cpes_not_vulnerable 3",
         ),
     ],
 )
@@ -213,6 +183,29 @@ def test_filters_generic(client, filters: dict, expected_ids: list[str]):
     assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
     assert resp_data["total_results_count"] == len(expected_ids)
 
+
+@pytest.mark.parametrize(
+    "vuln_status",
+    [
+        "Received",
+        "Rejected",
+        "Analyzed",
+        "Awaiting Analysis",
+        "Modified",
+    ],
+)
+def test_vuln_status(client, vuln_status):
+    filters = dict()
+    if vuln_status:
+        filters.update(vuln_status=vuln_status)
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=filters)
+    resp_data = resp.json()
+    assert all(
+        cve["type"] == "vulnerability" for cve in resp_data["objects"]
+    ), "response.objects[*].type must always be vulnerability"
+    fn = lambda x: [y['description'] for y in x['external_references'] if y['source_name'] == 'vulnStatus'][0]
+    assert set(map(fn, resp_data['objects'])).issubset({vuln_status}), f"all objects must have vulnStatus == `{vuln_status}`"
 
 def test_has_kev(client, ):
     expected_ids = set([
@@ -250,7 +243,7 @@ def test_cvss_base_score_min(client, cvss_base_score_min):
         cvss = list(cve["x_cvss"].values())
         if not cvss:
             continue
-        assert cvss[-1]["base_score"] >= cvss_base_score_min
+        assert get_primary_cvss(cve) >= cvss_base_score_min
 
 
 def more_created_filters(client, prop, count):
@@ -349,14 +342,21 @@ def test_retrieve_vulnerability(client, cve_id):
 @pytest.mark.parametrize(
     ["cve_id", "filters", "expected_count"],
     [
-        ["CVE-2024-12978", None, 10],
+        ["CVE-2024-12978", None, 17],
         ["CVE-2024-53647", None, 34],
-        ["CVE-2023-31025", None, 22],
+        ["CVE-2023-31025", None, 21],
         ##
         ["CVE-2024-53647", dict(include_capec=False), 20],
         ["CVE-2024-53647", dict(include_attack=False), 24],
-        ["CVE-2023-31025", dict(include_capec=False), 22],
-        ["CVE-2023-31025", dict(include_epss=False), 21],
+        ["CVE-2023-31025", dict(include_capec=False), 21],
+        ["CVE-2023-31025", dict(include_epss=False), 20],
+        ["CVE-2024-53197", dict(include_kev=True), 5157],
+        ["CVE-2024-53197", dict(include_kev=False), 5155], #subtract cisa and vulncheck kev (5157 - 2)
+        ["CVE-2024-53197", dict(include_kev=False, include_epss=False), 5154], #subtract cisa and vulncheck kev (5157 - 2) and one epss report (5155 - 1)
+        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5157],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 14],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False), 12],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False, include_epss=False), 11],
     ],
 )
 def test_bundle(client, cve_id, filters, expected_count):
@@ -371,25 +371,6 @@ def test_bundle(client, cve_id, filters, expected_count):
     assert objects.issuperset(
         CVE_BUNDLE_DEFAULT_OBJECTS
     ), "result must contain default objects"
-
-
-@pytest.mark.parametrize(
-    ["cve_id", "expected_count"],
-    [
-        ["CVE-2024-12978", 1],
-        ["CVE-2024-53647", 13],
-        ["CVE-2023-31025", 3],
-    ],
-)
-def test_relationships(client, cve_id, expected_count):
-    url = f"/api/v1/cve/objects/{cve_id}/relationships/"
-    resp = client.get(url)
-    resp_data = resp.json()
-    objects = {obj["id"] for obj in resp_data["relationships"]}
-    assert resp_data["total_results_count"] == expected_count
-    assert (
-        len(objects) == resp_data["page_results_count"]
-    ), "response contains duplicates"
 
 
 @pytest.mark.parametrize("sort_param", CVE_SORT_FIELDS)

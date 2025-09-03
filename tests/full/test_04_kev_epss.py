@@ -28,7 +28,7 @@ def test_list_obvjects(client, path):
             "kev",
             "CVE-2024-3393",
             (
-                "report--1c0c4245-72cb-5379-b1bb-4a3d22683636",  # vulncheck kev
+                "report--9554b1d8-deb9-5f17-966a-4f998dd5bf46",  # vulncheck kev
                 "report--9f381c8b-2df2-5da3-af0f-0f8dcc197ea3",  # cisa kev
             ),
         ],
