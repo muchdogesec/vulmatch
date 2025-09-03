@@ -50,7 +50,7 @@ class Transport(WSGITransport):
             serialized_request.update(data=json.dumps(json_data))
         import django.test
 
-        client = django.test.Client()
+        client = django.test.Client(raise_request_exception=False)
         response: DRFResponse = client.generic(**serialized_request)
         elapsed = time.time() - t
         return self.get_st_response(response, case, elapsed)
