@@ -343,9 +343,9 @@ RETURN KEEP(doc, KEYS(doc, true))
                 for criteria_id in criteria_ids
             ]
             filters.append("FILTER doc.id IN @criteria_ids")
-        if name := self.query.get('name'):
-            binds['name'] = self.like_string(name).lower()
-            filters.append('FILTER doc.name LIKE @name')
+        if name := self.query.get("name"):
+            binds["name"] = self.like_string(name).lower()
+            filters.append("FILTER doc.name LIKE @name")
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
@@ -421,6 +421,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         binds = {}
         filters = []
 
+        prefetched_matches = []
         if q := self.query.get("vuln_status"):
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
@@ -431,9 +432,8 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["cvss_base_score_min"] = q
             filters.append("FILTER doc._cvss_base_score >= @cvss_base_score_min")
 
-        if value := self.query_as_array("stix_id"):
-            binds["stix_ids"] = value
-            filters.append("FILTER doc.id in @stix_ids")
+        if stix_ids := self.query_as_array("stix_id"):
+            prefetched_matches.append(set(stix_ids))
 
         created_min, created_max = self.query.get("created_min", ""), self.query.get(
             "created_max", "2099"
@@ -452,8 +452,6 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
                 "FILTER IN_RANGE(doc.modified, @modified[0], @modified[1], true, true)"
             )
             binds["modified"] = modified_min, modified_max
-
-        prefetched_matches = []
 
         ######################## cpes_in_pattern and cpes_vulnerable filters ##############################
         pattern_cpes = self.query_as_array("x_cpes_not_vulnerable")
@@ -488,7 +486,8 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         if attack_ids or capec_ids:
             prefetched_matches.append(
                 self.capec_attack_to_vulnerability(
-                    capec_ids=list(map(str.upper, capec_ids)), attack_ids=list(map(str.upper, attack_ids))
+                    capec_ids=list(map(str.upper, capec_ids)),
+                    attack_ids=list(map(str.upper, attack_ids)),
                 )
             )
 
@@ -926,9 +925,10 @@ RETURN KEEP(d, KEYS(d, TRUE))
         bind_vars = {
             "@collection": "nvd_cve_vertex_collection",
         }
-        if value := self.query_as_array("id"):
-            bind_vars["ids"] = value
-            filters.append("FILTER doc.id in @ids")
+        prefetched_matches = []
+
+        if stix_ids := self.query_as_array("id"):
+            prefetched_matches.append(set(stix_ids))
 
         if value := self.query.get("cpe_match_string"):
             bind_vars["cpe_match_string"] = self.like_string(value).lower()
@@ -967,14 +967,16 @@ RETURN KEEP(d, KEYS(d, TRUE))
         in_cve_pattern = self.query_as_array("in_cve_not_vulnerable")
         cve_vulnerable = self.query_as_array("in_cve_vulnerable")
         if in_cve_pattern or cve_vulnerable:
-            filters.append("FILTER doc.id IN @cve_matches")
+            cve_matches = self.cves_to_softwares(cve_vulnerable, in_cve_pattern)
+            prefetched_matches.append(set(cve_matches))
+        ######################## in_cve_pattern and cve_vulnerable filters ##############################
+        if prefetched_matches:
             # because this filter fails with `arango.exceptions.AQLQueryExecuteError: [HTTP 500][ERR 1577] could not use index hint to serve query; {"indexHint":{"forced":true,"lookahead":1,"type":"simple","hint":["cpe_search_inv"]}}`
             # if there are no matches, we'll use NULL_LIST instead to simulate emptiness
-            bind_vars["cve_matches"] = (
-                self.cves_to_softwares(cve_vulnerable, in_cve_pattern) or self.NULL_LIST
+            bind_vars["id_matches"] = (
+                list(set.intersection(*prefetched_matches)) or self.NULL_LIST
             )
-
-        ######################## in_cve_pattern and cve_vulnerable filters ##############################
+            filters.append("FILTER doc.id IN @id_matches")
 
         if q := self.query.get("name"):
             bind_vars["name"] = self.like_string(q).lower()
@@ -992,5 +994,5 @@ RETURN KEEP(d, KEYS(d, TRUE))
             "@filters", "\n".join(filters)
         )
 
-        # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""")
+        # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=bind_vars)
