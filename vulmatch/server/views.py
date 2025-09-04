@@ -148,37 +148,37 @@ class VulnerabilityStatus(models.models.TextChoices):
             ),
             OpenApiParameter(
                 "include_x_cpes_not_vulnerable",
-                description="will show all `software` objects related to this vulnerability (and the SROS linking cve-cpe)",
+                description="Will show all `software` objects related to this vulnerability that are NOT vulnerable to it.",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_x_cpes_vulnerable",
-                description="will show `software` objects vulnerable to this vulnerability (and the SROS), if exist. Note `include_cpe` should be set to `false` if you only want to see vulnerable cpes (and the SROS linking cve-cpe)",
+                description="Will show all `software` objects related to this vulnerability that ARE vulnerable to it.",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_cwe",
-                description="will show `weakness` objects related to this vulnerability, if exists (and the SROS linking cve-cwe)",
+                description="Will show `weakness` objects related to this vulnerability, if exists (and the SROS linking cve-cwe)",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_epss",
-                description="will show `report` objects related to this vulnerability (with `label` = `epss`), if exist",
+                description="Will show `report` objects related to this vulnerability (with `label` = `epss`), if exist",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_kev",
-                description="will show `report` objects related to this vulnerability (with `label` = `kev`), if exist (and the SROS linking cve-sighting)",
+                description="Will show `report` objects related to this vulnerability (with `label` = `kev`), if exist (and the SROS linking cve-sighting)",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_capec",
-                description="will show CAPEC `attack-pattern` objects related to this vulnerability, if exist  (and the SROS linking cwe-capec)\n * note this mode will also show `include_cwe` outputs, due to the way CAPEC is linked to CVE",
+                description="Will show CAPEC `attack-pattern` objects related to this vulnerability, if exist  (and the SROS linking cwe-capec)\n * note this mode will also show `include_cwe` outputs, due to the way CAPEC is linked to CVE",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
                 "include_attack",
-                description="will show ATT&CK `attack-pattern` objects (for Techniques/Sub-techniques) related to this vulnerability, if exist (and the SROS linking capec-attack)\n * note this mode will also show `include_capec` and `include_cwe` outputs, due to the way ATT&CK is linked to CVE",
+                description="Will show ATT&CK `attack-pattern` objects (for Techniques/Sub-techniques) related to this vulnerability, if exist (and the SROS linking capec-attack)\n * note this mode will also show `include_capec` and `include_cwe` outputs, due to the way ATT&CK is linked to CVE",
                 type=OpenApiTypes.BOOL,
             ),
             OpenApiParameter(
@@ -253,14 +253,14 @@ class CveView(viewsets.ViewSet):
         x_cpes_vulnerable = BaseCSVFilter(
             help_text=textwrap.dedent(
                 """
-            Filter Vulnerabilities that are vulnerable to a full CPE Match String (e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.)
+            Filter Vulnerability objects that the CPE Match String is vulnerable to. Pass a full Match String e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
             """
             )
         )
         x_cpes_not_vulnerable = BaseCSVFilter(
             help_text=textwrap.dedent(
                 """
-            Filter Vulnerabilities that contain a full CPE Match String. Note, this will return Vulnerabilities that are vulnerable and not vulnerable (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). (e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.)
+            Filter Vulnerability objects that the CPE Match String is NOT vulnerable to (e.g. an operating system might not be vulnerable, but it might be required for software running on it to be vulnerable). Pass a full Match String e.g. `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x86:*`, `cpe:2.3:o:microsoft:windows_10_1607:-:*:*:*:*:*:x64:*`, etc.
             """
             )
         )
