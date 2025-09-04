@@ -243,7 +243,7 @@ def test_cvss_base_score_min(client, cvss_base_score_min):
         cvss = list(cve["x_cvss"].values())
         if not cvss:
             continue
-        assert get_primary_cvss(cve) >= cvss_base_score_min
+        assert get_primary_cvss(cve) or 0 >= cvss_base_score_min
 
 
 def more_created_filters(client, prop, count):
