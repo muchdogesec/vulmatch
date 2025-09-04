@@ -11,6 +11,4 @@ def get_primary_cvss(obj):
         if cvss['type'].lower() == 'primary':
             primary_cvss = cvss
             break
-    if primary_cvss:
-        return primary_cvss.get('base_score')
-    return
+    return primary_cvss.get('base_score')
