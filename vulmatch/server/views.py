@@ -991,6 +991,17 @@ class ProductView(mixins.ListModelMixin, viewsets.GenericViewSet):
         summary="List all match criteria",
         description="Just list them all",
     ),
+    versions=extend_schema(
+        responses=serializers.StixVersionsSerializer,
+        summary="Get all updates for a Vulnerability by CVE ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will return all the times a Vulnerability has been modified over time as new information becomes available.
+
+            By default the latest version of objects will be returned by all endpoints. This endpoint is generally most useful to researchers interested in the evolution of what is known about a vulnerability. The version returned can be used to get an older versions of a Vulnerability.
+            """
+        ),
+    ),
 )
 class CpeMatchView(viewsets.ViewSet):
     openapi_tags = ["CPE"]
@@ -1047,6 +1058,20 @@ class CpeMatchView(viewsets.ViewSet):
             "nvd_cve_vertex_collection", request
         ).retrieve_grouping(criteria_id)
         return Response(groupings[0])
+    
+    @decorators.action(
+        detail=True,
+        methods=["GET"],
+        pagination_class=Pagination("versions"),
+    )
+    def versions(self, request, *args, criteria_id=None, **kwargs):
+        groupings = VulmatchDBHelper(
+            "nvd_cve_vertex_collection", request
+        ).retrieve_grouping(criteria_id, get_all=True)
+        versions = sorted({it['modified'] for it in groupings}, reverse=True)
+        return Response(
+            dict(latest=versions[0] if versions else None, versions=versions)
+        )
 
     @decorators.action(methods=["GET"], detail=True)
     def bundle(self, request, *args, criteria_id=None, **kwargs):

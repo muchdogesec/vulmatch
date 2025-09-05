@@ -387,7 +387,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
         )
 
-    def retrieve_grouping(self, criteria_id: str, hide_sys=True):
+    def retrieve_grouping(self, criteria_id: str, hide_sys=True, get_all=False):
         binds = dict(
             grouping_id=generate_grouping_id(criteria_id.upper()), hide_sys=hide_sys
         )
@@ -395,16 +395,20 @@ RETURN KEEP(doc, KEYS(doc, true))
         if v := self.query.get("version"):
             version_filter = "FILTER doc.modified == @stix_version"
             binds.update(stix_version=v)
+        limit_statement = 'LIMIT 1'
+        if get_all:
+            version_filter = ''
+            limit_statement = ''
 
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
-LIMIT 1
+#limit_statement
 RETURN KEEP(doc, KEYS(doc, @hide_sys))
     """.replace(
             "#version_filter", version_filter
-        )
+        ).replace('#limit_statement', limit_statement)
         groupings = self.execute_query(query, bind_vars=binds, paginate=False)
         if not groupings:
             raise NotFound({"error": f"No grouping with criteria_id `{criteria_id}`"})
