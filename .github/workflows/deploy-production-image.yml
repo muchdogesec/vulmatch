@@ -12,7 +12,6 @@ env:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    environment: vulmatch_web_production
     permissions:
       contents: read
       packages: write
@@ -43,11 +42,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             DJANGO_DEBUG=False
-            DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            ARANGODB_PASSWORD=${{ secrets.ARANGODB_PASSWORD }}
-            CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}
-            VULNCHECK_API_KEY=${{ secrets.VULNCHECK_API_KEY }}
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
