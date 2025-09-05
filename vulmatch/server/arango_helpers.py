@@ -165,12 +165,11 @@ CPEMATCH_BUNDLE_TYPES = {"grouping", "indicator", "relationship", "software"}
 
 BUNDLE_OBJECT_IDS = [
     "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3", #cve2stix
-    "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5", #dogesec
-    "identity--152ecfe1-5015-522b-97e4-86b60c57036d", #acvep
-    "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3", #cve2stix
-    "marking-definition--152ecfe1-5015-522b-97e4-86b60c57036d", #acvep
-
+    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",  # cve2stix
+    "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",  # dogesec
+    "identity--152ecfe1-5015-522b-97e4-86b60c57036d",  # acvep
+    "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3",  # cve2stix
+    "marking-definition--152ecfe1-5015-522b-97e4-86b60c57036d",  # acvep
 ]
 CVE_BUNDLE_DEFAULT_OBJECTS = [
     *BUNDLE_OBJECT_IDS,
@@ -178,7 +177,6 @@ CVE_BUNDLE_DEFAULT_OBJECTS = [
     "extension-definition--82cad0bb-0906-5885-95cc-cafe5ee0a500",
     "extension-definition--2c5c13af-ee92-5246-9ba7-0b958f8cd34a",
 ]
-
 
 
 def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
@@ -283,13 +281,16 @@ class VulmatchDBHelper(DCHelper):
         ):
             filters.append("FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score")
             binds["epss_min_score"] = min_score
-        if kev_source := self.query.get('source'):
+        if kev_source := self.query.get("source"):
             binds.update(kev_source=kev_source)
-            filters.append("FILTER {source_name: 'arango_cve_processor', external_id: @kev_source} IN doc.external_references")
-        if known_ransomware := self.query.get('known_ransomware'):
+            filters.append(
+                "FILTER {source_name: 'arango_cve_processor', external_id: @kev_source} IN doc.external_references"
+            )
+        if known_ransomware := self.query.get("known_ransomware"):
             binds.update(known_ransomware=known_ransomware)
-            filters.append("FILTER {source_name: 'known_ransomware', description: @known_ransomware} IN doc.external_references")
-
+            filters.append(
+                "FILTER {source_name: 'known_ransomware', description: @known_ransomware} IN doc.external_references"
+            )
 
         query = """
 FOR doc IN nvd_cve_vertex_collection

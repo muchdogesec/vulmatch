@@ -496,13 +496,18 @@ class KevView(KevEpssView):
             """
             )
         )
-        source = ChoiceFilter(help_text="Only show KEV from source", choices=[(f, f) for f in KEV_CHOICES])
-        known_ransomware = ChoiceFilter(help_text="Only show known or unknown ransomware", choices=[(f, f) for f in ['Known', 'Unknown']])
+        source = ChoiceFilter(
+            help_text="Only show KEV from source", choices=[(f, f) for f in KEV_CHOICES]
+        )
+        known_ransomware = ChoiceFilter(
+            help_text="Only show known or unknown ransomware",
+            choices=[(f, f) for f in ["Known", "Unknown"]],
+        )
 
     @decorators.action(methods=["GET"], url_path="exploits", detail=False)
     def list_exploits(self, request, *args, **kwargs):
         return VulmatchDBHelper("", request).list_exploits()
-    
+
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -1012,7 +1017,9 @@ class CpeMatchView(viewsets.ViewSet):
             """
             )
         )
-        name = CharFilter(help_text="search match criteria by criteria pattern, e.g `google`, `microsoft`")
+        name = CharFilter(
+            help_text="search match criteria by criteria pattern, e.g `google`, `microsoft`"
+        )
         sort = ChoiceFilter(
             choices=[
                 (v, v)
