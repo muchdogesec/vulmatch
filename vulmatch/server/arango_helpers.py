@@ -158,15 +158,22 @@ CVE_BUNDLE_TYPES = set(
 
 CPEMATCH_BUNDLE_TYPES = {"grouping", "indicator", "relationship", "software"}
 
+BUNDLE_OBJECT_IDS = [
+    "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3", #cve2stix
+    "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5", #dogesec
+    "identity--152ecfe1-5015-522b-97e4-86b60c57036d", #acvep
+    "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3", #cve2stix
+    "marking-definition--152ecfe1-5015-522b-97e4-86b60c57036d", #acvep
 
+]
 CVE_BUNDLE_DEFAULT_OBJECTS = [
+    *BUNDLE_OBJECT_IDS,
     "extension-definition--ad995824-2901-5f6e-890b-561130a239d4",
     "extension-definition--82cad0bb-0906-5885-95cc-cafe5ee0a500",
     "extension-definition--2c5c13af-ee92-5246-9ba7-0b958f8cd34a",
-    "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-    "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3",
-    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",
 ]
+
 
 
 def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
@@ -824,9 +831,6 @@ SEARCH d.type IN @types AND d._id IN all_objects_ids
 LIMIT @offset, @count
 RETURN KEEP(d, KEYS(d, TRUE))
 """
-        # query = query \
-        #             .replace("@@@vertex_filters", " OR ".join(vertex_filters))
-
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
 
@@ -851,12 +855,15 @@ RETURN KEEP(d, KEYS(d, TRUE))
         #     filters.append('FILTER doc.relationship_type != "x-cpe-vulnerable"')
         # if not self.query_as_bool('include_cves_not_vulnerable', True):
         #     filters.append('FILTER doc.relationship_type != "x-cpe-not-vulnerable"')
+        indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
 
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
             type_part, _, uuid_part = indicator_id.partition("--")
             if type_part == "indicator":
-                indicator_ids.append("vulnerability--" + uuid_part)
+                vuln_id = "vulnerability--" + uuid_part
+                relationship_id = "relationship--" + uuid_part
+                indicator_ids.extend((vuln_id, relationship_id))
             types.add(type_part)
         if t := self.query_as_array("types"):
             types.intersection_update(t)
@@ -889,7 +896,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
             "type": type,
             "var": var,
         }
-        # return Response(bind_vars)
         filters = ["FILTER doc._is_latest == TRUE"]
         if q := self.query.get(version_param):
             bind_vars["stix_modified"] = q
