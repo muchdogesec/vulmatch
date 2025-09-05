@@ -90,6 +90,11 @@ ATLAS_TYPES = set(
     ]
 )
 
+KEV_CHOICES = [
+    "cve-kev",
+    "cve-vulncheck-kev",
+]
+
 SOFTWARE_TYPES = set(["software", "identity", "marking-definition"])
 CAPEC_TYPES = set(
     ["attack-pattern", "course-of-action", "identity", "marking-definition"]
@@ -278,6 +283,13 @@ class VulmatchDBHelper(DCHelper):
         ):
             filters.append("FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score")
             binds["epss_min_score"] = min_score
+        if kev_source := self.query.get('source'):
+            binds.update(kev_source=kev_source)
+            filters.append("FILTER {source_name: 'arango_cve_processor', external_id: @kev_source} IN doc.external_references")
+        if known_ransomware := self.query.get('known_ransomware'):
+            binds.update(known_ransomware=known_ransomware)
+            filters.append("FILTER {source_name: 'known_ransomware', description: @known_ransomware} IN doc.external_references")
+
 
         query = """
 FOR doc IN nvd_cve_vertex_collection

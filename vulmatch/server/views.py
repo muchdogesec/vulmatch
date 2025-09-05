@@ -9,6 +9,7 @@ from vulmatch.server.arango_helpers import (
     CVE_BUNDLE_TYPES,
     CVE_SORT_FIELDS,
     EPSS_SORT_FIELDS,
+    KEV_CHOICES,
     KEV_SORT_FIELDS,
     VulmatchDBHelper,
 )
@@ -404,6 +405,42 @@ class CveView(viewsets.ViewSet):
     list_objects=extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)},
         filters=True,
+    ),
+    retrieve_objects=extend_schema(
+        responses={
+            200: VulmatchDBHelper.get_paginated_response_schema("objects", "report")
+        },
+        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
+    ),
+)
+class KevEpssView(viewsets.ViewSet):
+    pagination_class = Pagination("objects")
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = serializers.StixObjectsSerializer(many=True)
+    lookup_url_kwarg = "cve_id"
+
+    openapi_path_params = [
+        OpenApiParameter(
+            "cve_id",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            description="The CVE ID, e.g `CVE-2023-22518`",
+        ),
+    ]
+
+    @decorators.action(methods=["GET"], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
+        return VulmatchDBHelper("", request).list_kev_or_epss_objects(self.label)
+
+    @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
+    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
+        return VulmatchDBHelper(
+            "nvd_cve_vertex_collection", request
+        ).retrieve_kev_or_epss_object(cve_id, self.label)
+
+
+@extend_schema_view(
+    list_objects=extend_schema(
         summary="Get KEV Objects for CVEs",
         description=textwrap.dedent(
             """
@@ -414,6 +451,11 @@ class CveView(viewsets.ViewSet):
             **IMPORTANT:** You need to run Arango CVE Processor in `cve-kev` mode to generate these reports.
             """
         ),
+        parameters=[
+            OpenApiParameter(
+                "sort", enum=KEV_SORT_FIELDS, description="Sort results by"
+            ),
+        ],
     ),
     retrieve_objects=extend_schema(
         summary="Get a KEV Report by CVE ID",
@@ -424,10 +466,6 @@ class CveView(viewsets.ViewSet):
             If there is no KEV reported for the CVE, the response will be empty.
             """
         ),
-        responses={
-            200: VulmatchDBHelper.get_paginated_response_schema("objects", "report")
-        },
-        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
     list_exploits=extend_schema(
         summary="List all Exploit Objects linked to KEVs",
@@ -445,23 +483,10 @@ class CveView(viewsets.ViewSet):
         ],
     ),
 )
-class KevView(viewsets.ViewSet):
+class KevView(KevEpssView):
 
     openapi_tags = ["KEV"]
-    pagination_class = Pagination("objects")
-    filter_backends = [DjangoFilterBackend]
-    serializer_class = serializers.StixObjectsSerializer(many=True)
-    lookup_url_kwarg = "cve_id"
     label = "kev"
-
-    openapi_path_params = [
-        OpenApiParameter(
-            "cve_id",
-            type=OpenApiTypes.STR,
-            location=OpenApiParameter.PATH,
-            description="The CVE ID, e.g `CVE-2023-22518`",
-        ),
-    ]
 
     class filterset_class(FilterSet):
         cve_id = CharFilter(
@@ -471,28 +496,13 @@ class KevView(viewsets.ViewSet):
             """
             )
         )
-
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(
-                "sort", enum=KEV_SORT_FIELDS, description="Sort results by"
-            ),
-        ]
-    )
-    @decorators.action(methods=["GET"], url_path="objects", detail=False)
-    def list_objects(self, request, *args, **kwargs):
-        return VulmatchDBHelper("", request).list_kev_or_epss_objects(self.label)
-
-    @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
-    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper(
-            "nvd_cve_vertex_collection", request
-        ).retrieve_kev_or_epss_object(cve_id, self.label)
+        source = ChoiceFilter(help_text="Only show KEV from source", choices=[(f, f) for f in KEV_CHOICES])
+        known_ransomware = ChoiceFilter(help_text="Only show known or unknown ransomware", choices=[(f, f) for f in ['Known', 'Unknown']])
 
     @decorators.action(methods=["GET"], url_path="exploits", detail=False)
     def list_exploits(self, request, *args, **kwargs):
         return VulmatchDBHelper("", request).list_exploits()
-
+    
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -532,6 +542,15 @@ class EPSSView(KevView):
     openapi_tags = ["EPSS"]
     label = "epss"
     list_exploits = None
+
+    class filterset_class(FilterSet):
+        cve_id = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filter the results using a CVE ID. e.g. `CVE-2024-23897`
+            """
+            )
+        )
 
 
 @extend_schema_view(
