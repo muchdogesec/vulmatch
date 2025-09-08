@@ -9,6 +9,7 @@ from vulmatch.server.arango_helpers import (
     CVE_BUNDLE_TYPES,
     CVE_SORT_FIELDS,
     EPSS_SORT_FIELDS,
+    EXPLOIT_TYPES,
     KEV_CHOICES,
     KEV_SORT_FIELDS,
     VulmatchDBHelper,
@@ -479,6 +480,13 @@ class KevEpssView(viewsets.ViewSet):
         parameters=[
             OpenApiParameter(
                 "sort", enum=KEV_SORT_FIELDS, description="Sort results by"
+            ),
+            OpenApiParameter(
+                "exploit_type",
+                description="Filter by exploit type",
+                enum=EXPLOIT_TYPES,
+                many=True,
+                explode=False,
             ),
         ],
     ),

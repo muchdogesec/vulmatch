@@ -11,6 +11,17 @@ from arango_cve_processor.tools.cpe import generate_grouping_id
 
 if typing.TYPE_CHECKING:
     from .. import settings
+
+EXPLOIT_TYPES = [
+  "initial-access",
+  "client-side",
+  "local",
+  "denial-of-service",
+  "infoleak",
+  "remote-with-credentials",
+  "initial"
+]
+
 SDO_TYPES = set(
     [
         "report",
@@ -342,6 +353,10 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if cve_ids := self.query_as_array("cve_id"):
             binds["cve_ids"] = [cve_id.upper() for cve_id in cve_ids]
             filters.append("FILTER doc.name IN @cve_ids")
+        if exploit_types := self.query_as_array('exploit_type'):
+            binds.update(exploit_types=exploit_types)
+            filters.append("FILTER doc.exploit_type IN @exploit_types")
+
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
