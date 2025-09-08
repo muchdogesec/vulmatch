@@ -642,7 +642,17 @@ class EPSSView(KevView):
                 ],
                 many=True,
                 explode=False,
-            )
+            ),
+            OpenApiParameter(
+                "include_cves_not_vulnerable",
+                description="Will show all `software` objects related to this vulnerability that are NOT vulnerable to it.",
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                "include_cves_vulnerable",
+                description="Will show all `software` objects related to this vulnerability that ARE vulnerable to it.",
+                type=OpenApiTypes.BOOL,
+            ),
         ],
         filters=False,
     ),

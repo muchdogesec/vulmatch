@@ -881,25 +881,29 @@ RETURN KEEP(d, KEYS(d, TRUE))
         filters = []
         groupings = self.cpes_to_grouping(cpes=[cpe_id])
 
-        indicator_ids = self.execute_query(
+        matches = self.execute_query(
             """
             FOR doc IN nvd_cve_edge_collection
             FILTER doc._to IN @matched_ids
             #filters
-            FOR d IN [doc.source_ref, doc.target_ref, doc.id]
-            RETURN d
+            RETURN [doc.relationship_type, doc.source_ref, doc.target_ref, doc.id]
             """.replace(
                 "#filters", "\n".join(filters)
             ),
             bind_vars={"matched_ids": list(groupings)},
             paginate=False,
         )
-        # if not self.query_as_bool('include_cves_vulnerable', True):
-        #     filters.append('FILTER doc.relationship_type != "x-cpe-vulnerable"')
-        # if not self.query_as_bool('include_cves_not_vulnerable', True):
-        #     filters.append('FILTER doc.relationship_type != "x-cpe-not-vulnerable"')
+        include_cves_vulnerable = self.query_as_bool('include_cves_vulnerable', True)
+        include_cves_not_vulnerable = self.query_as_bool('include_cves_not_vulnerable', True)
+        indicator_ids = CVE_BUNDLE_DEFAULT_OBJECTS.copy()
+        for rel_type, *stix_ids in matches:
+            if rel_type == 'x-cpes-vulnerable' and include_cves_vulnerable:
+                indicator_ids.extend(stix_ids)
+            elif rel_type == "x-cpes-not-vulnerable" and include_cves_not_vulnerable:
+                indicator_ids.extend(stix_ids)
+            else:
+                logging.warning(f"unknown relationship_type from grouping {(rel_type, stix_ids)}")
         indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
-
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
             type_part, _, uuid_part = indicator_id.partition("--")
