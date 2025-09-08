@@ -161,7 +161,16 @@ CVE_BUNDLE_TYPES = set(
     ]
 )
 
-CPEMATCH_BUNDLE_TYPES = {"grouping", "indicator", "relationship", "software"}
+CPEMATCH_BUNDLE_TYPES = {
+    "grouping",
+    "indicator",
+    "relationship",
+    "software",
+    # default objects
+    "extension-definition",
+    "marking-definition",
+    "identity",
+}
 
 BUNDLE_OBJECT_IDS = [
     "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
@@ -424,10 +433,12 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             bind_vars=dict(grouping_id=grouping["_id"]),
             paginate=False,
         )
+        bundle_refs = [*CVE_BUNDLE_DEFAULT_OBJECTS, *grouping["object_refs"]]
         grouping_ids = list(itertools.chain([grouping["_id"]], *pre_query))
         query = """
         FOR d in @@view
-        SEARCH d.type IN @types AND (d._id IN @grouping_id OR d.id IN @grouping_refs)
+        SEARCH d.type IN @types AND (d._id IN @grouping_id OR d.id IN @bundle_refs)
+        FILTER d._id IN @grouping_id OR d._is_latest == TRUE
         LIMIT @offset, @count
         RETURN KEEP(d, KEYS(d, TRUE))
         """
@@ -436,7 +447,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             bind_vars={
                 "@view": settings.VIEW_NAME,
                 "grouping_id": grouping_ids,
-                "grouping_refs": grouping["object_refs"],
+                "bundle_refs": bundle_refs,
                 "types": list(types),
             },
         )
