@@ -8,7 +8,7 @@ amqp==5.3.1
     # via kombu
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango_cve_processor==1.1.11
+arango-cve-processor==1.1.11
     # via -r requirements.in
 asgiref==3.9.1
     # via
@@ -44,7 +44,7 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
-django==5.2.4
+django==5.2.6
     # via
     #   -r requirements.in
     #   django-cors-headers
@@ -142,6 +142,7 @@ requests==2.32.4
     #   requests-toolbelt
     #   stix2
     #   stix2arango
+    #   stix2extensions
 requests-toolbelt==1.0.0
     # via python-arango
 rpds-py==0.26.0
@@ -163,13 +164,15 @@ stix2==3.0.1
     #   arango-cve-processor
     #   dogesec-commons
     #   stix2arango
+    #   stix2extensions
 stix2-patterns==2.0.0
     # via stix2
 stix2arango==1.1.0
     # via
     #   -r requirements.in
     #   arango-cve-processor
-stix2extensions
+stix2extensions==1.1.1
+    # via arango-cve-processor
 tqdm==4.67.1
     # via
     #   arango-cve-processor
