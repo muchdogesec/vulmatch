@@ -11,6 +11,17 @@ from arango_cve_processor.tools.cpe import generate_grouping_id
 
 if typing.TYPE_CHECKING:
     from .. import settings
+
+EXPLOIT_TYPES = [
+  "initial-access",
+  "client-side",
+  "local",
+  "denial-of-service",
+  "infoleak",
+  "remote-with-credentials",
+  "initial"
+]
+
 SDO_TYPES = set(
     [
         "report",
@@ -161,7 +172,16 @@ CVE_BUNDLE_TYPES = set(
     ]
 )
 
-CPEMATCH_BUNDLE_TYPES = {"grouping", "indicator", "relationship", "software"}
+CPEMATCH_BUNDLE_TYPES = {
+    "grouping",
+    "indicator",
+    "relationship",
+    "software",
+    # default objects
+    "extension-definition",
+    "marking-definition",
+    "identity",
+}
 
 BUNDLE_OBJECT_IDS = [
     "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
@@ -333,6 +353,10 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if cve_ids := self.query_as_array("cve_id"):
             binds["cve_ids"] = [cve_id.upper() for cve_id in cve_ids]
             filters.append("FILTER doc.name IN @cve_ids")
+        if exploit_types := self.query_as_array('exploit_type'):
+            binds.update(exploit_types=exploit_types)
+            filters.append("FILTER doc.exploit_type IN @exploit_types")
+
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
@@ -424,10 +448,12 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             bind_vars=dict(grouping_id=grouping["_id"]),
             paginate=False,
         )
+        bundle_refs = [*CVE_BUNDLE_DEFAULT_OBJECTS, *grouping["object_refs"]]
         grouping_ids = list(itertools.chain([grouping["_id"]], *pre_query))
         query = """
         FOR d in @@view
-        SEARCH d.type IN @types AND (d._id IN @grouping_id OR d.id IN @grouping_refs)
+        SEARCH d.type IN @types AND (d._id IN @grouping_id OR d.id IN @bundle_refs)
+        FILTER d._id IN @grouping_id OR d._is_latest == TRUE
         LIMIT @offset, @count
         RETURN KEEP(d, KEYS(d, TRUE))
         """
@@ -436,7 +462,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             bind_vars={
                 "@view": settings.VIEW_NAME,
                 "grouping_id": grouping_ids,
-                "grouping_refs": grouping["object_refs"],
+                "bundle_refs": bundle_refs,
                 "types": list(types),
             },
         )
@@ -855,25 +881,29 @@ RETURN KEEP(d, KEYS(d, TRUE))
         filters = []
         groupings = self.cpes_to_grouping(cpes=[cpe_id])
 
-        indicator_ids = self.execute_query(
+        matches = self.execute_query(
             """
             FOR doc IN nvd_cve_edge_collection
             FILTER doc._to IN @matched_ids
             #filters
-            FOR d IN [doc.source_ref, doc.target_ref, doc.id]
-            RETURN d
+            RETURN [doc.relationship_type, doc.source_ref, doc.target_ref, doc.id]
             """.replace(
                 "#filters", "\n".join(filters)
             ),
             bind_vars={"matched_ids": list(groupings)},
             paginate=False,
         )
-        # if not self.query_as_bool('include_cves_vulnerable', True):
-        #     filters.append('FILTER doc.relationship_type != "x-cpe-vulnerable"')
-        # if not self.query_as_bool('include_cves_not_vulnerable', True):
-        #     filters.append('FILTER doc.relationship_type != "x-cpe-not-vulnerable"')
+        include_cves_vulnerable = self.query_as_bool('include_cves_vulnerable', True)
+        include_cves_not_vulnerable = self.query_as_bool('include_cves_not_vulnerable', True)
+        indicator_ids = CVE_BUNDLE_DEFAULT_OBJECTS.copy()
+        for rel_type, *stix_ids in matches:
+            if rel_type == 'x-cpes-vulnerable' and include_cves_vulnerable:
+                indicator_ids.extend(stix_ids)
+            elif rel_type == "x-cpes-not-vulnerable" and include_cves_not_vulnerable:
+                indicator_ids.extend(stix_ids)
+            else:
+                logging.warning(f"unknown relationship_type from grouping {(rel_type, stix_ids)}")
         indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
-
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
             type_part, _, uuid_part = indicator_id.partition("--")
