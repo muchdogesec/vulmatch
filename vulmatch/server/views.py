@@ -825,7 +825,7 @@ class CpeView(viewsets.ViewSet):
 
 class ACPView(viewsets.GenericViewSet):
     openapi_tags = ["Arango CVE Processor"]
-    serializer_class = serializers.ACPSerializer
+    serializer_class = serializers.ACPSerializerGeneral
 
     def run_acvep(self):
         data = self.request.data
