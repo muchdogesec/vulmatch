@@ -82,6 +82,11 @@ class AcpCPEMatch(ACPSerializer):
 class AcpEPSSBackfill(ACPSerializer):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs['start_date'] > attrs['end_date']:
+            raise validators.ValidationError({"start_date": 'must not be greater than end_date'})
     
 
 class HealthCheckChoices(StrEnum):
