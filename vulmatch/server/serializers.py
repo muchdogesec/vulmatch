@@ -14,6 +14,8 @@ ACP_MODES = {
     "cve-cwe": "Relate CVE objects to CWE objects",
     "cve-capec": "Relate CWE objects to CAPEC objects",
     "cve-attack": "Relate CAPEC objects to ATT&CK objects",
+    "cve-epss-backfill": "Relate CAPEC objects to ATT&CK objects",
+    "cpematch": "Relate CAPEC objects to ATT&CK objects",
 }
 
 class StixObjectsSerializer(serializers.Serializer):
@@ -58,14 +60,29 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ACPSerializer(serializers.Serializer):
+    mode = serializers.HiddenField(default=None)
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
+    
+    def validate(self, attrs):
+        mode = self.context['request'].path.rstrip('/').split('/')[-1]
+        if mode not in ACP_MODES:
+            raise validators.ValidationError({"mode": f"This mode `{mode}` is not supported."})
+        attrs['mode'] = mode
+        return super().validate(attrs)
+
+class ACPSerializerGeneral(ACPSerializer):
     modified_min = serializers.DateTimeField(required=False)
     created_min = serializers.DateTimeField(required=False)
 
-class ACPSerializerWithMode(ACPSerializer):
-    mode = serializers.ChoiceField(choices=list(ACP_MODES.items()))
+class AcpCPEMatch(ACPSerializer):
+    modified_min = serializers.DateTimeField(required=False)
+
+class AcpEPSSBackfill(ACPSerializer):
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    
 
 class HealthCheckChoices(StrEnum):
     AUTHORIZED = auto()

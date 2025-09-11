@@ -780,46 +780,103 @@ class CpeView(viewsets.ViewSet):
             cpe_name
         )
 
-
 @extend_schema_view(
-    create=extend_schema(
+    cve_epss_backfill=extend_schema(
         responses={201: serializers.JobSerializer},
         summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(
-            """
-            This endpoint will link together knowledgebases based on the `mode` selected. For more information about how this works see [arango_cve_processor](https://github.com/muchdogesec/arango_cve_processor/), specifically the `--relationship` setting.
-
-            The following key/values are accepted in the body of the request:
-
-            * `ignore_embedded_relationships` (optional - default: `false`): arango_cve_processor generates SROs to link knowledge-bases. These SROs have embedded relationships inside them. Setting this to `false` is generally recommended, but ALWAYS when running `cve-epss` and `cve-kev` to ensure the Report objects created are correctly joined to the CVE.
-            * `ignore_embedded_relationships_sro` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SRO objects (`type` = `relationship`). Default is `true`. This is a stix2arango setting.
-            * `ignore_embedded_relationships_smo` (optional): boolean, if `true` passed (recommended), will stop any embedded relationships from being generated from SMO objects (`type` = `marking-definition`, `extension-definition`, `language-content`). Default is `true`. This is a stix2arango setting.
-            * `modified_min` (optional - default: all time - format: `YYYY-MM-DDTHH:MM:SS.sssZ`): by default arango_cve_processor will run over all objects in the latest version of a framework (e.g. ATT&CK). This is not always efficient, especially when updating CVE records. As such, you can ask the script to only consider objects with a `modified` time greater than that specified for this field.
-            * `created_min` (optional - default: all time- format: `YYYY-MM-DDTHH:MM:SS.sssZ`): same as `modified_min`, but this time considers `created` time of the object (not `modified` time).
-            """
-        ),
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cpematch=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_attack=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_capec=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_cwe=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_epss=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_kev=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
+    ),
+    cve_vulncheck_kev=extend_schema(
+        responses={201: serializers.JobSerializer},
+        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        description=textwrap.dedent(""" description goes here"""),
     ),
 )
-class ACPView(viewsets.ViewSet):
+
+class ACPView(viewsets.GenericViewSet):
     openapi_tags = ["Arango CVE Processor"]
     serializer_class = serializers.ACPSerializer
-    openapi_path_params = [
-        OpenApiParameter(
-            name="mode",
-            enum=list(serializers.ACP_MODES),
-            location=OpenApiParameter.PATH,
-            description="The  [`arango_cve_processor`](https://github.com/muchdogesec/arango_cve_processor/) `--relationship` mode.",
-        )
-    ]
 
-    def create(self, request, *args, **kwargs):
-        serializers.ACPSerializer(data=request.data).is_valid(raise_exception=True)
-        serializer = serializers.ACPSerializerWithMode(data={**request.data, **kwargs})
+    def run_acvep(self):
+        data = self.request.data
+        serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.data.copy()
+        data = serializer.validated_data.copy()
         job = new_task(data, models.JobType.CVE_PROCESSOR)
         job_s = serializers.JobSerializer(instance=job)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
+
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        url_path="cve-epss-backfill",
+        serializer_class=serializers.AcpEPSSBackfill,
+    )
+    def cve_epss_backfill(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        url_path="cpematch",
+        serializer_class=serializers.AcpCPEMatch,
+    )
+    def cpematch(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-attack")
+    def cve_attack(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-capec")
+    def cve_capec(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-cwe")
+    def cve_cwe(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-epss")
+    def cve_epss(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-kev")
+    def cve_kev(self, request, *args, **kwargs):
+        return self.run_acvep()
+
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-vulncheck-kev")
+    def cve_vulncheck_kev(self, request, *args, **kwargs):
+        return self.run_acvep()
 
 
 @extend_schema_view(
@@ -1076,7 +1133,7 @@ class CpeMatchView(viewsets.ViewSet):
             "nvd_cve_vertex_collection", request
         ).retrieve_grouping(criteria_id)
         return Response(groupings[0])
-    
+
     @decorators.action(
         detail=True,
         methods=["GET"],
@@ -1086,7 +1143,7 @@ class CpeMatchView(viewsets.ViewSet):
         groupings = VulmatchDBHelper(
             "nvd_cve_vertex_collection", request
         ).retrieve_grouping(criteria_id, get_all=True)
-        versions = sorted({it['modified'] for it in groupings}, reverse=True)
+        versions = sorted({it["modified"] for it in groupings}, reverse=True)
         return Response(
             dict(latest=versions[0] if versions else None, versions=versions)
         )
