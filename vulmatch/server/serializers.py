@@ -78,7 +78,7 @@ class ACPSerializerGeneral(ACPSerializer):
     created_min = serializers.DateTimeField(required=False)
 
 class AcpCPEMatch(ACPSerializer):
-    modified_min = serializers.DateTimeField(required=False)
+    updated_after = serializers.DateTimeField(required=False)
 
 class AcpEPSSBackfill(ACPSerializer):
     start_date = serializers.DateField()

@@ -838,17 +838,6 @@ class CpeView(viewsets.ViewSet):
             """
         ),
     ),
-    cve_epss=extend_schema(
-        responses={201: serializers.JobSerializer},
-        summary="Links vulnerability objects to EPSS scores",
-        description=textwrap.dedent(
-            """ 
-            This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. It will update the EPSS score for the current day. To run for historic EPSS scores, use the historic EPSS backfill mode.
-
-            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
-            """
-        ),
-    ),
     cve_kev=extend_schema(
         responses={201: serializers.JobSerializer},
         summary="Links vulnerability objects to CISA KEV objects",
@@ -888,7 +877,7 @@ class ACPView(viewsets.GenericViewSet):
     @decorators.action(
         methods=["POST"],
         detail=False,
-        url_path="cve-epss-backfill",
+        url_path="cve-epss",
         serializer_class=serializers.AcpEPSSBackfill,
     )
     def cve_epss_backfill(self, request, *args, **kwargs):
@@ -913,10 +902,6 @@ class ACPView(viewsets.GenericViewSet):
 
     @decorators.action(methods=["POST"], detail=False, url_path="cve-cwe")
     def cve_cwe(self, request, *args, **kwargs):
-        return self.run_acvep()
-
-    @decorators.action(methods=["POST"], detail=False, url_path="cve-epss")
-    def cve_epss(self, request, *args, **kwargs):
         return self.run_acvep()
 
     @decorators.action(methods=["POST"], detail=False, url_path="cve-kev")
