@@ -60,7 +60,7 @@ class ProductSerializer(serializers.ModelSerializer):
         exclude = ['id']
 
 
-class ACPSerializer(serializers.Serializer):
+class ACPSerializerBase(serializers.Serializer):
     mode = serializers.ReadOnlyField(default=None)
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
@@ -73,14 +73,14 @@ class ACPSerializer(serializers.Serializer):
         attrs['mode'] = mode
         return super().validate(attrs)
 
-class ACPSerializerGeneral(ACPSerializer):
+class ACPSerializerGeneral(ACPSerializerBase):
     modified_min = serializers.DateTimeField(required=False)
     created_min = serializers.DateTimeField(required=False)
 
-class AcpCPEMatch(ACPSerializer):
+class AcpCPEMatch(ACPSerializerBase):
     updated_after = serializers.DateTimeField(required=False)
 
-class AcpEPSSBackfill(ACPSerializer):
+class AcpEPSSBackfill(ACPSerializerBase):
     start_date = serializers.DateField()
     end_date = serializers.DateField()
 

@@ -902,11 +902,11 @@ class ACPView(viewsets.GenericViewSet):
     def cve_cwe(self, request, *args, **kwargs):
         return self.run_acvep()
 
-    @decorators.action(methods=["POST"], detail=False, url_path="cve-kev")
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-kev", serializer_class=serializers.ACPSerializerBase)
     def cve_kev(self, request, *args, **kwargs):
         return self.run_acvep()
 
-    @decorators.action(methods=["POST"], detail=False, url_path="cve-vulncheck-kev")
+    @decorators.action(methods=["POST"], detail=False, url_path="cve-vulncheck-kev", serializer_class=serializers.ACPSerializerBase)
     def cve_vulncheck_kev(self, request, *args, **kwargs):
         return self.run_acvep()
 
