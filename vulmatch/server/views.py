@@ -786,7 +786,9 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to EPSS scores",
         description=textwrap.dedent(
             """ 
-            This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs.
+            This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed.
+
+            `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs. e.g. To get all EPSS scores for CVEs for each day in 2024 you would use `start_date` `2024-01-01` and `end_date` `2024-12-31`.
             """
         ),
     ),
