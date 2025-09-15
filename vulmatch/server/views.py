@@ -783,43 +783,81 @@ class CpeView(viewsets.ViewSet):
 @extend_schema_view(
     cve_epss_backfill=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Generate EPSS scores for CVEs (historic)",
+        description=textwrap.dedent(
+            """ 
+            This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs.
+            """
+        ),
     ),
     cpematch=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Update CPE Match data",
+        description=textwrap.dedent(
+            """ 
+            This request will update EPSS match Grouping objects and the CPEs linked to them. CPE Matches change over time, and this request ensures they are current.
+
+            IMPORTANT: `modified_min` cannot be more than one month from request date.
+            """
+        ),
     ),
     cve_attack=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Links vulnerability objects to ATT&CK objects",
+        description=textwrap.dedent(
+            """ 
+            This request will link vulnerabilities to ATT&CK objects (using the CAPECs reported by `cve-capec` mode).
+
+            IMPORTANT: this mode relies on `cve-capec` mode, therefore it must be run before this request.
+            """
+        ),
     ),
     cve_capec=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Links vulnerability objects to CAPEC objects",
+        description=textwrap.dedent(
+            """ 
+            This request will link vulnerabilities to CAPEC objects (using the CAPECs reported in CWEs linked to the vulnerability)
+
+            IMPORTANT: this mode relies on `cve-cwe` mode, therefore it must be run before this request.
+            """
+        ),
     ),
     cve_cwe=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Links vulnerability objects to CWE objects.",
+        description=textwrap.dedent(
+            """ 
+            This request will link the CWEs reported in the CVE object to the STIX representation of the CWE object.
+            """
+        ),
     ),
     cve_epss=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        summary="Generate EPSS scores for CVEs",
+        description=textwrap.dedent(
+            """ 
+            This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. It will update the EPSS score for the current day. To run for historic EPSS scores, use the historic EPSS backfill mode.
+            """
+        ),
     ),
     cve_kev=extend_schema(
         responses={201: serializers.JobSerializer},
         summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        description=textwrap.dedent(
+            """ 
+            Links vulnerability objects to CWE objects.
+            """
+        ),
     ),
     cve_vulncheck_kev=extend_schema(
         responses={201: serializers.JobSerializer},
         summary="Trigger arango_cve_processor `mode` to generate relationships.",
-        description=textwrap.dedent(""" description goes here"""),
+        description=textwrap.dedent(
+            """ 
+            Links vulnerability objects to CWE objects.
+            """
+        ),
     ),
 )
 
