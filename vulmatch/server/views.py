@@ -797,7 +797,7 @@ class CpeView(viewsets.ViewSet):
             """ 
             This request will update EPSS match Grouping objects and the CPEs linked to them. CPE Matches change over time, and this request ensures they are current.
 
-            IMPORTANT: `modified_min` cannot be more than one month from request date.
+            IMPORTANT: `updated_after` cannot be more than one month from request date.
             """
         ),
     ),
@@ -843,7 +843,7 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to CISA KEV objects",
         description=textwrap.dedent(
             """ 
-            This request will create (or update, if exists), a Report object if a CISA KEV report exists for a vulnerability.
+            This request will create (or update, if exists), a Report object if a CISA KEV report exists for a vulnerability. It checks all CISA KEVs when run.
             """
         ),
     ),
@@ -852,7 +852,7 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to Vulncheck KEV objects",
         description=textwrap.dedent(
             """ 
-            This request will create (or update, if exists), a Report object if a Vulncheck KEV report exists for a vulnerability.
+            This request will create (or update, if exists), a Report object if a Vulncheck KEV report exists for a vulnerability. It checks all Vulncheck KEVs when run.
             """
         ),
     ),
