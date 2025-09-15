@@ -881,8 +881,7 @@ class ACPView(viewsets.GenericViewSet):
         data = self.request.data
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data.copy()
-        job = new_task(data, models.JobType.CVE_PROCESSOR)
+        job = new_task(serializer.data, models.JobType.CVE_PROCESSOR)
         job_s = serializers.JobSerializer(instance=job)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 

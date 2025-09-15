@@ -43,6 +43,7 @@ class NVDTaskSerializer(serializers.Serializer):
         if time_difference > timedelta(31):
             raise serializers.ValidationError(f'a maximum of 31 days difference allowed, last_modified_latest - last_modified_earliest = {time_difference.days} days')
         return super().validate(attrs)
+    
 
 class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField(required=False, allow_null=True)
@@ -60,7 +61,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ACPSerializer(serializers.Serializer):
-    mode = serializers.HiddenField(default=None)
+    mode = serializers.ReadOnlyField(default=None)
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
@@ -87,7 +88,7 @@ class AcpEPSSBackfill(ACPSerializer):
         attrs = super().validate(attrs)
         if attrs['start_date'] > attrs['end_date']:
             raise validators.ValidationError({"start_date": 'must not be greater than end_date'})
-    
+        return attrs
 
 class HealthCheckChoices(StrEnum):
     AUTHORIZED = auto()
