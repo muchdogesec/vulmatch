@@ -783,7 +783,7 @@ class CpeView(viewsets.ViewSet):
 @extend_schema_view(
     cve_epss_backfill=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Links vulnerability objects to EPSS scores (historic)",
+        summary="Links vulnerability objects to EPSS scores",
         description=textwrap.dedent(
             """ 
             This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs.
@@ -844,8 +844,6 @@ class CpeView(viewsets.ViewSet):
         description=textwrap.dedent(
             """ 
             This request will create (or update, if exists), a Report object if a CISA KEV report exists for a vulnerability.
-
-            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
@@ -855,8 +853,6 @@ class CpeView(viewsets.ViewSet):
         description=textwrap.dedent(
             """ 
             This request will create (or update, if exists), a Report object if a Vulncheck KEV report exists for a vulnerability.
-
-            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
