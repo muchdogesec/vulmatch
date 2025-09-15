@@ -783,7 +783,7 @@ class CpeView(viewsets.ViewSet):
 @extend_schema_view(
     cve_epss_backfill=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Generate EPSS scores for CVEs (historic)",
+        summary="Links vulnerability objects to EPSS scores (historic)",
         description=textwrap.dedent(
             """ 
             This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs.
@@ -806,7 +806,9 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to ATT&CK objects",
         description=textwrap.dedent(
             """ 
-            This request will link vulnerabilities to ATT&CK objects (using the CAPECs reported by `cve-capec` mode).
+            This request will link (via an SRO created) vulnerabilities to ATT&CK objects (using the CAPECs reported by `cve-capec` mode).
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
 
             IMPORTANT: this mode relies on `cve-capec` mode, therefore it must be run before this request.
             """
@@ -817,7 +819,9 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to CAPEC objects",
         description=textwrap.dedent(
             """ 
-            This request will link vulnerabilities to CAPEC objects (using the CAPECs reported in CWEs linked to the vulnerability)
+            This request will link (via an SRO created) vulnerabilities to CAPEC objects (using the CAPECs reported in CWEs linked to the vulnerability)
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
 
             IMPORTANT: this mode relies on `cve-cwe` mode, therefore it must be run before this request.
             """
@@ -828,34 +832,42 @@ class CpeView(viewsets.ViewSet):
         summary="Links vulnerability objects to CWE objects.",
         description=textwrap.dedent(
             """ 
-            This request will link the CWEs reported in the CVE object to the STIX representation of the CWE object.
+            This request will link (via an SRO created) the CWEs reported in the CVE object to the STIX representation of the CWE object.
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
     cve_epss=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Generate EPSS scores for CVEs",
+        summary="Links vulnerability objects to EPSS scores",
         description=textwrap.dedent(
             """ 
             This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed. It will update the EPSS score for the current day. To run for historic EPSS scores, use the historic EPSS backfill mode.
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
     cve_kev=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        summary="Links vulnerability objects to CISA KEV objects",
         description=textwrap.dedent(
             """ 
-            Links vulnerability objects to CWE objects.
+            This request will create (or update, if exists), a Report object if a CISA KEV report exists for a vulnerability.
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
     cve_vulncheck_kev=extend_schema(
         responses={201: serializers.JobSerializer},
-        summary="Trigger arango_cve_processor `mode` to generate relationships.",
+        summary="Links vulnerability objects to Vulncheck KEV objects",
         description=textwrap.dedent(
             """ 
-            Links vulnerability objects to CWE objects.
+            This request will create (or update, if exists), a Report object if a Vulncheck KEV report exists for a vulnerability.
+
+            You can run either `modified_min` OR `created_min`. These values refer to the dates of the vulnerability objects you want the mode to consider.
             """
         ),
     ),
