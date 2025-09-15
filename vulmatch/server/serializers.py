@@ -14,6 +14,8 @@ ACP_MODES = {
     "cve-cwe": "Relate CVE objects to CWE objects",
     "cve-capec": "Relate CWE objects to CAPEC objects",
     "cve-attack": "Relate CAPEC objects to ATT&CK objects",
+    "cve-epss-backfill": "Relate CAPEC objects to ATT&CK objects",
+    "cpematch": "Relate CAPEC objects to ATT&CK objects",
 }
 
 class StixObjectsSerializer(serializers.Serializer):
@@ -41,6 +43,7 @@ class NVDTaskSerializer(serializers.Serializer):
         if time_difference > timedelta(31):
             raise serializers.ValidationError(f'a maximum of 31 days difference allowed, last_modified_latest - last_modified_earliest = {time_difference.days} days')
         return super().validate(attrs)
+    
 
 class StixVersionsSerializer(serializers.Serializer):
     latest = serializers.DateTimeField(required=False, allow_null=True)
@@ -57,15 +60,35 @@ class ProductSerializer(serializers.ModelSerializer):
         exclude = ['id']
 
 
-class ACPSerializer(serializers.Serializer):
+class ACPSerializerBase(serializers.Serializer):
+    mode = serializers.ReadOnlyField(default=None)
     ignore_embedded_relationships = serializers.BooleanField(default=False)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
+    
+    def validate(self, attrs):
+        mode = self.context['request'].path.rstrip('/').split('/')[-1]
+        if mode not in ACP_MODES:
+            raise validators.ValidationError({"mode": f"This mode `{mode}` is not supported."})
+        attrs['mode'] = mode
+        return super().validate(attrs)
+
+class ACPSerializerGeneral(ACPSerializerBase):
     modified_min = serializers.DateTimeField(required=False)
     created_min = serializers.DateTimeField(required=False)
 
-class ACPSerializerWithMode(ACPSerializer):
-    mode = serializers.ChoiceField(choices=list(ACP_MODES.items()))
+class AcpCPEMatch(ACPSerializerBase):
+    updated_after = serializers.DateTimeField(required=False)
+
+class AcpEPSSBackfill(ACPSerializerBase):
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs['start_date'] > attrs['end_date']:
+            raise validators.ValidationError({"start_date": 'must not be greater than end_date'})
+        return attrs
 
 class HealthCheckChoices(StrEnum):
     AUTHORIZED = auto()
