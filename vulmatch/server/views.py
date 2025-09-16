@@ -201,6 +201,17 @@ class VulnerabilityStatus(models.models.TextChoices):
             """
         ),
     ),
+    navigator=extend_schema(
+        summary=f"Get navigator layer file for CVE Object",
+        description=textwrap.dedent(
+            """
+                    This endpoint will return a [MITRE ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/) layer file for the chosen object.
+                    """
+        ),
+        responses={
+            200: serializers.AttackNavigatorSerializer,
+        },
+    ),
 )
 class CveView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
@@ -400,6 +411,16 @@ class CveView(viewsets.ViewSet):
         return VulmatchDBHelper("nvd_cve_vertex_collection", request).get_cve_versions(
             cve_id
         )
+
+    @decorators.action(
+        detail=False,
+        url_path="objects/<str:cve_id>/navigator",
+        methods=["GET"],
+    )
+    def navigator(self, request, *args, cve_id=None, **kwargs):
+        return VulmatchDBHelper(
+            "nvd_cve_vertex_collection", request
+        ).get_navigator_layer(cve_id)
 
 
 @extend_schema_view(
@@ -780,6 +801,7 @@ class CpeView(viewsets.ViewSet):
             cpe_name
         )
 
+
 @extend_schema_view(
     cve_epss_backfill=extend_schema(
         responses={201: serializers.JobSerializer},
@@ -859,7 +881,6 @@ class CpeView(viewsets.ViewSet):
         ),
     ),
 )
-
 class ACPView(viewsets.GenericViewSet):
     openapi_tags = ["Arango CVE Processor"]
     serializer_class = serializers.ACPSerializerGeneral
@@ -902,11 +923,21 @@ class ACPView(viewsets.GenericViewSet):
     def cve_cwe(self, request, *args, **kwargs):
         return self.run_acvep()
 
-    @decorators.action(methods=["POST"], detail=False, url_path="cve-kev", serializer_class=serializers.ACPSerializerBase)
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        url_path="cve-kev",
+        serializer_class=serializers.ACPSerializerBase,
+    )
     def cve_kev(self, request, *args, **kwargs):
         return self.run_acvep()
 
-    @decorators.action(methods=["POST"], detail=False, url_path="cve-vulncheck-kev", serializer_class=serializers.ACPSerializerBase)
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        url_path="cve-vulncheck-kev",
+        serializer_class=serializers.ACPSerializerBase,
+    )
     def cve_vulncheck_kev(self, request, *args, **kwargs):
         return self.run_acvep()
 
