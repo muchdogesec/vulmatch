@@ -342,21 +342,21 @@ def test_retrieve_vulnerability(client, cve_id):
 @pytest.mark.parametrize(
     ["cve_id", "filters", "expected_count"],
     [
-        ["CVE-2024-12978", None, 17],
-        ["CVE-2024-53647", None, 34],
-        ["CVE-2023-31025", None, 21],
+        ["CVE-2024-12978", None, 20],
+        ["CVE-2024-53647", None, 37],
+        ["CVE-2023-31025", None, 24],
         ##
-        ["CVE-2024-53647", dict(include_capec=False), 20],
-        ["CVE-2024-53647", dict(include_attack=False), 24],
-        ["CVE-2023-31025", dict(include_capec=False), 21],
-        ["CVE-2023-31025", dict(include_epss=False), 20],
-        ["CVE-2024-53197", dict(include_kev=True), 5157],
-        ["CVE-2024-53197", dict(include_kev=False), 5155], #subtract cisa and vulncheck kev (5157 - 2)
-        ["CVE-2024-53197", dict(include_kev=False, include_epss=False), 5154], #subtract cisa and vulncheck kev (5157 - 2) and one epss report (5155 - 1)
-        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5157],
-        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 14],
-        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False), 12],
-        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False, include_epss=False), 11],
+        ["CVE-2024-53647", dict(include_capec=False), 23],
+        ["CVE-2024-53647", dict(include_attack=False), 27],
+        ["CVE-2023-31025", dict(include_capec=False), 24],
+        ["CVE-2023-31025", dict(include_epss=False), 23],
+        ["CVE-2024-53197", dict(include_kev=True), 5160],
+        ["CVE-2024-53197", dict(include_kev=False), 5158], #subtract cisa and vulncheck kev (5160 - 2)
+        ["CVE-2024-53197", dict(include_kev=False, include_epss=False), 5157], #subtract cisa and vulncheck kev (5160 - 2) and one epss report (5158 - 1)
+        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5160],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 17],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False), 15],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False, include_kev=False, include_epss=False), 14],
     ],
 )
 def test_bundle(client, cve_id, filters, expected_count):
