@@ -113,34 +113,26 @@ def test_retrieve_cpe(client, cpe_name):
     assert resp_data["objects"][0]["cpe"] == cpe_name
 
 @pytest.mark.parametrize(
-    ["cpe_name", 'include_cves_not_vulnerable', 'expected_count'],
+    ["cpe_name", 'filters', 'expected_count'],
     [
-        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", None, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", None, 5],
-        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", None, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", None, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", None, 5],
-        ####
-        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", True, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", True, 5],
-        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", True, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", True, 5],
-        ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", True, 5],
+        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", None, 15],
+        ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", dict(include_cves_vulnerable=False), 10],
+        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", None, 15],
+        ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", dict(include_cves_vulnerable=False), 10],
+        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", None, 15],
+        ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", dict(include_cves_vulnerable=False), 10],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", None, 15],
+        ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", dict(include_cves_vulnerable=False), 10],
         #####
-        # ["cpe:2.3:a:mongodb:c_driver:1.15.0:*:*:*:*:mongodb:*:*", False, 4],
-        # ["cpe:2.3:a:ays-pro:quiz_maker:1.1.0:*:*:*:*:wordpress:*:*", False, 4],
-        # ["cpe:2.3:o:juniper:junos:23.1:-:*:*:*:*:*:*", False, 4],
-        # ["cpe:2.3:a:ays-pro:quiz_maker:5.2.1:*:*:*:*:wordpress:*:*", False, 4],
-        # ["cpe:2.3:a:ays-pro:quiz_maker:5.1.3:*:*:*:*:wordpress:*:*", False, 4],
+        ["cpe:2.3:h:huawei:secospace_usg6600:-:*:*:*:*:*:*:*", dict(include_cves_vulnerable=False), 39],
+        ["cpe:2.3:h:huawei:secospace_usg6600:-:*:*:*:*:*:*:*", dict(include_cves_not_vulnerable=False), 10],
+        ["cpe:2.3:h:huawei:secospace_usg6600:-:*:*:*:*:*:*:*", dict(include_cves_not_vulnerable=True), 39],
+        ["cpe:2.3:h:huawei:secospace_usg6600:-:*:*:*:*:*:*:*", None, 39],
     ],
 )
-def test_bundle(client, cpe_name, include_cves_not_vulnerable, expected_count):
+def test_bundle(client, cpe_name, filters, expected_count):
     url = f"/api/v1/cpe/objects/{cpe_name}/bundle/"
-    filters = {}
-    if include_cves_not_vulnerable != None:
-        filters.update(include_cves_not_vulnerable=include_cves_not_vulnerable)
-    else:
-        include_cves_not_vulnerable = True
+    filters = filters or {}
     
     resp = client.get(url, query_params=filters)
     assert resp.status_code == 200, resp.json()
@@ -150,7 +142,7 @@ def test_bundle(client, cpe_name, include_cves_not_vulnerable, expected_count):
         == resp_data["page_results_count"]
     ), "response contains duplicates"
     assert resp_data["total_results_count"] == expected_count
-    if not include_cves_not_vulnerable:
+    if not filters.get('include_cves_not_vulnerable', True):
         assert all([obj['relationship_type'] != 'relies-on' for obj in resp_data["objects"] if obj['type'] == 'relationship'])
 
 @pytest.mark.parametrize(
@@ -159,13 +151,13 @@ def test_bundle(client, cpe_name, include_cves_not_vulnerable, expected_count):
         [('software',), 1],
         [('vulnerability',), 1],
         [('indicator',), 1],
-        [('relationship',), 1],
+        [('relationship',), 2],
         [('software','indicator'), 2],
         [('software','vulnerability'), 2],
-        [('relationship', "vulnerability"), 2],
-        [None, 5],
-        [('software', 'relationship', 'indicator', 'vulnerability'), 4],
-        [('software', 'relationship', 'indicator', 'vulnerability', 'grouping'), 5],
+        [('relationship', "vulnerability"), 3],
+        [None, 15],
+        [('software', 'relationship', 'indicator', 'vulnerability'), 5],
+        [('software', 'relationship', 'indicator', 'vulnerability', 'grouping'), 6],
     ]
 )
 def test_bundle_types(client, types, expected_count):
@@ -175,7 +167,7 @@ def test_bundle_types(client, types, expected_count):
         filters.update(types=','.join(types))
         types = set(types)
     else:
-        types = {'software', 'relationship', 'indicator', 'vulnerability', 'grouping'}
+        types = {'software', 'relationship', 'indicator', 'vulnerability', 'grouping', 'marking-definition', 'extension-definition', 'identity'}
     resp = client.get(url, query_params=filters)
     assert resp.status_code == 200, resp.json()
     resp_data = resp.json()

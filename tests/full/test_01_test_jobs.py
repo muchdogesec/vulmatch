@@ -8,7 +8,7 @@ import pytest
     pytest.param("arango-cve-processor/cve-cwe", dict()),
     pytest.param("arango-cve-processor/cve-capec", dict(created_min="2024-12-31")),
     pytest.param("arango-cve-processor/cve-attack", dict(created_min="2024-12-31")),
-    pytest.param("arango-cve-processor/cve-epss", dict()),
+    pytest.param("arango-cve-processor/cve-epss", dict(start_date='2025-09-01', end_date='2025-09-06')),
     pytest.param("arango-cve-processor/cve-kev", dict()),
     pytest.param("arango-cve-processor/cve-vulncheck-kev", dict(created_min="2024-01-12", modified_min="2024-12-31")),
 ])
