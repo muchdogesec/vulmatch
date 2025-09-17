@@ -448,7 +448,7 @@ def test_navigator(client):
         "description": "Techniques CVE-2024-56803 is exploited by",
         "name": "CVE-2024-56803",
         "domain": "enterprise-attack",
-        "versions": {"layer": "4.5", "attack": "17.1", "navigator": "5.1.0"},
+        "versions": {"layer": "4.5", "navigator": "5.1.0"},
         "techniques": [
             {"techniqueID": "T1027.009", "score": 100, "showSubtechniques": True},
             {"techniqueID": "T1027.006", "score": 100, "showSubtechniques": True},

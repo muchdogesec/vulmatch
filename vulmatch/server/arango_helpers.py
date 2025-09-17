@@ -1063,7 +1063,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
             'match_id': matched_object['id'],
         }
 
-        version = '17.1'
         new_query = """
         FOR d IN nvd_cve_edge_collection
         FILTER d._arango_cve_processor_note == "cve-attack" AND d.source_ref == @match_id AND d._from == @match_pk
@@ -1077,7 +1076,6 @@ RETURN KEEP(d, KEYS(d, TRUE))
             "domain": f"enterprise-attack",
             "versions": {
                 "layer": "4.5",
-                "attack": version.replace("_", "."),
                 "navigator": "5.1.0",
             },
             "techniques": [
