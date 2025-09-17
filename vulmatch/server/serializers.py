@@ -164,7 +164,7 @@ class AttackNavigatorSerializer(JSONSchemaSerializer):
                         "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
                         "comment": {"type": "string"},
                         "enabled": {"type": "boolean"},
-                        "showSubTechnique": {"type": "boolean"},
+                        "showSubtechniques": {"type": "boolean"},
                         "links": {
                             "type": "array",
                             "items": {
