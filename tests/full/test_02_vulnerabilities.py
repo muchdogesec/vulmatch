@@ -439,3 +439,36 @@ def test_versions(client, cve_id):
     assert resp.status_code == 200
     assert {'versions', 'latest'} == set(resp.data.keys())
     assert resp.data['latest'] == resp.data['versions'][0]
+
+def test_navigator(client):
+    cve_id = 'CVE-2024-56803'
+    resp = client.get(f"/api/v1/cve/objects/{cve_id}/navigator/")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "description": "Techniques CVE-2024-56803 is exploited by",
+        "name": "CVE-2024-56803",
+        "domain": "enterprise-attack",
+        "versions": {"layer": "4.5", "navigator": "5.1.0"},
+        "techniques": [
+            {"techniqueID": "T1027.009", "score": 100, "showSubtechniques": True},
+            {"techniqueID": "T1027.006", "score": 100, "showSubtechniques": True},
+            {"techniqueID": "T1564.009", "score": 100, "showSubtechniques": True},
+        ],
+        "gradient": {"colors": ["#ffffff", "#ff6666"], "minValue": 0, "maxValue": 100},
+        "legendItems": [],
+        "metadata": [
+            {
+                "name": "stix_id",
+                "value": "vulnerability--b82ec506-3b53-5bf9-91e6-584249b7b378",
+            },
+            {"name": "cve_id", "value": "CVE-2024-56803"},
+        ],
+        "links": [{"label": "vulmatch", "url": "https://app.vulmatch.com"}],
+        "layout": {"layout": "side"},
+    }
+
+
+def test_navigator__fails(client):
+    cve_id = 'CVE-2026-56803'
+    resp = client.get(f"/api/v1/cve/objects/{cve_id}/navigator/")
+    assert resp.status_code == 404

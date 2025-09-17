@@ -3,7 +3,7 @@ import itertools
 import logging
 import typing
 from django.conf import settings
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, ValidationError, ParseError
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
 from arango_cve_processor.tools.cpe import generate_grouping_id
@@ -1049,3 +1049,51 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
         # return HttpResponse(f"""{query}\n// {json.dumps(bind_vars)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=bind_vars)
+
+    def get_navigator_layer(self, cve_id):
+        primary_objects = self.get_cve_or_cpe_object(cve_id)
+        vulns = [p for p in primary_objects if p['type'] == 'vulnerability']
+        if not vulns:
+            raise NotFound('not found')
+        matched_object = vulns[0]
+
+        binds = {
+            # '@view': settings.VIEW_NAME,
+            'match_pk': matched_object['_id'],
+            'match_id': matched_object['id'],
+        }
+
+        new_query = """
+        FOR d IN nvd_cve_edge_collection
+        FILTER d._arango_cve_processor_note == "cve-attack" AND d.source_ref == @match_id AND d._from == @match_pk
+        RETURN d.external_references[1].external_id
+        """
+        techniques = self.execute_query(new_query, bind_vars=binds, paginate=False)
+        name = matched_object['name']
+        nav_retval = {
+            "description": f"Techniques {name} is exploited by",
+            "name": name,
+            "domain": f"enterprise-attack",
+            "versions": {
+                "layer": "4.5",
+                "navigator": "5.1.0",
+            },
+            "techniques": [
+                dict(techniqueID=technique_id, score=100, showSubtechniques=True)
+                for technique_id in techniques
+            ],
+            "gradient": {
+                "colors": ["#ffffff", "#ff6666"],
+                "minValue": 0,
+                "maxValue": 100,
+            },
+            "legendItems": [],
+            "metadata": [
+                {"name": "stix_id", "value": matched_object["id"]},
+                {"name": "cve_id", "value": matched_object["name"]},
+            ],
+            "links": [{"label": "vulmatch", "url": "https://app.vulmatch.com"}],
+            "layout": {"layout": "side"},
+        }
+
+        return Response(nav_retval)
