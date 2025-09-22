@@ -2,7 +2,6 @@ import random
 import pytest
 
 
-
 @pytest.mark.parametrize(
     ["filters", "expected_count"],
     [
@@ -104,13 +103,10 @@ def test_cpe_match_string(client, cpe_match_string, expected_count):
 def test_retrieve_cpe(client, cpe_name):
     url = f"/api/v1/cpe/objects/{cpe_name}/"
     resp = client.get(url)
-    resp_data = resp.json()
     assert resp.status_code == 200, resp_data
-    assert all(
-        cve["type"] == "software" for cve in resp_data["objects"]
-    ), "response.objects[*].type must always be software"
-    assert resp_data["total_results_count"] == 1, "there must be exactly one match"
-    assert resp_data["objects"][0]["cpe"] == cpe_name
+    resp_data = resp.json()
+    assert resp_data["type"] == "software"
+    assert resp_data["cpe"] == cpe_name
 
 @pytest.mark.parametrize(
     ["cpe_name", 'filters', 'expected_count'],
@@ -195,5 +191,3 @@ def test_paging(client, settings, page, page_size):
         )
     assert resp_data["total_results_count"] >= resp_data["page_results_count"]
     assert resp_data["page_results_count"] <= resp_data["page_size"]
-
-        

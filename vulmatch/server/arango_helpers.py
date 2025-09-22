@@ -934,31 +934,15 @@ RETURN KEEP(d, KEYS(d, TRUE))
         self,
         cve_id,
         type="vulnerability",
-        var="name",
-        version_param="cve_version",
     ):
-        bind_vars = {
-            "@collection": self.collection,
-            "obj_name": cve_id,
-            "type": type,
-            "var": var,
-        }
-        filters = ["FILTER doc._is_latest == TRUE"]
-        if q := self.query.get(version_param):
-            bind_vars["stix_modified"] = q
-            filters[0] = "FILTER doc.modified == @stix_modified"
-
-        query = """
-            FOR doc in @@collection
-            FILTER doc.type == @type AND doc[@var] == @obj_name
-            @filters
-            LIMIT @offset, @count
-            RETURN KEEP(doc, KEYS(doc, true))
-            """.replace(
-            "@filters", "\n".join(filters)
+        mode = 'cve'
+        if type == 'software':
+            mode = 'cpe'
+        primary_objects = self.get_cve_or_cpe_object(cve_id, mode=mode)
+        vulnerability = [p for p in primary_objects if p["type"] == type][0]
+        return Response(
+            {k: v for k, v in vulnerability.items() if not k.startswith("_")}
         )
-
-        return self.execute_query(query, bind_vars=bind_vars)
 
     def get_cve_versions(self, cve_id: str):
         query = """

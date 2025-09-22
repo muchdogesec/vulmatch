@@ -334,9 +334,9 @@ def test_extra_created_filters(client, subtests):
 def test_retrieve_vulnerability(client, cve_id):
     url = f"/api/v1/cve/objects/{cve_id}/"
     resp = client.get(url)
+    assert resp.status_code == 200
     resp_data = resp.json()
-    assert resp_data["total_results_count"] == 1
-    assert resp_data["objects"][0]["name"] == cve_id
+    assert resp_data["name"] == cve_id
 
 
 @pytest.mark.parametrize(
