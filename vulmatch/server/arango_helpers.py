@@ -1,4 +1,5 @@
 import contextlib
+from datetime import UTC, datetime, timedelta
 import itertools
 import logging
 import typing
@@ -13,13 +14,13 @@ if typing.TYPE_CHECKING:
     from .. import settings
 
 EXPLOIT_TYPES = [
-  "initial-access",
-  "client-side",
-  "local",
-  "denial-of-service",
-  "infoleak",
-  "remote-with-credentials",
-  "initial"
+    "initial-access",
+    "client-side",
+    "local",
+    "denial-of-service",
+    "infoleak",
+    "remote-with-credentials",
+    "initial",
 ]
 
 SDO_TYPES = set(
@@ -353,7 +354,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if cve_ids := self.query_as_array("cve_id"):
             binds["cve_ids"] = [cve_id.upper() for cve_id in cve_ids]
             filters.append("FILTER doc.name IN @cve_ids")
-        if exploit_types := self.query_as_array('exploit_type'):
+        if exploit_types := self.query_as_array("exploit_type"):
             binds.update(exploit_types=exploit_types)
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
@@ -419,10 +420,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         if v := self.query.get("version"):
             version_filter = "FILTER doc.modified == @stix_version"
             binds.update(stix_version=v)
-        limit_statement = 'LIMIT 1'
+        limit_statement = "LIMIT 1"
         if get_all:
-            version_filter = ''
-            limit_statement = ''
+            version_filter = ""
+            limit_statement = ""
 
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
@@ -432,7 +433,9 @@ FILTER doc.id == @grouping_id
 RETURN KEEP(doc, KEYS(doc, @hide_sys))
     """.replace(
             "#version_filter", version_filter
-        ).replace('#limit_statement', limit_statement)
+        ).replace(
+            "#limit_statement", limit_statement
+        )
         groupings = self.execute_query(query, bind_vars=binds, paginate=False)
         if not groupings:
             raise NotFound({"error": f"No grouping with criteria_id `{criteria_id}`"})
@@ -893,16 +896,20 @@ RETURN KEEP(d, KEYS(d, TRUE))
             bind_vars={"matched_ids": list(groupings)},
             paginate=False,
         )
-        include_cves_vulnerable = self.query_as_bool('include_cves_vulnerable', True)
-        include_cves_not_vulnerable = self.query_as_bool('include_cves_not_vulnerable', True)
+        include_cves_vulnerable = self.query_as_bool("include_cves_vulnerable", True)
+        include_cves_not_vulnerable = self.query_as_bool(
+            "include_cves_not_vulnerable", True
+        )
         indicator_ids = CVE_BUNDLE_DEFAULT_OBJECTS.copy()
         for rel_type, *stix_ids in matches:
-            if rel_type == 'x-cpes-vulnerable' and include_cves_vulnerable:
+            if rel_type == "x-cpes-vulnerable" and include_cves_vulnerable:
                 indicator_ids.extend(stix_ids)
             elif rel_type == "x-cpes-not-vulnerable" and include_cves_not_vulnerable:
                 indicator_ids.extend(stix_ids)
             else:
-                logging.warning(f"unknown relationship_type from grouping {(rel_type, stix_ids)}")
+                logging.warning(
+                    f"unknown relationship_type from grouping {(rel_type, stix_ids)}"
+                )
         indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
@@ -1052,15 +1059,15 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
     def get_navigator_layer(self, cve_id):
         primary_objects = self.get_cve_or_cpe_object(cve_id)
-        vulns = [p for p in primary_objects if p['type'] == 'vulnerability']
+        vulns = [p for p in primary_objects if p["type"] == "vulnerability"]
         if not vulns:
-            raise NotFound('not found')
+            raise NotFound("not found")
         matched_object = vulns[0]
 
         binds = {
             # '@view': settings.VIEW_NAME,
-            'match_pk': matched_object['_id'],
-            'match_id': matched_object['id'],
+            "match_pk": matched_object["_id"],
+            "match_id": matched_object["id"],
         }
 
         new_query = """
@@ -1069,7 +1076,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         RETURN d.external_references[1].external_id
         """
         techniques = self.execute_query(new_query, bind_vars=binds, paginate=False)
-        name = matched_object['name']
+        name = matched_object["name"]
         nav_retval = {
             "description": f"Techniques {name} is exploited by",
             "name": name,

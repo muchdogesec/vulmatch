@@ -1283,3 +1283,4 @@ class HealthCheck(viewsets.ViewSet):
         except BaseException as e:
             logging.exception(e)
             return "unknown"
+        

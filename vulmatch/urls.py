@@ -20,7 +20,7 @@ from rest_framework import routers
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-from vulmatch.server import views
+from vulmatch.server import statistics, views
 from vulmatch.server.ctibutler_views import ctibutler_views
 
 from django.http import JsonResponse
@@ -52,11 +52,12 @@ router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
 router.register("attack", ctibutler_views.AttackView, "attack-view")
 
-healthcheck = routers.SimpleRouter(use_regex_path=False)
-healthcheck.register('', views.HealthCheck, "service-status-view")
+service_router = routers.SimpleRouter(use_regex_path=False)
+service_router.register('healthcheck', views.HealthCheck, "service-status-view")
+service_router.register('statistics', statistics.StatisticsView, "service-statistics-view")
 
 urlpatterns = [
-    path(f'api/healthcheck/', include(healthcheck.urls)),
+    path(f'api/', include(service_router.urls)),
     path(f'api/{API_VERSION}/', include(router.urls)),
     path('admin/', admin.site.urls),
     # YOUR PATTERNS
