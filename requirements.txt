@@ -8,7 +8,7 @@ amqp==5.3.1
     # via kombu
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango-cve-processor==1.2.4
+arango-cve-processor @ https://github.com/muchdogesec/arango_cve_processor/archive/refs/heads/add-created-modified-deprecations-to-software.zip
     # via -r requirements.in
 asgiref==3.9.1
     # via
