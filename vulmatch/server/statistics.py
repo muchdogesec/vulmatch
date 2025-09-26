@@ -78,6 +78,7 @@ class StatisticsSerializer(serializers.Serializer):
 
 
 def cached_db_query(date, revision, query, **kwargs):
+    kwargs.update(aql_options=dict(cache=True), paginate=False)
     return VulmatchDBHelper("nvd_cve_vertex_collection", None).execute_query(
         query, **kwargs
     )
@@ -85,6 +86,7 @@ def cached_db_query(date, revision, query, **kwargs):
 
 class StatisticsHelper:
     now = None
+
     def __init__(self):
         eastern = timezone("US/Eastern")
         self.now = datetime.now(eastern).date()
@@ -106,6 +108,7 @@ class StatisticsHelper:
                 by_year=self.get_vulnerabilities_by_year(),
             ),
             kev=self.get_kev_stats(),
+            epss=self.get_epss_stats(),
             **self.get_attack_cwe_stats(),
         )
         return Response(retval)
@@ -129,8 +132,6 @@ class StatisticsHelper:
             count_modified_since = self.execute_query(
                 query,
                 bind_vars=dict(**binds, date=date),
-                aql_options=dict(cache=True),
-                paginate=False,
             )[0]
             v[d] = count_modified_since
         return v
@@ -152,7 +153,7 @@ class StatisticsHelper:
         retval = dict(
             created_since=self.get_modified_since_stats(created_since_query),
             by_year=self.execute_query(
-                by_year_query, aql_options=dict(cache=True), paginate=False
+                by_year_query,
             ),
         )
         return retval
@@ -168,14 +169,10 @@ RETURN {[@name]: cwe_id, year, cve_count}
             cwes=self.execute_query(
                 query,
                 bind_vars=dict(name="cwe_id", note="cve-cwe"),
-                aql_options=dict(cache=True),
-                paginate=False,
             ),
             attacks=self.execute_query(
                 query,
                 bind_vars=dict(name="attack_id", note="cve-attack"),
-                aql_options=dict(cache=True),
-                paginate=False,
             ),
         )
 
@@ -187,7 +184,9 @@ COLLECT year = LEFT(d.created, 4) WITH COUNT INTO year_count
 SORT year DESC
 RETURN {year, count: year_count}
         """
-        return self.execute_query(query, aql_options=dict(cache=True), paginate=False)
+        return self.execute_query(
+            query,
+        )
 
     def get_earliest_and_latest_vulnerabilities(self):
         query_templ = """
@@ -204,10 +203,33 @@ RETURN { cve: d.name, created_at: d.created }
         ]:
             query = query_templ.replace("%direction", direction)
             value = self.execute_query(
-                query, aql_options=dict(cache=True), paginate=False
+                query,
             )
             retval[k] = (value and value[0]) or None
         return retval
+
+    def get_epss_stats(self):
+        query = """
+        FOR d IN nvd_cve_vertex_collection
+            OPTIONS {indexHint: 'vulmatch_stats_epss'}
+        FILTER d.type == "vulnerability" 
+            AND d._is_latest == TRUE 
+        COLLECT group = d.x_opencti_epss_score != NULL ? FLOOR(d.x_opencti_epss_score * 10) / 10 : NULL WITH COUNT INTO cve_count
+        RETURN [
+                group,
+                cve_count
+        ]
+        """
+        groups = {}
+        for group, cve_count in self.execute_query(
+            query,
+        ):
+            if group == None:
+                name = "undefined"
+            else:
+                name = f"{group:.1f} - {group + 0.1: .1f}"
+            groups[name] = cve_count
+        return groups
 
 
 class StatisticsView(viewsets.ViewSet):

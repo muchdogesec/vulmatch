@@ -167,11 +167,11 @@ def refresh_products_cache():
     logging.info(f"revision has changed ({old_rev} -> {new_rev}), rebuilding products cache")
     logging.info(f"Last revised: {db_rev.updated}")
     query = """
-        FOR doc in nvd_cve_vertex_collection OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
-        FILTER doc.type == 'software' AND doc._is_latest == TRUE 
-        COLLECT vendor = doc.x_cpe_struct.vendor, product = doc.x_cpe_struct.product WITH COUNT INTO len
-        SORT NULL
-        RETURN [vendor, product, len]
+         FOR doc in nvd_cve_vertex_collection OPTIONS {indexHint: "vulmatch_products", forceIndexHint: true}
+         FILTER doc.type == 'software' AND doc._is_latest == TRUE 
+         COLLECT vendor = doc.x_cpe_struct.vendor, product = doc.x_cpe_struct.product WITH COUNT INTO len
+         SORT NULL
+         RETURN [vendor, product, len]
     """
     results = helper.execute_query(query, paginate=False)
     products: list[models.Products] = []
