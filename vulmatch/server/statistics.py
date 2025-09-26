@@ -1,4 +1,6 @@
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
+import json
 from rest_framework import serializers
 from rest_framework import viewsets
 from pytz import timezone
@@ -76,8 +78,9 @@ class StatisticsSerializer(serializers.Serializer):
     cwes = serializers.ListSerializer(child=CWESerializer())
     attacks = serializers.ListSerializer(child=AttackSerializer())
 
-
-def cached_db_query(date, revision, query, **kwargs):
+@lru_cache
+def cached_db_query(date, revision, query, kwargs):
+    kwargs = json.loads(kwargs)
     kwargs.update(aql_options=dict(cache=True), paginate=False)
     return VulmatchDBHelper("nvd_cve_vertex_collection", None).execute_query(
         query, **kwargs
@@ -97,7 +100,7 @@ class StatisticsHelper:
         )
 
     def execute_query(self, query, **kwargs):
-        return cached_db_query(self.now.isoformat(), self._rev, query, **kwargs)
+        return cached_db_query(self.now.isoformat(), self._rev, query, json.dumps(kwargs, sort_keys=True))
 
     def get_statistics(self):
         retval = dict(
