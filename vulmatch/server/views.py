@@ -235,6 +235,13 @@ class CveView(viewsets.ViewSet):
     ]
 
     class filterset_class(FilterSet):
+        created_by_ref = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filter the results using the STIX ID of a CNA object. e.g. `identity--64dfee48-e209-5e25-bad4-dcc80d221a85`.
+            """
+            )
+        )
         stix_id = MultipleChoiceFilter(
             help_text=textwrap.dedent(
                 """
@@ -421,7 +428,39 @@ class CveView(viewsets.ViewSet):
         return VulmatchDBHelper(
             "nvd_cve_vertex_collection", request
         ).get_navigator_layer(cve_id)
+    
+class CNAView(viewsets.ViewSet):
+    openapi_tags = ["CVE"]
+    pagination_class = Pagination("objects")
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = serializers.StixObjectsSerializer(many=True)
+    openapi_tags = ["CVE"]
+    lookup_url_kwarg = "cna_id"
 
+
+    class filterset_class(FilterSet):
+        name = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.'
+            """
+            )
+        )
+
+
+    @extend_schema(
+        responses={200: serializers.StixObjectsSerializer(many=True)},
+        filters=True,
+        summary="Get CNA Objects for CVEs",
+        description=textwrap.dedent(
+            """
+            Search and filter CNA records.
+            """
+        ),
+    )
+    @decorators.action(methods=["GET"], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
+        return VulmatchDBHelper("", request).list_cnas()
 
 @extend_schema_view(
     list_objects=extend_schema(
