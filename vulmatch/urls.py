@@ -40,6 +40,7 @@ router.register("arango-cve-processor", views.ACPView, "acp-view")
 # nvd
 router.register("cve", views.CveView, "cve-view")
 router.register("cpe", views.CpeView, "cpe-view")
+router.register("cna", views.CNAView, "cna-view")
 router.register("cpe/vendors", views.VendorView, "vendor-view")
 router.register("cpe/products", views.ProductView, "product-view")
 router.register("cpe/matchcriteria", views.CpeMatchView, "cpematch-view")

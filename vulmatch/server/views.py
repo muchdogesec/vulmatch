@@ -30,7 +30,13 @@ from django_filters.rest_framework import (
     NumberFilter,
     DateTimeFilter,
 )
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiResponse,
+    OpenApiExample,
+)
 from drf_spectacular.types import OpenApiTypes
 from dogesec_commons.utils.schemas import DEFAULT_400_RESPONSE
 
@@ -119,11 +125,24 @@ class VulnerabilityStatus(models.models.TextChoices):
             """
         ),
         responses={
-            200: VulmatchDBHelper.get_paginated_response_schema(
-                "objects", "vulnerability"
+            200: OpenApiResponse(
+                serializers.StixObjectsSerializer(many=False),
+                examples=[
+                    OpenApiExample(
+                        "vulnerability",
+                        value={
+                            "type": "vulnerability",
+                            "spec_version": "2.1",
+                            "id": "vulnerability--48eacc54-9f96-5295-9d82-13d9d348eefc",
+                            "created_by_ref": "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",
+                            "created": "2024-12-27T14:15:32.130Z",
+                            "modified": "2025-08-28T15:15:42.937Z",
+                            "name": "CVE-2024-53237",
+                        },
+                    )
+                ],
             )
         },
-        parameters=VulmatchDBHelper.get_schema_operation_parameters(),
     ),
     bundle=extend_schema(
         summary="Get all objects for a Vulnerability by CVE ID",
@@ -235,6 +254,13 @@ class CveView(viewsets.ViewSet):
     ]
 
     class filterset_class(FilterSet):
+        created_by_ref = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filter the results using the STIX ID of a CNA object. e.g. `identity--64dfee48-e209-5e25-bad4-dcc80d221a85`.
+            """
+            )
+        )
         stix_id = MultipleChoiceFilter(
             help_text=textwrap.dedent(
                 """
@@ -397,8 +423,8 @@ class CveView(viewsets.ViewSet):
     )
     @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper("nvd_cve_vertex_collection", request).get_cxe_object(
-            cve_id
+        return VulmatchDBHelper(f"nvd_cve_vertex_collection", request).get_cxe_object(
+            cve_id, type="vulnerability"
         )
 
     @decorators.action(
@@ -421,7 +447,39 @@ class CveView(viewsets.ViewSet):
         return VulmatchDBHelper(
             "nvd_cve_vertex_collection", request
         ).get_navigator_layer(cve_id)
+    
+class CNAView(viewsets.ViewSet):
+    openapi_tags = ["CVE"]
+    pagination_class = Pagination("objects")
+    filter_backends = [DjangoFilterBackend]
+    serializer_class = serializers.StixObjectsSerializer(many=True)
+    openapi_tags = ["CVE"]
+    lookup_url_kwarg = "cna_id"
 
+
+    class filterset_class(FilterSet):
+        name = CharFilter(
+            help_text=textwrap.dedent(
+                """
+            Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.'
+            """
+            )
+        )
+
+
+    @extend_schema(
+        responses={200: serializers.StixObjectsSerializer(many=True)},
+        filters=True,
+        summary="Get CNA Objects for CVEs",
+        description=textwrap.dedent(
+            """
+            Search and filter CNA records.
+            """
+        ),
+    )
+    @decorators.action(methods=["GET"], url_path="objects", detail=False)
+    def list_objects(self, request, *args, **kwargs):
+        return VulmatchDBHelper("", request).list_cnas()
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -635,6 +693,26 @@ class EPSSView(KevView):
             """
         ),
         filters=False,
+        responses={
+            200: OpenApiResponse(
+                serializers.StixObjectsSerializer(many=False),
+                examples=[
+                    OpenApiExample(
+                        "software",
+                        value={
+                            "type": "software",
+                            "spec_version": "2.1",
+                            "id": "software--16c716ce-e2cf-589e-bd89-1c13af6d1c03",
+                            "name": "Drupal Plugin: Back Button",
+                            "cpe": "cpe:2.3:a:other.media:browser_back_button:2.0.0:*:*:*:*:drupal:*:*",
+                            "swid": "A3123930-8F72-4665-B1CD-217CDBBCC53F",
+                            "vendor": "other.media",
+                            "version": "2.0.0",
+                        },
+                    )
+                ],
+            )
+        },
     ),
     retrieve_object_bundle=extend_schema(
         summary="Get Bundle for CPE",
@@ -790,7 +868,7 @@ class CpeView(viewsets.ViewSet):
     @decorators.action(methods=["GET"], url_path="objects/<str:cpe_name>", detail=False)
     def retrieve_objects(self, request, *args, cpe_name=None, **kwargs):
         return VulmatchDBHelper(f"nvd_cve_vertex_collection", request).get_cxe_object(
-            cpe_name, type="software", var="cpe"
+            cpe_name, type="software"
         )
 
     @decorators.action(

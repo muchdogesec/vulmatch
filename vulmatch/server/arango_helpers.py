@@ -340,7 +340,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
 
         query = """
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER doc.labels == [@label] AND doc._is_latest
 FILTER doc.external_references[0].external_id == @cve_id
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
@@ -359,7 +359,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -392,7 +392,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -426,7 +426,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
@@ -522,9 +522,9 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
 
         if (hasKev := self.query_as_bool("has_kev", None)) != None:
             if hasKev:
-                filters.append("FILTER doc.id IN kevs")
+                filters.append("FILTER doc.x_opencti_cisa_kev == TRUE")
             else:
-                filters.append("FILTER doc.id NOT IN kevs")
+                filters.append("FILTER doc.x_opencti_cisa_kev == NULL")
 
         if q := self.query_as_array("weakness_id"):
             binds["weakness_ids"] = [qq.upper() for qq in q]
@@ -556,55 +556,35 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             self.query.get("epss_score_min"), default=None, type=float
         ):
             binds["epss_score_min"] = epss_score_min
-            epss_filters.append("FILTER TO_NUMBER(last_epss.epss) >= @epss_score_min")
+            filters.append("FILTER doc.x_opencti_epss_score >= @epss_score_min")
 
         if epss_percentile_min := as_number(
             self.query.get("epss_percentile_min"), default=None, type=float
         ):
             binds["epss_percentile_min"] = epss_percentile_min
-            epss_filters.append(
-                "FILTER TO_NUMBER(last_epss.percentile) >= @epss_percentile_min"
+            filters.append(
+                "FILTER doc.x_opencti_epss_percentile >= @epss_percentile_min"
             )
 
-        if epss_filters:
-            filters.append("FILTER doc.id IN KEYS(epss)")
-
-        query = (
-            """
-LET kevs = (
-FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "kev"
-RETURN doc.object_refs[0]
-)
-LET epss = MERGE(
-FOR doc IN nvd_cve_vertex_collection
-LET last_epss = LAST(doc.x_epss)
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "epss"
-#epss_filters
-RETURN {[doc.object_refs[0]]: last_epss}
-)
-
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+        query = """
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
     """.replace(
-                "@filters", "\n".join(filters)
-            )
-            .replace("#epss_filters", "\n".join(epss_filters))
-            .replace(
-                "@sort_stmt",
-                self.get_sort_stmt(
-                    CVE_SORT_FIELDS,
-                    {
-                        "epss_score": "epss[doc.id].epss",
-                        "epss_percentile": "epss[doc.id].percentile",
-                        "cvss_base_score": "doc._cvss_base_score",
-                    },
-                ),
-            )
+            "@filters", "\n".join(filters)
+        ).replace(
+            "@sort_stmt",
+            self.get_sort_stmt(
+                CVE_SORT_FIELDS,
+                {
+                    "epss_score": "doc.x_opencti_epss_score",
+                    "epss_percentile": "doc.x_opencti_epss_percentile",
+                    "cvss_base_score": "doc._cvss_base_score",
+                },
+            ),
         )
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(
@@ -941,31 +921,15 @@ RETURN KEEP(d, KEYS(d, TRUE))
         self,
         cve_id,
         type="vulnerability",
-        var="name",
-        version_param="cve_version",
     ):
-        bind_vars = {
-            "@collection": self.collection,
-            "obj_name": cve_id,
-            "type": type,
-            "var": var,
-        }
-        filters = ["FILTER doc._is_latest == TRUE"]
-        if q := self.query.get(version_param):
-            bind_vars["stix_modified"] = q
-            filters[0] = "FILTER doc.modified == @stix_modified"
-
-        query = """
-            FOR doc in @@collection
-            FILTER doc.type == @type AND doc[@var] == @obj_name
-            @filters
-            LIMIT @offset, @count
-            RETURN KEEP(doc, KEYS(doc, true))
-            """.replace(
-            "@filters", "\n".join(filters)
+        mode = 'cve'
+        if type == 'software':
+            mode = 'cpe'
+        primary_objects = self.get_cve_or_cpe_object(cve_id, mode=mode)
+        vulnerability = [p for p in primary_objects if p["type"] == type][0]
+        return Response(
+            {k: v for k, v in vulnerability.items() if not k.startswith("_")}
         )
-
-        return self.execute_query(query, bind_vars=bind_vars)
 
     def get_cve_versions(self, cve_id: str):
         query = """
@@ -1104,3 +1068,23 @@ RETURN KEEP(d, KEYS(d, TRUE))
         }
 
         return Response(nav_retval)
+
+    def list_cnas(self):
+        name_filter = ""
+        bind_vars = {
+            "@collection": "nvd_cve_vertex_collection",
+        }
+        if name := self.query.get("name"):
+            bind_vars["name"] = self.like_string(name).lower()
+            name_filter = "FILTER doc.name LIKE @name OR doc.external_references[? ANY FILTER CURRENT.external_id LIKE @name]"
+        query = """
+        FOR doc IN @@collection //OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
+        FILTER doc.type == 'identity' 
+        FILTER doc._is_latest == TRUE AND doc.external_references != NULL
+        // name_filter
+        LIMIT @offset, @count
+        RETURN KEEP(doc, KEYS(doc, true))
+        """.replace(
+            "// name_filter", name_filter
+        )
+        return self.execute_query(query, bind_vars=bind_vars)

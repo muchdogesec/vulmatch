@@ -174,7 +174,7 @@ def create_indexes(db: StandardDatabase):
     vertex_collection.add_index(
         dict(
             type="inverted",
-            name="cve_search_inv",
+            name="cve_search_inv_v2",
             sparse=True,
             fields=[
                 "name",
@@ -184,8 +184,9 @@ def create_indexes(db: StandardDatabase):
                 dict(name="description", analyzer="norm_en"),
                 "type",
                 "_cvss_base_score",
-                "_epss_score",
-                "_epss_percentile",
+                "x_opencti_epss_score",
+                "x_opencti_epss_percentile",
+                "x_opencti_cisa_kev",
                 "_is_latest",
             ],
             inBackground=True,

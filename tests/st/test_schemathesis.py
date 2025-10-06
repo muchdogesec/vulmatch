@@ -1,3 +1,4 @@
+import random
 import time
 from unittest.mock import patch
 from urllib.parse import urlencode
@@ -75,11 +76,16 @@ def override_transport(monkeypatch):
     cve_id=object_ids_st,
     cpe_id=object_ids_st,
 )
-@schema.exclude(method="POST").exclude(path='/api/healthcheck/service/').parametrize()
+@schema.exclude(method="POST").exclude(path='/api/healthcheck/service/').exclude(path="/api/v1/cve/objects/{cve_id}/").parametrize()
 def test_api(case: schemathesis.Case, **kwargs):
     for k, v in kwargs.items():
         if k in case.path_parameters:
             case.path_parameters[k] = v
+    case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])
+
+@schema.include(path="/api/v1/cve/objects/{cve_id}/").parametrize()
+def test_retrieve_cve(case: schemathesis.Case, **kwargs):
+    case.path_parameters['cve_id'] = random.choice(object_ids)
     case.call_and_validate(excluded_checks=[negative_data_rejection, positive_data_acceptance])
 
 
