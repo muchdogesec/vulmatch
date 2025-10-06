@@ -310,10 +310,24 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        cvss_base_score_min = NumberFilter(
+        x_opencti_cvss_v2_base_score = NumberFilter(
             help_text=textwrap.dedent(
                 """
-            The minimum CVSS score you want. `0` is lowest, `10` is highest. Note, some CVEs have multiple CVSS scores. This filter will use the base score from the highest version of CVSS reported (e.g. v4.0 over v3.1) and always use the primary source reporting the CVSS if it exist.
+            The minimum CVSSv2 score you want. `0` is lowest, `10` is highest.
+            """
+            )
+        )
+        x_opencti_cvss_base_score = NumberFilter(
+            help_text=textwrap.dedent(
+                """
+            The minimum CVSSv3.1 score you want. `0` is lowest, `10` is highest.
+            """
+            )
+        )
+        x_opencti_cvss_v4_base_score = NumberFilter(
+            help_text=textwrap.dedent(
+                """
+            The minimum CVSSv4 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
@@ -447,7 +461,8 @@ class CveView(viewsets.ViewSet):
         return VulmatchDBHelper(
             "nvd_cve_vertex_collection", request
         ).get_navigator_layer(cve_id)
-    
+
+
 class CNAView(viewsets.ViewSet):
     openapi_tags = ["CVE"]
     pagination_class = Pagination("objects")
@@ -455,7 +470,6 @@ class CNAView(viewsets.ViewSet):
     serializer_class = serializers.StixObjectsSerializer(many=True)
     openapi_tags = ["CVE"]
     lookup_url_kwarg = "cna_id"
-
 
     class filterset_class(FilterSet):
         name = CharFilter(
@@ -465,7 +479,6 @@ class CNAView(viewsets.ViewSet):
             """
             )
         )
-
 
     @extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)},
@@ -480,6 +493,7 @@ class CNAView(viewsets.ViewSet):
     @decorators.action(methods=["GET"], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return VulmatchDBHelper("", request).list_cnas()
+
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -1361,4 +1375,3 @@ class HealthCheck(viewsets.ViewSet):
         except BaseException as e:
             logging.exception(e)
             return "unknown"
-        

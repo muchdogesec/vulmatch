@@ -91,6 +91,11 @@ CWE_TYPES = set(
         # "extension-definition"
     ]
 )
+CVSS_BASE_SCORE_KEYS = [
+    "x_opencti_cvss_v2_base_score",
+    "x_opencti_cvss_base_score",
+    "x_opencti_cvss_v4_base_score",
+]
 
 ATLAS_TYPES = set(
     [
@@ -123,8 +128,12 @@ CVE_SORT_FIELDS = [
     "name_descending",
     "epss_score_ascending",
     "epss_score_descending",
-    "cvss_base_score_ascending",
-    "cvss_base_score_descending",
+    "x_opencti_cvss_v2_base_score_ascending",
+    "x_opencti_cvss_v2_base_score_descending",
+    "x_opencti_cvss_base_score_ascending",
+    "x_opencti_cvss_base_score_descending",
+    "x_opencti_cvss_v4_base_score_ascending",
+    "x_opencti_cvss_v4_base_score_descending",
 ]
 EPSS_SORT_FIELDS = [
     "name_descending",
@@ -481,11 +490,13 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
-        if q := as_number(
-            self.query.get("cvss_base_score_min"), default=None, type=float
-        ):
-            binds["cvss_base_score_min"] = q
-            filters.append("FILTER doc._cvss_base_score >= @cvss_base_score_min")
+        min_base_scores = {}
+        for kk in CVSS_BASE_SCORE_KEYS:
+            if q := as_number(self.query.get(kk + "_min"), default=None, type=float):
+                min_base_scores[kk] = q
+                filters.append(f"FILTER doc.{kk} >= @min_base_scores.{kk}")
+        if min_base_scores:
+            binds['min_base_scores'] = min_base_scores
 
         if stix_ids := self.query_as_array("stix_id"):
             prefetched_matches.append(set(stix_ids))
@@ -584,7 +595,6 @@ RETURN KEEP(doc, KEYS(doc, true))
                 {
                     "epss_score": "doc.x_opencti_epss_score",
                     "epss_percentile": "doc.x_opencti_epss_percentile",
-                    "cvss_base_score": "doc._cvss_base_score",
                 },
             ),
         )

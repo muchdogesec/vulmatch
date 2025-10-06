@@ -1,8 +1,6 @@
 import random
 import pytest
 
-from vulmatch.worker.utils import get_primary_cvss
-
 from .utils import is_sorted
 
 CVE_BUNDLE_DEFAULT_OBJECTS = [
@@ -21,8 +19,12 @@ CVE_SORT_FIELDS = [
     "name_descending",
     "epss_score_ascending",
     "epss_score_descending",
-    "cvss_base_score_ascending",
-    "cvss_base_score_descending",
+    "x_opencti_cvss_v2_base_score_ascending",
+    "x_opencti_cvss_v2_base_score_descending",
+    "x_opencti_cvss_base_score_ascending",
+    "x_opencti_cvss_base_score_descending",
+    "x_opencti_cvss_v4_base_score_ascending",
+    "x_opencti_cvss_v4_base_score_descending",
 ]
 
 
@@ -314,17 +316,25 @@ def random_cve_values(client, key, count):
 
 
 @pytest.mark.parametrize(
-    "cvss_base_score_min", [random.randint(0, 100) / 10 for i in range(15)]
+    "filter_value", [random.randint(0, 100) / 10 for i in range(15)]
 )
-def test_cvss_base_score_min(client, cvss_base_score_min):
+@pytest.mark.parametrize(
+    "filter_key",
+    [
+        "x_opencti_cvss_v2_base_score",
+        "x_opencti_cvss_base_score",
+        "x_opencti_cvss_v4_base_score",
+    ],
+)
+def test_cvss_base_score_min(client, filter_key, filter_value):
     url = f"/api/v1/cve/objects/"
-    resp = client.get(url, query_params=dict(cvss_base_score_min=cvss_base_score_min))
+    resp = client.get(url, query_params={filter_key + "_min": filter_value})
     vulnerabilities = resp.json()["objects"]
     for cve in vulnerabilities:
         cvss = list(cve["x_cvss"].values())
         if not cvss:
             continue
-        assert get_primary_cvss(cve) or 0 >= cvss_base_score_min
+        assert cve.get(filter_key, 0) >= filter_value
 
 
 def more_created_filters(client, prop, count):
@@ -506,11 +516,8 @@ def test_sort(client, sort_param):
     def key_fn(obj):
         if param == "epss_score":
             return cve_epss_score_map.get(obj["name"], default)
-        if param == "cvss_base_score":
-            try:
-                return float(obj["x_cvss"][-1]["base_score"])
-            except:
-                return 0
+        if 'cvss' in param:
+            return obj.get(param, 0)
         return obj[param]
 
     revered = direction == "descending"
