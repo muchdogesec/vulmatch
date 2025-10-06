@@ -1,9 +1,11 @@
 import contextlib
 from datetime import UTC, datetime, timedelta
 import itertools
+import json
 import logging
 import typing
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework.exceptions import NotFound, ValidationError, ParseError
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
@@ -624,11 +626,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = """
         FOR d IN nvd_cve_edge_collection
             OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
-        FILTER d.relationship_type == 'exploited-using'
-            AND d._arango_cve_processor_note in ["cve-attack", "cve-capec"]
+        FILTER d._arango_cve_processor_note in ["cve-attack", "cve-capec"]
             AND d.external_references[*].external_id IN @ext_ids
         LET ext_id = d.external_references[1].external_id
-        RETURN [ext_id, d.source_ref]
+        RETURN [ext_id, d.target_ref]
         """
         matched_ids = self.execute_query(
             query,
@@ -781,7 +782,9 @@ RETURN KEEP(doc, KEYS(doc, true))
     def get_cve_bundle(self, cve_id: str):
         primary_objects = self.get_cve_or_cpe_object(cve_id)
         cve_id = cve_id.upper()
-        cve_rels_types = ["x-cpe-match"]
+        cve_rels_types = ["related-to"]
+        acvep_notes = []
+        excluded_types = []
         binds = dict(
             cve_edge_types=cve_rels_types,
             default_imports_and_groupings=CVE_BUNDLE_DEFAULT_OBJECTS.copy(),
@@ -806,16 +809,17 @@ RETURN KEEP(doc, KEYS(doc, true))
         include_cwe = self.query_as_bool("include_cwe", True)  # or include_capec
 
         if include_capec:
-            cve_rels_types.append("cve-capec")
+            acvep_notes.append("cve-capec")
         if include_attack:
-            cve_rels_types.append("cve-attack")
-
+            acvep_notes.append("cve-attack")
         if include_cwe:
-            cve_rels_types.append("cve-cwe")
+            acvep_notes.append("cve-cwe")
+        else:
+            excluded_types.append("weakness")
 
         docnames = [cve_id]
         doctypes = ["exploit"]
-        binds.update(docnames=docnames, doctypes=doctypes)
+        binds.update(docnames=docnames, doctypes=doctypes, acvep_notes=acvep_notes)
         if self.query_as_bool("include_epss", True):
             docnames.append(f"EPSS Scores: {cve_id}")
             cve_rels_types.append("object")
@@ -827,7 +831,9 @@ RETURN KEEP(doc, KEYS(doc, true))
             doctypes.append("report")
 
         types = self.query_as_array("object_type") or CVE_BUNDLE_TYPES
-        binds["types"] = list(CVE_BUNDLE_TYPES.intersection(types))
+        binds["types"] = list(
+            CVE_BUNDLE_TYPES.intersection(types).difference(excluded_types)
+        )
         binds["@view"] = settings.VIEW_NAME
         binds.update(primary_keys=[d["_id"] for d in primary_objects])
         query = """
@@ -846,7 +852,9 @@ LET default_object_ids = (
 
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND (doc._arango_cve_processor_note IN @cve_edge_types OR doc.relationship_type IN @cve_edge_types)
+    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids)
+    FILTER doc._arango_cve_processor_note IN @acvep_notes
+        OR doc.relationship_type IN @cve_edge_types
     LET retval = doc._target_type == 'grouping' ? [doc._id, doc._from] : [doc._id, doc._from, doc._to] // don't return direct relation for grouping, already handled with default_imports_and_groupings
     RETURN retval
     )
@@ -922,9 +930,9 @@ RETURN KEEP(d, KEYS(d, TRUE))
         cve_id,
         type="vulnerability",
     ):
-        mode = 'cve'
-        if type == 'software':
-            mode = 'cpe'
+        mode = "cve"
+        if type == "software":
+            mode = "cpe"
         primary_objects = self.get_cve_or_cpe_object(cve_id, mode=mode)
         vulnerability = [p for p in primary_objects if p["type"] == type][0]
         return Response(
@@ -1036,10 +1044,12 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
         new_query = """
         FOR d IN nvd_cve_edge_collection
-        FILTER d._arango_cve_processor_note == "cve-attack" AND d.source_ref == @match_id AND d._from == @match_pk
+        FILTER d._arango_cve_processor_note == "cve-attack" AND d.target_ref == @match_id AND d._to == @match_pk
         RETURN d.external_references[1].external_id
         """
-        techniques = self.execute_query(new_query, bind_vars=binds, paginate=False)
+        techniques = sorted(
+            self.execute_query(new_query, bind_vars=binds, paginate=False)
+        )
         name = matched_object["name"]
         nav_retval = {
             "description": f"Techniques {name} is exploited by",

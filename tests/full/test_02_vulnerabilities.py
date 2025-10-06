@@ -11,7 +11,6 @@ CVE_BUNDLE_DEFAULT_OBJECTS = [
     "extension-definition--2c5c13af-ee92-5246-9ba7-0b958f8cd34a",
     "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
     "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3",
-    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",
 ]
 CVE_SORT_FIELDS = [
     "modified_descending",
@@ -426,38 +425,38 @@ def test_retrieve_vulnerability(client, cve_id):
 @pytest.mark.parametrize(
     ["cve_id", "filters", "expected_count"],
     [
-        ["CVE-2024-12978", None, 20],
-        ["CVE-2024-53647", None, 37],
-        ["CVE-2023-31025", None, 24],
+        ["CVE-2024-12978", None, 18],
+        ["CVE-2024-53647", None, 102],
+        ["CVE-2023-31025", None, 22],
         ##
-        ["CVE-2024-53647", dict(include_capec=False), 23],
-        ["CVE-2024-53647", dict(include_attack=False), 27],
-        ["CVE-2023-31025", dict(include_capec=False), 24],
-        ["CVE-2023-31025", dict(include_epss=False), 23],
-        ["CVE-2024-53197", dict(include_kev=True), 5160],
+        ["CVE-2024-53647", dict(include_capec=False), 48],
+        ["CVE-2024-53647", dict(include_attack=False), 80],
+        ["CVE-2023-31025", dict(include_capec=False), 22],
+        ["CVE-2023-31025", dict(include_epss=False), 21],
+        ["CVE-2024-53197", dict(include_kev=True), 5158],
         [
             "CVE-2024-53197",
             dict(include_kev=False),
-            5158,
+            5156,
         ],  # subtract cisa and vulncheck kev (5160 - 2)
         [
             "CVE-2024-53197",
             dict(include_kev=False, include_epss=False),
-            5157,
+            5155,
         ],  # subtract cisa and vulncheck kev (5160 - 2) and one epss report (5158 - 1)
-        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5160],
-        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 17],
+        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5158],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 15],
         [
             "CVE-2024-53197",
             dict(include_x_cpes_vulnerable=False, include_kev=False),
-            15,
+            13,
         ],
         [
             "CVE-2024-53197",
             dict(
                 include_x_cpes_vulnerable=False, include_kev=False, include_epss=False
             ),
-            14,
+            12,
         ],
     ],
 )
@@ -465,14 +464,14 @@ def test_bundle(client, cve_id, filters, expected_count):
     url = f"/api/v1/cve/objects/{cve_id}/bundle/"
     resp = client.get(url, query_params=filters)
     resp_data = resp.json()
-    objects = {obj["id"] for obj in resp_data["objects"]}
+    object_ids = {obj["id"] for obj in resp_data["objects"]}
     assert resp_data["total_results_count"] == expected_count
     assert (
-        len(objects) == resp_data["page_results_count"]
+        len(object_ids) == resp_data["page_results_count"]
     ), "response contains duplicates"
-    assert objects.issuperset(
+    assert object_ids.issuperset(
         CVE_BUNDLE_DEFAULT_OBJECTS
-    ), "result must contain default objects"
+    ), f"result must contain default objects"
 
 
 @pytest.mark.parametrize("sort_param", CVE_SORT_FIELDS)
@@ -503,7 +502,6 @@ def test_sort(client, sort_param):
     cve_epss_score_map = get_epss_scores(
         [cve["name"] for cve in sort_objects_to_consider]
     )
-
 
     def key_fn(obj):
         if param == "epss_score":
@@ -555,8 +553,8 @@ def test_navigator(client):
         "domain": "enterprise-attack",
         "versions": {"layer": "4.5", "navigator": "5.1.0"},
         "techniques": [
-            {"techniqueID": "T1027.009", "score": 100, "showSubtechniques": True},
             {"techniqueID": "T1027.006", "score": 100, "showSubtechniques": True},
+            {"techniqueID": "T1027.009", "score": 100, "showSubtechniques": True},
             {"techniqueID": "T1564.009", "score": 100, "showSubtechniques": True},
         ],
         "gradient": {"colors": ["#ffffff", "#ff6666"], "minValue": 0, "maxValue": 100},
