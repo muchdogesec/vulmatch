@@ -174,7 +174,7 @@ def create_indexes(db: StandardDatabase):
     vertex_collection.add_index(
         dict(
             type="inverted",
-            name="cve_search_inv_v2",
+            name="cve_search_inv_v3",
             sparse=True,
             fields=[
                 "name",

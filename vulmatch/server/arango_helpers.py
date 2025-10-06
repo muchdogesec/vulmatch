@@ -370,7 +370,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -403,7 +403,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -437,7 +437,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
@@ -580,7 +580,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             )
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
