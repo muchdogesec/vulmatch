@@ -71,6 +71,7 @@ def create_indexes(db: StandardDatabase):
             sparse=True,
         )
     )
+
     vertex_collection.add_index(
         dict(
             type="persistent",
@@ -82,7 +83,35 @@ def create_indexes(db: StandardDatabase):
     )
     vertex_collection.add_index(
         dict(
+            type="persistent",
+            fields=["type", "_is_latest"],
+            storedValues=["x_cpe_struct.vendor", "x_cpe_struct.product"],
+            inBackground=True,
+            sparse=True,
+            name=f"vulmatch_products",
+        )
+    )
+    vertex_collection.add_index(
+        dict(
             type="persistent", fields=["name"], inBackground=True, name=f"vulmatch_name"
+        )
+    )
+    vertex_collection.add_index(
+        dict(
+            type="persistent",
+            fields=["labels", "created"],
+            sparse=True,
+            inBackground=True,
+            name=f"vulmatch_stats_kev",
+        )
+    )
+    vertex_collection.add_index(
+        dict(
+            type="persistent",
+            fields=["type", "_is_latest"],
+            storedValues=["x_opencti_epss_score"],
+            inBackground=True,
+            name=f"vulmatch_stats_epss",
         )
     )
     db.create_analyzer(
@@ -176,6 +205,15 @@ def create_indexes(db: StandardDatabase):
                 "_from",
             ],
             inBackground=True,
+        )
+    )
+    edge_collection.add_index(
+        dict(
+            type="persistent",
+            fields=["_arango_cve_processor_note", "_is_latest"],
+            storedValues=["external_references", "created"],
+            inBackground=True,
+            name=f"vulmatch_stats_attack_cwe",
         )
     )
     create_acvep_indexes(db)
