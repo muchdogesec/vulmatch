@@ -1083,3 +1083,24 @@ RETURN KEEP(d, KEYS(d, TRUE))
         }
 
         return Response(nav_retval)
+
+
+    def list_cnas(self):
+        name_filter = ""
+        bind_vars = {
+            "@collection": "nvd_cve_vertex_collection",
+        }
+        if name := self.query.get("name"):
+            bind_vars["name"] = self.like_string(name).lower()
+            name_filter = "FILTER doc.name LIKE @name OR doc.external_references[? ANY FILTER CURRENT.external_id LIKE @name]"
+        query = """
+        FOR doc IN @@collection //OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
+        FILTER doc.type == 'identity' 
+        FILTER doc._is_latest == TRUE AND doc.external_references != NULL
+        // name_filter
+        LIMIT @offset, @count
+        RETURN KEEP(doc, KEYS(doc, true))
+        """.replace(
+            "// name_filter", name_filter
+        )
+        return self.execute_query(query, bind_vars=bind_vars)
