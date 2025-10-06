@@ -435,38 +435,38 @@ def test_retrieve_vulnerability(client, cve_id):
 @pytest.mark.parametrize(
     ["cve_id", "filters", "expected_count"],
     [
-        ["CVE-2024-12978", None, 18],
-        ["CVE-2024-53647", None, 102],
-        ["CVE-2023-31025", None, 22],
+        ["CVE-2024-12978", None, 20],
+        ["CVE-2024-53647", None, 104],
+        ["CVE-2023-31025", None, 24],
         ##
-        ["CVE-2024-53647", dict(include_capec=False), 48],
-        ["CVE-2024-53647", dict(include_attack=False), 80],
-        ["CVE-2023-31025", dict(include_capec=False), 22],
-        ["CVE-2023-31025", dict(include_epss=False), 21],
-        ["CVE-2024-53197", dict(include_kev=True), 5158],
+        ["CVE-2024-53647", dict(include_capec=False), 50],
+        ["CVE-2024-53647", dict(include_attack=False), 82],
+        ["CVE-2023-31025", dict(include_capec=False), 24],
+        ["CVE-2023-31025", dict(include_epss=False), 23],
+        ["CVE-2024-53197", dict(include_kev=True), 5160],
         [
             "CVE-2024-53197",
             dict(include_kev=False),
-            5156,
+            5158,
         ],  # subtract cisa and vulncheck kev (5160 - 2)
         [
             "CVE-2024-53197",
             dict(include_kev=False, include_epss=False),
-            5155,
+            5157,
         ],  # subtract cisa and vulncheck kev (5160 - 2) and one epss report (5158 - 1)
-        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5158],
-        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 15],
+        ["CVE-2024-53197", dict(include_x_cpes_not_vulnerable=False), 5160],
+        ["CVE-2024-53197", dict(include_x_cpes_vulnerable=False), 17],
         [
             "CVE-2024-53197",
             dict(include_x_cpes_vulnerable=False, include_kev=False),
-            13,
+            15,
         ],
         [
             "CVE-2024-53197",
             dict(
                 include_x_cpes_vulnerable=False, include_kev=False, include_epss=False
             ),
-            12,
+            14,
         ],
     ],
 )
