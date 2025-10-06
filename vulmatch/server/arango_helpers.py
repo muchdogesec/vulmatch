@@ -13,13 +13,13 @@ if typing.TYPE_CHECKING:
     from .. import settings
 
 EXPLOIT_TYPES = [
-  "initial-access",
-  "client-side",
-  "local",
-  "denial-of-service",
-  "infoleak",
-  "remote-with-credentials",
-  "initial"
+    "initial-access",
+    "client-side",
+    "local",
+    "denial-of-service",
+    "infoleak",
+    "remote-with-credentials",
+    "initial",
 ]
 
 SDO_TYPES = set(
@@ -339,7 +339,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
 
         query = """
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
+FILTER doc.labels == [@label] AND doc._is_latest
 FILTER doc.external_references[0].external_id == @cve_id
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
@@ -353,12 +353,12 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if cve_ids := self.query_as_array("cve_id"):
             binds["cve_ids"] = [cve_id.upper() for cve_id in cve_ids]
             filters.append("FILTER doc.name IN @cve_ids")
-        if exploit_types := self.query_as_array('exploit_type'):
+        if exploit_types := self.query_as_array("exploit_type"):
             binds.update(exploit_types=exploit_types)
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -391,7 +391,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -419,20 +419,22 @@ RETURN KEEP(doc, KEYS(doc, true))
         if v := self.query.get("version"):
             version_filter = "FILTER doc.modified == @stix_version"
             binds.update(stix_version=v)
-        limit_statement = 'LIMIT 1'
+        limit_statement = "LIMIT 1"
         if get_all:
-            version_filter = ''
-            limit_statement = ''
+            version_filter = ""
+            limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
 RETURN KEEP(doc, KEYS(doc, @hide_sys))
     """.replace(
             "#version_filter", version_filter
-        ).replace('#limit_statement', limit_statement)
+        ).replace(
+            "#limit_statement", limit_statement
+        )
         groupings = self.execute_query(query, bind_vars=binds, paginate=False)
         if not groupings:
             raise NotFound({"error": f"No grouping with criteria_id `{criteria_id}`"})
@@ -519,9 +521,9 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
 
         if (hasKev := self.query_as_bool("has_kev", None)) != None:
             if hasKev:
-                filters.append("FILTER doc.id IN kevs")
+                filters.append("FILTER doc.x_opencti_cisa_kev == TRUE")
             else:
-                filters.append("FILTER doc.id NOT IN kevs")
+                filters.append("FILTER doc.x_opencti_cisa_kev == NULL")
 
         if q := self.query_as_array("weakness_id"):
             binds["weakness_ids"] = [qq.upper() for qq in q]
@@ -553,55 +555,35 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             self.query.get("epss_score_min"), default=None, type=float
         ):
             binds["epss_score_min"] = epss_score_min
-            epss_filters.append("FILTER TO_NUMBER(last_epss.epss) >= @epss_score_min")
+            filters.append("FILTER doc.x_opencti_epss_score >= @epss_score_min")
 
         if epss_percentile_min := as_number(
             self.query.get("epss_percentile_min"), default=None, type=float
         ):
             binds["epss_percentile_min"] = epss_percentile_min
-            epss_filters.append(
-                "FILTER TO_NUMBER(last_epss.percentile) >= @epss_percentile_min"
+            filters.append(
+                "FILTER doc.x_opencti_epss_percentile >= @epss_percentile_min"
             )
 
-        if epss_filters:
-            filters.append("FILTER doc.id IN KEYS(epss)")
-
-        query = (
-            """
-LET kevs = (
-FOR doc IN nvd_cve_vertex_collection
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "kev"
-RETURN doc.object_refs[0]
-)
-LET epss = MERGE(
-FOR doc IN nvd_cve_vertex_collection
-LET last_epss = LAST(doc.x_epss)
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == "epss"
-#epss_filters
-RETURN {[doc.object_refs[0]]: last_epss}
-)
-
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv", forceIndexHint: true}
+        query = """
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, true))
     """.replace(
-                "@filters", "\n".join(filters)
-            )
-            .replace("#epss_filters", "\n".join(epss_filters))
-            .replace(
-                "@sort_stmt",
-                self.get_sort_stmt(
-                    CVE_SORT_FIELDS,
-                    {
-                        "epss_score": "epss[doc.id].epss",
-                        "epss_percentile": "epss[doc.id].percentile",
-                        "cvss_base_score": "doc._cvss_base_score",
-                    },
-                ),
-            )
+            "@filters", "\n".join(filters)
+        ).replace(
+            "@sort_stmt",
+            self.get_sort_stmt(
+                CVE_SORT_FIELDS,
+                {
+                    "epss_score": "doc.x_opencti_epss_score",
+                    "epss_percentile": "doc.x_opencti_epss_percentile",
+                    "cvss_base_score": "doc._cvss_base_score",
+                },
+            ),
         )
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(
@@ -893,16 +875,20 @@ RETURN KEEP(d, KEYS(d, TRUE))
             bind_vars={"matched_ids": list(groupings)},
             paginate=False,
         )
-        include_cves_vulnerable = self.query_as_bool('include_cves_vulnerable', True)
-        include_cves_not_vulnerable = self.query_as_bool('include_cves_not_vulnerable', True)
+        include_cves_vulnerable = self.query_as_bool("include_cves_vulnerable", True)
+        include_cves_not_vulnerable = self.query_as_bool(
+            "include_cves_not_vulnerable", True
+        )
         indicator_ids = CVE_BUNDLE_DEFAULT_OBJECTS.copy()
         for rel_type, *stix_ids in matches:
-            if rel_type == 'x-cpes-vulnerable' and include_cves_vulnerable:
+            if rel_type == "x-cpes-vulnerable" and include_cves_vulnerable:
                 indicator_ids.extend(stix_ids)
             elif rel_type == "x-cpes-not-vulnerable" and include_cves_not_vulnerable:
                 indicator_ids.extend(stix_ids)
             else:
-                logging.warning(f"unknown relationship_type from grouping {(rel_type, stix_ids)}")
+                logging.warning(
+                    f"unknown relationship_type from grouping {(rel_type, stix_ids)}"
+                )
         indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
         types = {"vulnerability", "software"}
         for indicator_id in indicator_ids[:]:
@@ -1052,15 +1038,15 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
     def get_navigator_layer(self, cve_id):
         primary_objects = self.get_cve_or_cpe_object(cve_id)
-        vulns = [p for p in primary_objects if p['type'] == 'vulnerability']
+        vulns = [p for p in primary_objects if p["type"] == "vulnerability"]
         if not vulns:
-            raise NotFound('not found')
+            raise NotFound("not found")
         matched_object = vulns[0]
 
         binds = {
             # '@view': settings.VIEW_NAME,
-            'match_pk': matched_object['_id'],
-            'match_id': matched_object['id'],
+            "match_pk": matched_object["_id"],
+            "match_id": matched_object["id"],
         }
 
         new_query = """
@@ -1069,7 +1055,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
         RETURN d.external_references[1].external_id
         """
         techniques = self.execute_query(new_query, bind_vars=binds, paginate=False)
-        name = matched_object['name']
+        name = matched_object["name"]
         nav_retval = {
             "description": f"Techniques {name} is exploited by",
             "name": name,
