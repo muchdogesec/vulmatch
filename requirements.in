@@ -16,7 +16,7 @@ django-cleanup
 ## dogesec
 dogesec-commons
 stix2arango
-arango-cve-processor>=1.2.5
+arango-cve-processor
 
 ## production
 gunicorn==23.0.0
