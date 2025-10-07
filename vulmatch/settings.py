@@ -172,6 +172,7 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
     ),
     "TAGS": [
         {"name": "CVE", "description": "Download and search the latest CVE objects."},
+        {"name": "CNA", "description": "Search and filter CNA objects."},
         {"name": "CPE", "description": "Search and filter CPE objects."},
         {"name": "KEV", "description": "Search and filter KEV objects."},
         {"name": "EPSS", "description": "Search and filter EPSS objects."},
