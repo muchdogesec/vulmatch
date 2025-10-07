@@ -9,7 +9,12 @@ from django.core.cache import cache
 from vulmatch.server.arango_helpers import (
     VulmatchDBHelper,
 )
-from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from drf_spectacular.utils import (
+    extend_schema_field,
+    extend_schema_serializer,
+    extend_schema_view,
+    extend_schema,
+)
 
 from rest_framework.response import Response
 
@@ -78,6 +83,7 @@ class StatisticsSerializer(serializers.Serializer):
     cwes = serializers.ListSerializer(child=CWESerializer())
     attacks = serializers.ListSerializer(child=AttackSerializer())
 
+
 @lru_cache
 def cached_db_query(date, revision, query, kwargs):
     kwargs = json.loads(kwargs)
@@ -100,7 +106,9 @@ class StatisticsHelper:
         )
 
     def execute_query(self, query, **kwargs):
-        return cached_db_query(self.now.isoformat(), self._rev, query, json.dumps(kwargs, sort_keys=True))
+        return cached_db_query(
+            self.now.isoformat(), self._rev, query, json.dumps(kwargs, sort_keys=True)
+        )
 
     def get_statistics(self):
         retval = dict(
@@ -235,8 +243,15 @@ RETURN { cve: d.name, created_at: d.created }
         return groups
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description="Use this endpoint to get high level summary of the data held in Vulmatch",
+        summary="Get calculated statistics",
+    )
+)
 class StatisticsView(viewsets.ViewSet):
     serializer_class = StatisticsSerializer(many=False)
+    openapi_tags = ["Statistics"]
 
     def list(self, request, *args, **kwargs):
         return StatisticsHelper().get_statistics()
