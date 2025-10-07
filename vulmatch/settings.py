@@ -181,6 +181,7 @@ SPECTACULAR_SETTINGS: dict[str, Any] = {
         {"name": "CWE", "description": "Search and filter MITRE CWE objects."},
         {"name": "Arango CVE Processor", "description": "Trigger the generation of relationships between objects."},
         {"name": "Jobs", "description": "Search through Vulmatch Jobs triggered when downloading data and creating relationships."},
+        {"name": "Statistics", "description": "Calculated results of the stored dataset"},
         {"name": "Server Status", "description": "Checks health of the server."},
     ]
 }
