@@ -516,7 +516,7 @@ def test_sort(client, sort_param):
     def key_fn(obj):
         if param == "epss_score":
             return cve_epss_score_map.get(obj["name"], default)
-        if 'cvss' in param:
+        if "cvss" in param:
             return obj.get(param, 0)
         return obj[param]
 
@@ -602,3 +602,79 @@ def test_epss_percentile_min(client, min_percentile):
     assert resp.status_code == 200
     for cve in resp.data["objects"]:
         assert cve.get("x_opencti_epss_percentile", 0) >= min_percentile
+
+
+@pytest.mark.parametrize(
+    "filters,expected_ids",
+    [
+        (
+            None,
+            [
+                "identity--64dfee48-e209-5e25-bad4-dcc80d221a85",
+                "identity--74a17a7d-4559-56ac-882c-abd4e64618bf",
+                "identity--ac18951b-427a-56a7-9ca2-b9ba414c9708",
+                "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+                "identity--a572da7d-cac6-5e37-abee-184f7b03b815",
+                "identity--a84148fc-e7c0-5007-9bd6-e91d53b46f97",
+                "identity--2a31dab1-be63-538a-b6fb-5d7c60b7f9b5",
+                "identity--31974714-735f-5bd7-872f-09d92126f94e",
+                "identity--2d63a748-daeb-5c11-a121-948a7d78e1c0",
+                "identity--9092b7ea-75a6-5459-bf2f-3da759bd34a9",
+                "identity--5ce49a66-a966-5f76-98f5-3f397dde31bb",
+                "identity--37df4a90-2dcb-5a06-bc4f-104e2c080807",
+                "identity--fd1062d3-9675-575f-8fc9-b8c3da931026",
+                "identity--b1e77389-b06c-5d05-9077-8221a7fa6223",
+                "identity--5db48ebd-e120-511c-a5ea-4b69ef872425",
+                "identity--1e4d4d72-2010-572f-ac94-85bdf2ac3529",
+                "identity--cb19f1c9-2cff-55c1-9782-eeabef1a6566",
+                "identity--f54381f2-378c-502c-94a4-b314a8bc5fda",
+                "identity--9a326c24-d2a5-5ac7-bd5c-bf22f11f4163",
+                "identity--cd00e3bf-6784-5972-9539-468b9f63483e",
+                "identity--13120cf7-b197-5280-a1c4-feb9f63a5ad0",
+                "identity--de53d769-414b-5744-9f69-7e6ad92edba8",
+                "identity--b099e12f-e96e-5f45-88e3-56cf2152a88c",
+                "identity--d71c6b17-8860-557e-91fc-602fed648208",
+                "identity--f8f12490-69f1-5f2d-bee3-600249d5998b",
+                "identity--a9546a6d-7e78-5367-847d-8d10e8a77bc9",
+                "identity--3759e3ac-4da9-5c8c-a506-bbd312f35b07",
+                "identity--a50227ba-6e4e-5158-a0c1-e0f2dbb870ff",
+                "identity--bf10c45b-3fbe-544a-b446-3719385b0b8b",
+                "identity--3644753d-7db4-5c2f-af5e-4dc9b8d196ba",
+                "identity--62c68901-68ea-5732-8339-de64564cc422",
+                "identity--d1a7d194-0a3b-5bb1-ac5f-45da6a391b1d",
+                "identity--998eaac5-239e-54e8-91f1-c6033ef07ea8",
+                "identity--a106f448-a5f1-5236-a07a-390817820ab2",
+                "identity--7b1bfc27-312f-541c-80ba-55f4e3d79ccd",
+            ],
+        ),
+        (
+            dict(name="security"),
+            [
+                "identity--74a17a7d-4559-56ac-882c-abd4e64618bf",
+                "identity--ac18951b-427a-56a7-9ca2-b9ba414c9708",
+                "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+                "identity--5ce49a66-a966-5f76-98f5-3f397dde31bb",
+                "identity--1e4d4d72-2010-572f-ac94-85bdf2ac3529",
+                "identity--f54381f2-378c-502c-94a4-b314a8bc5fda",
+                "identity--9a326c24-d2a5-5ac7-bd5c-bf22f11f4163",
+                "identity--de53d769-414b-5744-9f69-7e6ad92edba8",
+                "identity--f8f12490-69f1-5f2d-bee3-600249d5998b",
+                "identity--a50227ba-6e4e-5158-a0c1-e0f2dbb870ff",
+                "identity--d1a7d194-0a3b-5bb1-ac5f-45da6a391b1d",
+            ],
+        ),
+        (dict(name="secure"), []),
+        (dict(name="miTre"), ["identity--64dfee48-e209-5e25-bad4-dcc80d221a85"]),
+    ],
+)
+def test_list_cnas(client, filters: dict, expected_ids: list[str]):
+    expected_ids = set(expected_ids)
+    url = f"/api/v1/cna/objects/"
+    resp = client.get(url, query_params=filters)
+    resp_data = resp.json()
+    assert all(
+        cve["type"] == "identity" for cve in resp_data["objects"]
+    ), "response.objects[*].type must always be identity"
+    print((filters, [cve["id"] for cve in resp_data["objects"]]), ",")
+    assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
+    assert resp_data["total_results_count"] == len(expected_ids)
