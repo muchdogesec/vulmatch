@@ -310,21 +310,21 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        x_opencti_cvss_v2_base_score = NumberFilter(
+        x_opencti_cvss_v2_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv2 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
-        x_opencti_cvss_base_score = NumberFilter(
+        x_opencti_cvss_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv3.1 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
-        x_opencti_cvss_v4_base_score = NumberFilter(
+        x_opencti_cvss_v4_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv4 score you want. `0` is lowest, `10` is highest.

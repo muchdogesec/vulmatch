@@ -331,9 +331,6 @@ def test_cvss_base_score_min(client, filter_key, filter_value):
     resp = client.get(url, query_params={filter_key + "_min": filter_value})
     vulnerabilities = resp.json()["objects"]
     for cve in vulnerabilities:
-        cvss = list(cve["x_cvss"].values())
-        if not cvss:
-            continue
         assert cve.get(filter_key, 0) >= filter_value
 
 
@@ -675,6 +672,5 @@ def test_list_cnas(client, filters: dict, expected_ids: list[str]):
     assert all(
         cve["type"] == "identity" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be identity"
-    print((filters, [cve["id"] for cve in resp_data["objects"]]), ",")
     assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
     assert resp_data["total_results_count"] == len(expected_ids)
