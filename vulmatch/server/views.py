@@ -464,7 +464,6 @@ class CveView(viewsets.ViewSet):
 
 
 class CNAView(viewsets.ViewSet):
-    openapi_tags = ["C"]
     pagination_class = Pagination("objects")
     filter_backends = [DjangoFilterBackend]
     serializer_class = serializers.StixObjectsSerializer(many=True)
