@@ -29,4 +29,4 @@ def test_statistics(client, api_schema):
     }
     assert data.pop("cwes")
     assert data.pop("attacks")
-    assert data.pop('epss')
+    assert data.pop("epss")

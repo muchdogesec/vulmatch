@@ -62,7 +62,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 class ACPSerializerBase(serializers.Serializer):
     mode = serializers.ReadOnlyField(default=None)
-    ignore_embedded_relationships = serializers.BooleanField(default=False)
+    ignore_embedded_relationships = serializers.BooleanField(default=True)
     ignore_embedded_relationships_sro = serializers.BooleanField(default=True)
     ignore_embedded_relationships_smo = serializers.BooleanField(default=True)
     

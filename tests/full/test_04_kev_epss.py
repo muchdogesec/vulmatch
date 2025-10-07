@@ -121,6 +121,7 @@ def test_sort(client, path, sort_param: str):
         resp_data["objects"], key=key_fn, reverse=reversed
     ), "object not sorted"
 
+
 @pytest.mark.parametrize(
     "sort_param",
     [
@@ -152,16 +153,31 @@ def test_sort_exploits(client, sort_param: str):
 
 
 @pytest.mark.parametrize(
-    ['cve_ids', 'expected_ids'],
+    ["cve_ids", "expected_ids"],
     [
-        [['CVE-2024-3393', 'CVE-2024-11972'], {'exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1', 'exploit--42d4dee3-2645-581a-89b2-73b0245776c8', 'exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48', 'exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802'}],
-        [['CVE-2024-3393'], {'exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1'}],
-        [['CVE-2024-11972'], {'exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802', 'exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48', 'exploit--42d4dee3-2645-581a-89b2-73b0245776c8'}],
-    ]
+        [
+            ["CVE-2024-3393", "CVE-2024-11972"],
+            {
+                "exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1",
+                "exploit--42d4dee3-2645-581a-89b2-73b0245776c8",
+                "exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48",
+                "exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802",
+            },
+        ],
+        [["CVE-2024-3393"], {"exploit--74a0d3ec-2235-5d3a-b081-4e277892a7e1"}],
+        [
+            ["CVE-2024-11972"],
+            {
+                "exploit--7b8f29c8-bf2e-5c66-9ff7-147b04e47802",
+                "exploit--a12cf1f9-701c-56e5-b63b-b96aa1839b48",
+                "exploit--42d4dee3-2645-581a-89b2-73b0245776c8",
+            },
+        ],
+    ],
 )
 def test_list_exploits(client, cve_ids, expected_ids):
     url = f"/api/v1/kev/exploits/"
-    resp = client.get(url, query_params=dict(cve_id=','.join(cve_ids or [])))
+    resp = client.get(url, query_params=dict(cve_id=",".join(cve_ids or [])))
     resp_data = resp.json()
     print({obj["id"] for obj in resp_data["objects"]})
     print({obj["name"] for obj in resp_data["objects"]})
@@ -169,14 +185,14 @@ def test_list_exploits(client, cve_ids, expected_ids):
 
 
 def test_epss_retrieve(client):
-    cve_id = 'CVE-2023-7028'
+    cve_id = "CVE-2023-7028"
     url = f"/api/v1/epss/objects/{cve_id}/"
     resp = client.get(url)
     resp_data = resp.json()
-    epss_obj = resp_data['objects'][0]
+    epss_obj = resp_data["objects"][0]
     assert epss_obj == {
         "created": "2024-01-12T14:15:49.420Z",
-        "created_by_ref": "identity--152ecfe1-5015-522b-97e4-86b60c57036d",
+        "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
         "extensions": {
             "extension-definition--efd26d23-d37d-5cf2-ac95-a101e46ce11d": {
                 "extension_type": "toplevel-property-extension"

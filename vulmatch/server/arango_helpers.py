@@ -1,9 +1,11 @@
 import contextlib
 from datetime import UTC, datetime, timedelta
 import itertools
+import json
 import logging
 import typing
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework.exceptions import NotFound, ValidationError, ParseError
 from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
@@ -89,6 +91,11 @@ CWE_TYPES = set(
         # "extension-definition"
     ]
 )
+CVSS_BASE_SCORE_KEYS = [
+    "x_opencti_cvss_v2_base_score",
+    "x_opencti_cvss_base_score",
+    "x_opencti_cvss_v4_base_score",
+]
 
 ATLAS_TYPES = set(
     [
@@ -121,8 +128,12 @@ CVE_SORT_FIELDS = [
     "name_descending",
     "epss_score_ascending",
     "epss_score_descending",
-    "cvss_base_score_ascending",
-    "cvss_base_score_descending",
+    "x_opencti_cvss_v2_base_score_ascending",
+    "x_opencti_cvss_v2_base_score_descending",
+    "x_opencti_cvss_base_score_ascending",
+    "x_opencti_cvss_base_score_descending",
+    "x_opencti_cvss_v4_base_score_ascending",
+    "x_opencti_cvss_v4_base_score_descending",
 ]
 EPSS_SORT_FIELDS = [
     "name_descending",
@@ -186,9 +197,7 @@ CPEMATCH_BUNDLE_TYPES = {
 
 BUNDLE_OBJECT_IDS = [
     "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-    "identity--562918ee-d5da-5579-b6a1-fae50cc6bad3",  # cve2stix
     "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",  # dogesec
-    "identity--152ecfe1-5015-522b-97e4-86b60c57036d",  # acvep
     "marking-definition--562918ee-d5da-5579-b6a1-fae50cc6bad3",  # cve2stix
     "marking-definition--152ecfe1-5015-522b-97e4-86b60c57036d",  # acvep
 ]
@@ -359,7 +368,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -392,7 +401,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -426,7 +435,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
@@ -440,6 +449,25 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         if not groupings:
             raise NotFound({"error": f"No grouping with criteria_id `{criteria_id}`"})
         return groupings
+    
+    def get_extensions_and_refs(self, matched_pks, use_latest=False):
+        if use_latest:
+            filter = 'FILTER d.id IN @matched_pks AND d._is_latest == TRUE'
+        else:
+            filter = 'FILTER d._id == @matched_pks'
+        query = """
+        FOR d IN nvd_cve_vertex_collection
+        ##filter
+        LET refs = (FOR k IN KEYS(d) FILTER k LIKE '%_ref' OR k LIKE '%_refs' RETURN d[k])
+        FOR ref IN FLATTEN([KEYS(d.extensions), refs], 3)
+        RETURN DISTINCT ref
+        """.replace('##filter', filter)
+        refs = self.execute_query(
+            query,
+            bind_vars=dict(matched_pks=matched_pks),
+            paginate=False,
+        )
+        return [ref for ref in refs if isinstance(ref, str)]
 
     def get_grouping_bundle(self, criteria_id):
         grouping = self.retrieve_grouping(criteria_id, hide_sys=False)[0]
@@ -452,7 +480,10 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             paginate=False,
         )
         bundle_refs = [*CVE_BUNDLE_DEFAULT_OBJECTS, *grouping["object_refs"]]
-        grouping_ids = list(itertools.chain([grouping["_id"]], *pre_query))
+        matched_pks = list(itertools.chain(*pre_query))
+        bundle_refs.extend(self.get_extensions_and_refs(matched_pks))
+        matched_pks.append(grouping['_id'])
+
         query = """
         FOR d in @@view
         SEARCH d.type IN @types AND (d._id IN @grouping_id OR d.id IN @bundle_refs)
@@ -464,7 +495,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             query,
             bind_vars={
                 "@view": settings.VIEW_NAME,
-                "grouping_id": grouping_ids,
+                "grouping_id": matched_pks,
                 "bundle_refs": bundle_refs,
                 "types": list(types),
             },
@@ -479,11 +510,13 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
-        if q := as_number(
-            self.query.get("cvss_base_score_min"), default=None, type=float
-        ):
-            binds["cvss_base_score_min"] = q
-            filters.append("FILTER doc._cvss_base_score >= @cvss_base_score_min")
+        min_base_scores = {}
+        for kk in CVSS_BASE_SCORE_KEYS:
+            if q := as_number(self.query.get(kk + "_min"), default=None, type=float):
+                min_base_scores[kk] = q
+                filters.append(f"FILTER doc.{kk} >= @min_base_scores.{kk}")
+        if min_base_scores:
+            binds['min_base_scores'] = min_base_scores
 
         if stix_ids := self.query_as_array("stix_id"):
             prefetched_matches.append(set(stix_ids))
@@ -567,7 +600,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             )
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v2", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -582,7 +615,6 @@ RETURN KEEP(doc, KEYS(doc, true))
                 {
                     "epss_score": "doc.x_opencti_epss_score",
                     "epss_percentile": "doc.x_opencti_epss_percentile",
-                    "cvss_base_score": "doc._cvss_base_score",
                 },
             ),
         )
@@ -624,11 +656,10 @@ RETURN KEEP(doc, KEYS(doc, true))
         query = """
         FOR d IN nvd_cve_edge_collection
             OPTIONS {indexHint: "cve_edge_inv", forceIndexHint: true}
-        FILTER d.relationship_type == 'exploited-using'
-            AND d._arango_cve_processor_note in ["cve-attack", "cve-capec"]
+        FILTER d._arango_cve_processor_note in ["cve-attack", "cve-capec"]
             AND d.external_references[*].external_id IN @ext_ids
         LET ext_id = d.external_references[1].external_id
-        RETURN [ext_id, d.source_ref]
+        RETURN [ext_id, d.target_ref]
         """
         matched_ids = self.execute_query(
             query,
@@ -781,7 +812,9 @@ RETURN KEEP(doc, KEYS(doc, true))
     def get_cve_bundle(self, cve_id: str):
         primary_objects = self.get_cve_or_cpe_object(cve_id)
         cve_id = cve_id.upper()
-        cve_rels_types = ["x-cpe-match"]
+        cve_rels_types = ["related-to"]
+        acvep_notes = []
+        excluded_types = []
         binds = dict(
             cve_edge_types=cve_rels_types,
             default_imports_and_groupings=CVE_BUNDLE_DEFAULT_OBJECTS.copy(),
@@ -800,22 +833,26 @@ RETURN KEEP(doc, KEYS(doc, true))
                 indicators[0], include_x_cpes_vulnerable, include_x_cpes_not_vulnerable
             )
             binds["default_imports_and_groupings"].extend(grouping_ids)
+        for obj in primary_objects:
+            binds["default_imports_and_groupings"].extend([v for k, v in obj.items() if k.endswith('_ref') or k.endswith('_refs')])
+            binds["default_imports_and_groupings"].extend(obj.get('extensions', {}))
 
         include_attack = self.query_as_bool("include_attack", True)
         include_capec = self.query_as_bool("include_capec", True)  # or include_attack
         include_cwe = self.query_as_bool("include_cwe", True)  # or include_capec
 
         if include_capec:
-            cve_rels_types.append("cve-capec")
+            acvep_notes.append("cve-capec")
         if include_attack:
-            cve_rels_types.append("cve-attack")
-
+            acvep_notes.append("cve-attack")
         if include_cwe:
-            cve_rels_types.append("cve-cwe")
+            acvep_notes.append("cve-cwe")
+        else:
+            excluded_types.append("weakness")
 
         docnames = [cve_id]
         doctypes = ["exploit"]
-        binds.update(docnames=docnames, doctypes=doctypes)
+        binds.update(docnames=docnames, doctypes=doctypes, acvep_notes=acvep_notes)
         if self.query_as_bool("include_epss", True):
             docnames.append(f"EPSS Scores: {cve_id}")
             cve_rels_types.append("object")
@@ -827,7 +864,9 @@ RETURN KEEP(doc, KEYS(doc, true))
             doctypes.append("report")
 
         types = self.query_as_array("object_type") or CVE_BUNDLE_TYPES
-        binds["types"] = list(CVE_BUNDLE_TYPES.intersection(types))
+        binds["types"] = list(
+            CVE_BUNDLE_TYPES.intersection(types).difference(excluded_types)
+        )
         binds["@view"] = settings.VIEW_NAME
         binds.update(primary_keys=[d["_id"] for d in primary_objects])
         query = """
@@ -846,7 +885,9 @@ LET default_object_ids = (
 
 LET cve_rels = FLATTEN(
     FOR doc IN nvd_cve_edge_collection
-    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids) AND (doc._arango_cve_processor_note IN @cve_edge_types OR doc.relationship_type IN @cve_edge_types)
+    FILTER (doc._from IN cve_data_ids OR doc._to IN cve_data_ids)
+    FILTER doc._arango_cve_processor_note IN @acvep_notes
+        OR doc.relationship_type IN @cve_edge_types
     LET retval = doc._target_type == 'grouping' ? [doc._id, doc._from] : [doc._id, doc._from, doc._to] // don't return direct relation for grouping, already handled with default_imports_and_groupings
     RETURN retval
     )
@@ -891,7 +932,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
                     f"unknown relationship_type from grouping {(rel_type, stix_ids)}"
                 )
         indicator_ids.extend(CVE_BUNDLE_DEFAULT_OBJECTS)
-        types = {"vulnerability", "software"}
+        types = {"vulnerability", "software", 'extension-definition', 'identity'}
         for indicator_id in indicator_ids[:]:
             type_part, _, uuid_part = indicator_id.partition("--")
             if type_part == "indicator":
@@ -899,6 +940,9 @@ RETURN KEEP(d, KEYS(d, TRUE))
                 relationship_id = "relationship--" + uuid_part
                 indicator_ids.extend((vuln_id, relationship_id))
             types.add(type_part)
+            
+        indicator_ids.extend(self.get_extensions_and_refs([id for id in indicator_ids if not id.startswith('grouping--')], use_latest=True))
+
         if t := self.query_as_array("types"):
             types.intersection_update(t)
         indicator_ids.extend(itertools.chain(*groupings.values()))
@@ -922,9 +966,9 @@ RETURN KEEP(d, KEYS(d, TRUE))
         cve_id,
         type="vulnerability",
     ):
-        mode = 'cve'
-        if type == 'software':
-            mode = 'cpe'
+        mode = "cve"
+        if type == "software":
+            mode = "cpe"
         primary_objects = self.get_cve_or_cpe_object(cve_id, mode=mode)
         vulnerability = [p for p in primary_objects if p["type"] == type][0]
         return Response(
@@ -1036,10 +1080,12 @@ RETURN KEEP(d, KEYS(d, TRUE))
 
         new_query = """
         FOR d IN nvd_cve_edge_collection
-        FILTER d._arango_cve_processor_note == "cve-attack" AND d.source_ref == @match_id AND d._from == @match_pk
+        FILTER d._arango_cve_processor_note == "cve-attack" AND d.target_ref == @match_id AND d._to == @match_pk
         RETURN d.external_references[1].external_id
         """
-        techniques = self.execute_query(new_query, bind_vars=binds, paginate=False)
+        techniques = sorted(
+            self.execute_query(new_query, bind_vars=binds, paginate=False)
+        )
         name = matched_object["name"]
         nav_retval = {
             "description": f"Techniques {name} is exploited by",

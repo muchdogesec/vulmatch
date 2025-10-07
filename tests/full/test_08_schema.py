@@ -18,4 +18,3 @@ def test_healthcheck_service(client, api_schema):
     api_schema["/api/healthcheck/service/"]["GET"].validate_response(
         Transport.get_st_response(resp)
     )
-
