@@ -475,7 +475,7 @@ class CNAView(viewsets.ViewSet):
         name = CharFilter(
             help_text=textwrap.dedent(
             """
-            Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.'
+            Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.
             """
             )
         )
@@ -486,7 +486,7 @@ class CNAView(viewsets.ViewSet):
         summary="Get CNA Objects for CVEs",
         description=textwrap.dedent(
             """
-            Search and filter CNA records.
+            All vulnerabilites records are created by (`created_by_ref`) identity. You can search and filter those identities using this endpoint.
             """
         ),
     )
