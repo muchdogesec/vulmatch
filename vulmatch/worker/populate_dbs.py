@@ -184,6 +184,7 @@ def create_indexes(db: StandardDatabase):
                 dict(name="description", analyzer="norm_en"),
                 "type",
                 "_is_latest",
+                "created_by_ref",
                 "x_opencti_cvss_v2_base_score",
                 "x_opencti_cvss_base_score",
                 "x_opencti_cvss_v4_base_score",

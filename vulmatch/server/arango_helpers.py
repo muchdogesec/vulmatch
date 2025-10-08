@@ -510,6 +510,11 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
+                
+        if created_by_ref := self.query.get('created_by_ref'):
+            binds['created_by_ref'] = created_by_ref
+            filters.append('FILTER doc.created_by_ref == @created_by_ref')
+
         min_base_scores = {}
         for kk in CVSS_BASE_SCORE_KEYS:
             if q := as_number(self.query.get(kk + "_min"), default=None, type=float):

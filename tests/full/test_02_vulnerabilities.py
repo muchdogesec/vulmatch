@@ -674,3 +674,26 @@ def test_list_cnas(client, filters: dict, expected_ids: list[str]):
     ), "response.objects[*].type must always be identity"
     assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
     assert resp_data["total_results_count"] == len(expected_ids)
+
+
+@pytest.mark.parametrize(
+    "created_by_ref",
+    [
+        "identity--3644753d-7db4-5c2f-af5e-4dc9b8d196ba",
+        "identity--3759e3ac-4da9-5c8c-a506-bbd312f35b07",
+        "identity--d71c6b17-8860-557e-91fc-602fed648208",
+        "identity--2d63a748-daeb-5c11-a121-948a7d78e1c0",
+        "identity--64dfee48-e209-5e25-bad4-dcc80d221a85",
+        "identity--9092b7ea-75a6-5459-bf2f-3da759bd34a9",
+        "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+        "identity--ac18951b-427a-56a7-9ca2-b9ba414c9708",
+    ],
+)
+def test_created_by_ref(client, created_by_ref):
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=dict(created_by_ref=created_by_ref))
+    resp_data = resp.json()
+    assert resp_data["objects"]
+    for cve in resp_data["objects"]:
+        assert cve["type"] == "vulnerability"
+        assert cve["created_by_ref"] == created_by_ref
