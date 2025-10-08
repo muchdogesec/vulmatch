@@ -80,7 +80,7 @@ CVE_SORT_FIELDS = [
         ),
         pytest.param(
             dict(
-                has_kev=True,
+                x_opencti_cisa_kev=True,
                 stix_id="vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d,vulnerability--f361b90a-21dd-5f91-9f24-292e81f65836",
             ),
             [
@@ -90,7 +90,7 @@ CVE_SORT_FIELDS = [
         ),
         pytest.param(
             dict(
-                has_kev=False,
+                x_opencti_cisa_kev=False,
                 stix_id="vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d,vulnerability--f361b90a-21dd-5f91-9f24-292e81f65836",
             ),
             [
@@ -287,7 +287,7 @@ def test_vuln_status(client, vuln_status):
     ), f"all objects must have vulnStatus == `{vuln_status}`"
 
 
-def test_has_kev(
+def test_x_opencti_cisa_kev(
     client,
 ):
     expected_ids = {
@@ -299,7 +299,7 @@ def test_has_kev(
         "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
     }
     url = f"/api/v1/cve/objects/"
-    resp = client.get(url, query_params=dict(has_kev=True))
+    resp = client.get(url, query_params=dict(x_opencti_cisa_kev=True))
     resp_data = resp.json()
     assert all(
         cve["type"] == "vulnerability" for cve in resp_data["objects"]

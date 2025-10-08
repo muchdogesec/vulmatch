@@ -282,7 +282,7 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        has_kev = BooleanFilter(
+        x_opencti_cisa_kev = BooleanFilter(
             help_text=textwrap.dedent(
                 """
             Optionally filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).

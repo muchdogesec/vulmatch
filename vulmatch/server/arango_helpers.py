@@ -558,7 +558,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["cve_ids"] = [qq.upper() for qq in q]
             filters.append("FILTER doc.name IN @cve_ids")
 
-        if (hasKev := self.query_as_bool("has_kev", None)) != None:
+        if (hasKev := self.query_as_bool("x_opencti_cisa_kev", None)) != None:
             if hasKev:
                 filters.append("FILTER doc.x_opencti_cisa_kev == TRUE")
             else:
