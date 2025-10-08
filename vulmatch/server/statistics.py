@@ -17,7 +17,7 @@ from drf_spectacular.utils import (
 )
 
 from rest_framework.response import Response
-
+import textwrap
 
 @extend_schema_field({"type": "string", "example": "CVE-2024-19091"})
 class CVEField(serializers.CharField):
@@ -245,7 +245,15 @@ RETURN { cve: d.name, created_at: d.created }
 
 @extend_schema_view(
     list=extend_schema(
-        description="Use this endpoint to get high level summary of the data held in Vulmatch",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get high level summary of the data held in Vulmatch.
+
+            When you make a request to the endpoint, and new summart is generated unless the `revision` or `date` (EST time) has changed.
+            
+            `revision` is updated if any change is made to the collection. This is the same behaviour used for caching vendor/products data on cpe endpoints.
+            """
+        ),
         summary="Get calculated statistics",
     )
 )

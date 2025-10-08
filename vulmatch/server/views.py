@@ -480,7 +480,7 @@ class CNAView(viewsets.ViewSet):
         )
         id = BaseCSVFilter(help_text=textwrap.dedent(
             """
-            Only show results that match id.
+            Only show results that match identity ID (e.g. `identity--a388f8a4-73be-5212-8dda-abb80b4abd8d`).
             """
         ))
 
