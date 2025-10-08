@@ -478,6 +478,11 @@ class CNAView(viewsets.ViewSet):
             """
             )
         )
+        id = MultipleChoiceFilter(help_text=textwrap.dedent(
+            """
+            Only show results that match id.
+            """
+        ))
 
     @extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)},

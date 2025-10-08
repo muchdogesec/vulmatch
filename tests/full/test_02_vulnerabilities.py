@@ -662,6 +662,16 @@ def test_epss_percentile_min(client, min_percentile):
         ),
         (dict(name="secure"), []),
         (dict(name="miTre"), ["identity--64dfee48-e209-5e25-bad4-dcc80d221a85"]),
+        (
+            dict(
+                name="security",
+                id="identity--74a17a7d-4559-56ac-882c-abd4e64618bf,identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+            ),
+            [
+                "identity--74a17a7d-4559-56ac-882c-abd4e64618bf",
+                "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+            ],
+        ),
     ],
 )
 def test_list_cnas(client, filters: dict, expected_ids: list[str]):
