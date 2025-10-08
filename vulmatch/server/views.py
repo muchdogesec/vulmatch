@@ -906,7 +906,7 @@ class CpeView(viewsets.ViewSet):
             """ 
             This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed.
 
-            `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs. e.g. To get all EPSS scores for CVEs for each day in 2024 you would use `start_date` `2024-01-01` and `end_date` `2024-12-31`.
+            `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs. e.g. To get all EPSS scores for CVEs for each day in 2024 you would use `start_date` `2024-01-01` and `end_date` `2024-12-31`. `start_date` and `end_date` MUST be in the past (you cannot use current day to avoid timezone issues).
             """
         ),
     ),
