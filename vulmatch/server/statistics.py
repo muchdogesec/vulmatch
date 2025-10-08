@@ -9,10 +9,15 @@ from django.core.cache import cache
 from vulmatch.server.arango_helpers import (
     VulmatchDBHelper,
 )
-from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from drf_spectacular.utils import (
+    extend_schema_field,
+    extend_schema_serializer,
+    extend_schema_view,
+    extend_schema,
+)
 
 from rest_framework.response import Response
-
+import textwrap
 
 @extend_schema_field({"type": "string", "example": "CVE-2024-19091"})
 class CVEField(serializers.CharField):
@@ -78,6 +83,7 @@ class StatisticsSerializer(serializers.Serializer):
     cwes = serializers.ListSerializer(child=CWESerializer())
     attacks = serializers.ListSerializer(child=AttackSerializer())
 
+
 @lru_cache
 def cached_db_query(date, revision, query, kwargs):
     kwargs = json.loads(kwargs)
@@ -100,7 +106,9 @@ class StatisticsHelper:
         )
 
     def execute_query(self, query, **kwargs):
-        return cached_db_query(self.now.isoformat(), self._rev, query, json.dumps(kwargs, sort_keys=True))
+        return cached_db_query(
+            self.now.isoformat(), self._rev, query, json.dumps(kwargs, sort_keys=True)
+        )
 
     def get_statistics(self):
         retval = dict(
@@ -235,8 +243,23 @@ RETURN { cve: d.name, created_at: d.created }
         return groups
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get high level summary of the data held in Vulmatch.
+
+            When you make a request to the endpoint, and new summart is generated unless the `revision` or `date` (EST time) has changed.
+            
+            `revision` is updated if any change is made to the collection. This is the same behaviour used for caching vendor/products data on cpe endpoints.
+            """
+        ),
+        summary="Get calculated statistics",
+    )
+)
 class StatisticsView(viewsets.ViewSet):
     serializer_class = StatisticsSerializer(many=False)
+    openapi_tags = ["Statistics"]
 
     def list(self, request, *args, **kwargs):
         return StatisticsHelper().get_statistics()

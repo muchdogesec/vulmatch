@@ -282,7 +282,7 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        has_kev = BooleanFilter(
+        x_opencti_cisa_kev = BooleanFilter(
             help_text=textwrap.dedent(
                 """
             Optionally filter the results to only include those reported by CISA KEV (Known Exploited Vulnerability).
@@ -310,35 +310,35 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        x_opencti_cvss_v2_base_score = NumberFilter(
+        x_opencti_cvss_v2_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv2 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
-        x_opencti_cvss_base_score = NumberFilter(
+        x_opencti_cvss_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv3.1 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
-        x_opencti_cvss_v4_base_score = NumberFilter(
+        x_opencti_cvss_v4_base_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum CVSSv4 score you want. `0` is lowest, `10` is highest.
             """
             )
         )
-        epss_score_min = NumberFilter(
+        x_opencti_epss_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
             """
             )
         )
-        epss_percentile_min = NumberFilter(
+        x_opencti_epss_percentile_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
@@ -478,6 +478,11 @@ class CNAView(viewsets.ViewSet):
             """
             )
         )
+        id = BaseCSVFilter(help_text=textwrap.dedent(
+            """
+            Only show results that match identity ID (e.g. `identity--a388f8a4-73be-5212-8dda-abb80b4abd8d`).
+            """
+        ))
 
     @extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)},
@@ -901,7 +906,7 @@ class CpeView(viewsets.ViewSet):
             """ 
             This request will create (or update, if exists), a Report object representing the EPSS scores for the CVEs indexed.
 
-            `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs. e.g. To get all EPSS scores for CVEs for each day in 2024 you would use `start_date` `2024-01-01` and `end_date` `2024-12-31`.
+            `start_date` and `end_date` control the EPSS dates you want to collect for the CVEs. e.g. To get all EPSS scores for CVEs for each day in 2024 you would use `start_date` `2024-01-01` and `end_date` `2024-12-31`. `start_date` and `end_date` MUST be in the past (you cannot use current day to avoid timezone issues).
             """
         ),
     ),

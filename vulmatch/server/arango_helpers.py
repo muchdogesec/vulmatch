@@ -510,6 +510,11 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
+                
+        if created_by_ref := self.query.get('created_by_ref'):
+            binds['created_by_ref'] = created_by_ref
+            filters.append('FILTER doc.created_by_ref == @created_by_ref')
+
         min_base_scores = {}
         for kk in CVSS_BASE_SCORE_KEYS:
             if q := as_number(self.query.get(kk + "_min"), default=None, type=float):
@@ -553,7 +558,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["cve_ids"] = [qq.upper() for qq in q]
             filters.append("FILTER doc.name IN @cve_ids")
 
-        if (hasKev := self.query_as_bool("has_kev", None)) != None:
+        if (hasKev := self.query_as_bool("x_opencti_cisa_kev", None)) != None:
             if hasKev:
                 filters.append("FILTER doc.x_opencti_cisa_kev == TRUE")
             else:
@@ -586,13 +591,13 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         ### epss  matches should happen later
         epss_filters = []
         if epss_score_min := as_number(
-            self.query.get("epss_score_min"), default=None, type=float
+            self.query.get("x_opencti_epss_score_min"), default=None, type=float
         ):
             binds["epss_score_min"] = epss_score_min
             filters.append("FILTER doc.x_opencti_epss_score >= @epss_score_min")
 
         if epss_percentile_min := as_number(
-            self.query.get("epss_percentile_min"), default=None, type=float
+            self.query.get("x_opencti_epss_percentile_min"), default=None, type=float
         ):
             binds["epss_percentile_min"] = epss_percentile_min
             filters.append(
@@ -1116,21 +1121,24 @@ RETURN KEEP(d, KEYS(d, TRUE))
         return Response(nav_retval)
 
     def list_cnas(self):
-        name_filter = ""
+        filters = []
         bind_vars = {
             "@collection": "nvd_cve_vertex_collection",
         }
         if name := self.query.get("name"):
             bind_vars["name"] = self.like_string(name).lower()
-            name_filter = "FILTER doc.name LIKE @name OR doc.external_references[? ANY FILTER CURRENT.external_id LIKE @name]"
+            filters.append("FILTER doc.name LIKE @name OR doc.external_references[? ANY FILTER CURRENT.external_id LIKE @name]")
+        if ids := self.query_as_array('id'):
+            bind_vars['ids'] = ids
+            filters.append('FILTER doc.id IN @ids')
         query = """
         FOR doc IN @@collection //OPTIONS {indexHint: "cpe_search_inv", forceIndexHint: true}
         FILTER doc.type == 'identity' 
         FILTER doc._is_latest == TRUE AND doc.external_references != NULL
-        // name_filter
+        // filters
         LIMIT @offset, @count
         RETURN KEEP(doc, KEYS(doc, true))
         """.replace(
-            "// name_filter", name_filter
+            "// filters", '\n'.join(filters)
         )
         return self.execute_query(query, bind_vars=bind_vars)

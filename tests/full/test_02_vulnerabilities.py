@@ -80,7 +80,7 @@ CVE_SORT_FIELDS = [
         ),
         pytest.param(
             dict(
-                has_kev=True,
+                x_opencti_cisa_kev=True,
                 stix_id="vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d,vulnerability--f361b90a-21dd-5f91-9f24-292e81f65836",
             ),
             [
@@ -90,7 +90,7 @@ CVE_SORT_FIELDS = [
         ),
         pytest.param(
             dict(
-                has_kev=False,
+                x_opencti_cisa_kev=False,
                 stix_id="vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d,vulnerability--f361b90a-21dd-5f91-9f24-292e81f65836",
             ),
             [
@@ -172,7 +172,7 @@ CVE_SORT_FIELDS = [
             id="x_cpes_not_vulnerable 3",
         ),
         pytest.param(
-            dict(epss_score_min="0.1"),
+            dict(x_opencti_epss_score_min="0.1"),
             [
                 "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
                 "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
@@ -187,10 +187,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
                 "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
             ],
-            id="epss_score_min 1",
+            id="x_opencti_epss_score_min 1",
         ),
         pytest.param(
-            dict(epss_score_min="0.8"),
+            dict(x_opencti_epss_score_min="0.8"),
             [
                 "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
                 "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
@@ -198,10 +198,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
                 "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
             ],
-            id="epss_score_min 2",
+            id="x_opencti_epss_score_min 2",
         ),
         pytest.param(
-            dict(epss_percentile_min="0.9"),
+            dict(x_opencti_epss_percentile_min="0.9"),
             [
                 "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
                 "vulnerability--2fecb4e8-21da-5b10-bc08-f35a6c7daadb",
@@ -216,10 +216,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--7f541ed1-94d4-50f9-9f3d-34b8473a47cb",
                 "vulnerability--aad38a2e-7afa-5c55-8a92-f5e3b47daffc",
             ],
-            id="epss_percentile_min 1",
+            id="x_opencti_epss_percentile_min 1",
         ),
         pytest.param(
-            dict(epss_percentile_min="0.8"),
+            dict(x_opencti_epss_percentile_min="0.8"),
             [
                 "vulnerability--8d86bec6-8a68-5b16-8f4d-c7a8a8fe5900",
                 "vulnerability--ad1294fa-26ee-5877-afa4-c93d7e7a9d32",
@@ -241,7 +241,7 @@ CVE_SORT_FIELDS = [
                 "vulnerability--16623214-ad93-5163-99e0-33404eb563fc",
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
             ],
-            id="epss_percentile_min 2",
+            id="x_opencti_epss_percentile_min 2",
         ),
     ],
 )
@@ -287,7 +287,7 @@ def test_vuln_status(client, vuln_status):
     ), f"all objects must have vulnStatus == `{vuln_status}`"
 
 
-def test_has_kev(
+def test_x_opencti_cisa_kev(
     client,
 ):
     expected_ids = {
@@ -299,7 +299,7 @@ def test_has_kev(
         "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
     }
     url = f"/api/v1/cve/objects/"
-    resp = client.get(url, query_params=dict(has_kev=True))
+    resp = client.get(url, query_params=dict(x_opencti_cisa_kev=True))
     resp_data = resp.json()
     assert all(
         cve["type"] == "vulnerability" for cve in resp_data["objects"]
@@ -331,9 +331,6 @@ def test_cvss_base_score_min(client, filter_key, filter_value):
     resp = client.get(url, query_params={filter_key + "_min": filter_value})
     vulnerabilities = resp.json()["objects"]
     for cve in vulnerabilities:
-        cvss = list(cve["x_cvss"].values())
-        if not cvss:
-            continue
         assert cve.get(filter_key, 0) >= filter_value
 
 
@@ -585,9 +582,9 @@ def test_navigator__fails(client):
 
 
 @pytest.mark.parametrize("min_score", [x / 20 for x in range(0, 20)])
-def test_epss_score_min(client, min_score):
+def test_x_opencti_epss_score_min(client, min_score):
     resp = client.get(
-        f"/api/v1/cve/objects/", query_params=dict(epss_score_min=min_score)
+        f"/api/v1/cve/objects/", query_params=dict(x_opencti_epss_score_min=min_score)
     )
     assert resp.status_code == 200
     for cve in resp.data["objects"]:
@@ -595,9 +592,9 @@ def test_epss_score_min(client, min_score):
 
 
 @pytest.mark.parametrize("min_percentile", [x / 20 for x in range(0, 20)])
-def test_epss_percentile_min(client, min_percentile):
+def test_x_opencti_epss_percentile_min(client, min_percentile):
     resp = client.get(
-        f"/api/v1/cve/objects/", query_params=dict(epss_percentile_min=min_percentile)
+        f"/api/v1/cve/objects/", query_params=dict(x_opencti_epss_percentile_min=min_percentile)
     )
     assert resp.status_code == 200
     for cve in resp.data["objects"]:
@@ -665,6 +662,16 @@ def test_epss_percentile_min(client, min_percentile):
         ),
         (dict(name="secure"), []),
         (dict(name="miTre"), ["identity--64dfee48-e209-5e25-bad4-dcc80d221a85"]),
+        (
+            dict(
+                name="security",
+                id="identity--74a17a7d-4559-56ac-882c-abd4e64618bf,identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+            ),
+            [
+                "identity--74a17a7d-4559-56ac-882c-abd4e64618bf",
+                "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+            ],
+        ),
     ],
 )
 def test_list_cnas(client, filters: dict, expected_ids: list[str]):
@@ -675,6 +682,28 @@ def test_list_cnas(client, filters: dict, expected_ids: list[str]):
     assert all(
         cve["type"] == "identity" for cve in resp_data["objects"]
     ), "response.objects[*].type must always be identity"
-    print((filters, [cve["id"] for cve in resp_data["objects"]]), ",")
     assert {cve["id"] for cve in resp_data["objects"]} == expected_ids
     assert resp_data["total_results_count"] == len(expected_ids)
+
+
+@pytest.mark.parametrize(
+    "created_by_ref",
+    [
+        "identity--3644753d-7db4-5c2f-af5e-4dc9b8d196ba",
+        "identity--3759e3ac-4da9-5c8c-a506-bbd312f35b07",
+        "identity--d71c6b17-8860-557e-91fc-602fed648208",
+        "identity--2d63a748-daeb-5c11-a121-948a7d78e1c0",
+        "identity--64dfee48-e209-5e25-bad4-dcc80d221a85",
+        "identity--9092b7ea-75a6-5459-bf2f-3da759bd34a9",
+        "identity--5ed2f6ab-d27e-5cff-9e4f-056dd36be502",
+        "identity--ac18951b-427a-56a7-9ca2-b9ba414c9708",
+    ],
+)
+def test_created_by_ref(client, created_by_ref):
+    url = f"/api/v1/cve/objects/"
+    resp = client.get(url, query_params=dict(created_by_ref=created_by_ref))
+    resp_data = resp.json()
+    assert resp_data["objects"]
+    for cve in resp_data["objects"]:
+        assert cve["type"] == "vulnerability"
+        assert cve["created_by_ref"] == created_by_ref
