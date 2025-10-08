@@ -189,7 +189,7 @@ def acp_task(options, job_id=None):
     job = Job.objects.get(pk=job_id)
     for k in ['start_date', 'end_date']:
         if k in options:
-            options[k] = datetime.strptime(options[k], '%Y-%m-%d')
+            options[k] = datetime.strptime(options[k], '%Y-%m-%d').date()
     run_task_with_acp(**options)
 
 @app.task(base=CustomTask)

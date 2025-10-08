@@ -30,7 +30,7 @@ import pytest
         pytest.param("arango-cve-processor/cve-attack", dict(created_min="2024-12-31")),
         pytest.param(
             "arango-cve-processor/cve-epss",
-            dict(start_date="2025-09-01", end_date="2025-09-06"),
+            dict(start_date="2025-09-01", end_date="2025-09-06"), id='cve-epss'
         ),
         pytest.param("arango-cve-processor/cve-kev", dict()),
         pytest.param(
