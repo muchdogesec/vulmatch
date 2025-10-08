@@ -331,14 +331,14 @@ class CveView(viewsets.ViewSet):
             """
             )
         )
-        epss_score_min = NumberFilter(
+        x_opencti_epss_score_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum EPSS score you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
             """
             )
         )
-        epss_percentile_min = NumberFilter(
+        x_opencti_epss_percentile_min = NumberFilter(
             help_text=textwrap.dedent(
                 """
             The minimum EPSS percentile you want. Between `0` (lowest) and `1` highest to 2 decimal places (e.g. `9.34`).
@@ -478,7 +478,7 @@ class CNAView(viewsets.ViewSet):
             """
             )
         )
-        id = MultipleChoiceFilter(help_text=textwrap.dedent(
+        id = BaseCSVFilter(help_text=textwrap.dedent(
             """
             Only show results that match id.
             """

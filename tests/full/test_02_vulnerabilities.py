@@ -172,7 +172,7 @@ CVE_SORT_FIELDS = [
             id="x_cpes_not_vulnerable 3",
         ),
         pytest.param(
-            dict(epss_score_min="0.1"),
+            dict(x_opencti_epss_score_min="0.1"),
             [
                 "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
                 "vulnerability--90fd6537-fece-54e1-b698-4205e636ed3d",
@@ -187,10 +187,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
                 "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
             ],
-            id="epss_score_min 1",
+            id="x_opencti_epss_score_min 1",
         ),
         pytest.param(
-            dict(epss_score_min="0.8"),
+            dict(x_opencti_epss_score_min="0.8"),
             [
                 "vulnerability--10a94cae-1727-5bf0-aff3-2a6c67cb00c3",
                 "vulnerability--c9f9c6ce-26aa-5061-a5d0-218874181eae",
@@ -198,10 +198,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
                 "vulnerability--0cd2c4ea-93fa-5a6c-a607-674016cf4ac4",
             ],
-            id="epss_score_min 2",
+            id="x_opencti_epss_score_min 2",
         ),
         pytest.param(
-            dict(epss_percentile_min="0.9"),
+            dict(x_opencti_epss_percentile_min="0.9"),
             [
                 "vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f",
                 "vulnerability--2fecb4e8-21da-5b10-bc08-f35a6c7daadb",
@@ -216,10 +216,10 @@ CVE_SORT_FIELDS = [
                 "vulnerability--7f541ed1-94d4-50f9-9f3d-34b8473a47cb",
                 "vulnerability--aad38a2e-7afa-5c55-8a92-f5e3b47daffc",
             ],
-            id="epss_percentile_min 1",
+            id="x_opencti_epss_percentile_min 1",
         ),
         pytest.param(
-            dict(epss_percentile_min="0.8"),
+            dict(x_opencti_epss_percentile_min="0.8"),
             [
                 "vulnerability--8d86bec6-8a68-5b16-8f4d-c7a8a8fe5900",
                 "vulnerability--ad1294fa-26ee-5877-afa4-c93d7e7a9d32",
@@ -241,7 +241,7 @@ CVE_SORT_FIELDS = [
                 "vulnerability--16623214-ad93-5163-99e0-33404eb563fc",
                 "vulnerability--d7b810e0-1806-55b7-b473-f7d50532006d",
             ],
-            id="epss_percentile_min 2",
+            id="x_opencti_epss_percentile_min 2",
         ),
     ],
 )
@@ -582,9 +582,9 @@ def test_navigator__fails(client):
 
 
 @pytest.mark.parametrize("min_score", [x / 20 for x in range(0, 20)])
-def test_epss_score_min(client, min_score):
+def test_x_opencti_epss_score_min(client, min_score):
     resp = client.get(
-        f"/api/v1/cve/objects/", query_params=dict(epss_score_min=min_score)
+        f"/api/v1/cve/objects/", query_params=dict(x_opencti_epss_score_min=min_score)
     )
     assert resp.status_code == 200
     for cve in resp.data["objects"]:
@@ -592,9 +592,9 @@ def test_epss_score_min(client, min_score):
 
 
 @pytest.mark.parametrize("min_percentile", [x / 20 for x in range(0, 20)])
-def test_epss_percentile_min(client, min_percentile):
+def test_x_opencti_epss_percentile_min(client, min_percentile):
     resp = client.get(
-        f"/api/v1/cve/objects/", query_params=dict(epss_percentile_min=min_percentile)
+        f"/api/v1/cve/objects/", query_params=dict(x_opencti_epss_percentile_min=min_percentile)
     )
     assert resp.status_code == 200
     for cve in resp.data["objects"]:

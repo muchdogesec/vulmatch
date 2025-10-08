@@ -591,13 +591,13 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         ### epss  matches should happen later
         epss_filters = []
         if epss_score_min := as_number(
-            self.query.get("epss_score_min"), default=None, type=float
+            self.query.get("x_opencti_epss_score_min"), default=None, type=float
         ):
             binds["epss_score_min"] = epss_score_min
             filters.append("FILTER doc.x_opencti_epss_score >= @epss_score_min")
 
         if epss_percentile_min := as_number(
-            self.query.get("epss_percentile_min"), default=None, type=float
+            self.query.get("x_opencti_epss_percentile_min"), default=None, type=float
         ):
             binds["epss_percentile_min"] = epss_percentile_min
             filters.append(
