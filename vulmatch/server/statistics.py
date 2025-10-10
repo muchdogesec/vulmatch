@@ -19,6 +19,7 @@ from drf_spectacular.utils import (
 from rest_framework.response import Response
 import textwrap
 
+
 @extend_schema_field({"type": "string", "example": "CVE-2024-19091"})
 class CVEField(serializers.CharField):
     pass
@@ -63,16 +64,19 @@ class KEVSerializer(serializers.Serializer):
     by_year = serializers.ListSerializer(child=ByYearSerializer())
 
 
-class CWESerializer(serializers.Serializer):
-    cwe_id = serializers.CharField()
+class CVEByYear(serializers.Serializer):
     year = YearField()
     cve_count = serializers.IntegerField()
+
+
+class CWESerializer(serializers.Serializer):
+    cwe_id = serializers.CharField()
+    by_year = CVEByYear(many=True)
 
 
 class AttackSerializer(serializers.Serializer):
     attack_id = serializers.CharField()
-    year = YearField()
-    cve_count = serializers.IntegerField()
+    by_year = CVEByYear(many=True)
 
 
 @extend_schema_serializer(many=False)
@@ -173,19 +177,36 @@ class StatisticsHelper:
         query = """
 FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: 'vulmatch_stats_attack_cwe'}
 FILTER d._arango_cve_processor_note == @note AND d._is_latest == TRUE
-COLLECT cwe_id = d.external_references[1].external_id, year = LEFT(d.created, 4) WITH COUNT INTO cve_count
-RETURN {[@name]: cwe_id, year, cve_count}
+COLLECT name = d.external_references[1].external_id, year = LEFT(d.created, 4) WITH COUNT INTO cve_count
+RETURN {name, year, cve_count}
 """
         return dict(
-            cwes=self.execute_query(
-                query,
-                bind_vars=dict(name="cwe_id", note="cve-cwe"),
+            cwes=self.group_attack_stats(
+                self.execute_query(
+                    query,
+                    bind_vars=dict(note="cve-cwe"),
+                ),
+                "cwe_id",
             ),
-            attacks=self.execute_query(
-                query,
-                bind_vars=dict(name="attack_id", note="cve-attack"),
+            attacks=self.group_attack_stats(
+                self.execute_query(
+                    query,
+                    bind_vars=dict(note="cve-attack"),
+                ),
+                "attack_id",
             ),
         )
+
+    @staticmethod
+    def group_attack_stats(stat: list[dict], id_name):
+        retval = dict()
+        for attack in stat:
+            attack_id = attack.pop("name")
+            lst = retval.setdefault(attack_id, {id_name: attack_id, "by_year": []})[
+                "by_year"
+            ]
+            lst.append(attack)
+        return list(retval.values())
 
     def get_vulnerabilities_by_year(self):
         query = """
