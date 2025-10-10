@@ -64,19 +64,19 @@ class KEVSerializer(serializers.Serializer):
     by_year = serializers.ListSerializer(child=ByYearSerializer())
 
 
-class CVEByYear(serializers.Serializer):
+class CVECountsByYear(serializers.Serializer):
     year = YearField()
     cve_count = serializers.IntegerField()
 
 
 class CWESerializer(serializers.Serializer):
     cwe_id = serializers.CharField()
-    by_year = CVEByYear(many=True)
+    by_year = CVECountsByYear(many=True)
 
 
 class AttackSerializer(serializers.Serializer):
     attack_id = serializers.CharField()
-    by_year = CVEByYear(many=True)
+    by_year = CVECountsByYear(many=True)
 
 
 @extend_schema_serializer(many=False)
