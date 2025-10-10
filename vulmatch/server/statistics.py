@@ -201,6 +201,7 @@ RETURN {name, year, cve_count}
     def group_attack_stats(stat: list[dict], id_name):
         retval = dict()
         for attack in stat:
+            attack = attack.copy()
             attack_id = attack.pop("name")
             lst = retval.setdefault(attack_id, {id_name: attack_id, "by_year": []})[
                 "by_year"
