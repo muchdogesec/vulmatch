@@ -9,11 +9,11 @@ def test_statistics(client, api_schema):
     helper.now = date(2025, 1, 1)
     with patch("vulmatch.server.statistics.StatisticsHelper") as mock_helper:
         mock_helper.return_value = helper
-        resp = client.get("/api/statistics/")
+        resp = client.get("/api/v1/statistics/")
     assert resp.status_code == 200
     data = resp.json()
 
-    api_schema["/api/statistics/"]["GET"].validate_response(
+    api_schema["/api/v1/statistics/"]["GET"].validate_response(
         Transport.get_st_response(resp)
     )
     assert data["summary"] == {
