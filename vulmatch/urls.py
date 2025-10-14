@@ -52,10 +52,10 @@ router.register("epss", views.EPSSView, "epss-view")
 router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
 router.register("attack", ctibutler_views.AttackView, "attack-view")
+router.register('statistics', statistics.StatisticsView, "statistics-view")
 
 service_router = routers.SimpleRouter(use_regex_path=False)
 service_router.register('healthcheck', views.HealthCheck, "service-status-view")
-service_router.register('statistics', statistics.StatisticsView, "service-statistics-view")
 
 urlpatterns = [
     path(f'api/', include(service_router.urls)),
