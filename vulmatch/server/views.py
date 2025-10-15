@@ -3,6 +3,7 @@ import os
 from urllib.parse import urljoin
 import requests
 from rest_framework import viewsets, status, decorators, mixins
+from vulmatch.server import statistics
 
 from vulmatch.server.arango_helpers import (
     CPEMATCH_BUNDLE_TYPES,
@@ -462,6 +463,15 @@ class CveView(viewsets.ViewSet):
             "nvd_cve_vertex_collection", request
         ).get_navigator_layer(cve_id)
 
+    @extend_schema(
+        summary="GET statistics", description="get statistics", filters=False
+    )
+    @decorators.action(
+        methods=["GET"], detail=False, serializer_class=statistics.CVEStatSerializer
+    )
+    def statistics(self, request, *args, **kwargs):
+        return Response(statistics.StatisticsHelper().get_cve_stat())
+
 
 class CNAView(viewsets.ViewSet):
     pagination_class = Pagination("objects")
@@ -473,16 +483,18 @@ class CNAView(viewsets.ViewSet):
     class filterset_class(FilterSet):
         name = CharFilter(
             help_text=textwrap.dedent(
-            """
+                """
             Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.
             """
             )
         )
-        id = BaseCSVFilter(help_text=textwrap.dedent(
-            """
+        id = BaseCSVFilter(
+            help_text=textwrap.dedent(
+                """
             Only show results that match identity ID (e.g. `identity--a388f8a4-73be-5212-8dda-abb80b4abd8d`).
             """
-        ))
+            )
+        )
 
     @extend_schema(
         responses={200: serializers.StixObjectsSerializer(many=True)},
@@ -613,6 +625,15 @@ class KevView(KevEpssView):
     def list_exploits(self, request, *args, **kwargs):
         return VulmatchDBHelper("", request).list_exploits()
 
+    @extend_schema(
+        summary="GET statistics", description="get statistics", filters=False
+    )
+    @decorators.action(
+        methods=["GET"], detail=False, serializer_class=statistics.KEVStatSerializer
+    )
+    def statistics(self, request, *args, **kwargs):
+        return Response(statistics.StatisticsHelper().get_kev_stats())
+
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -660,6 +681,18 @@ class EPSSView(KevView):
             Filter the results using a CVE ID. e.g. `CVE-2024-23897`
             """
             )
+        )
+
+    @extend_schema(summary="GET statistics", description="get statistics")
+    @decorators.action(
+        methods=["GET"],
+        detail=False,
+        serializer_class=statistics.CVENumericsStatSerializer(many=True),
+        pagination_class=None,
+    )
+    def statistics(self, request, *args, **kwargs):
+        return Response(
+            statistics.StatisticsHelper().get_cve_numeric_stat("x_opencti_epss_score")
         )
 
 

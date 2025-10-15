@@ -102,6 +102,21 @@ DATABASES = {
     }
 }
 
+# cache
+
+
+
+CELERY_BROKER_URL = os.environ["CELERY_BROKER_URL"]
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': CELERY_BROKER_URL,  # Use the appropriate Redis server URL
+        'OPTIONS': {
+            # 'CLIENT_CLASS': 'django.core.cache.backends.redis.RedisCacheClient',
+        }
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -197,4 +212,3 @@ CVE2STIX_BUCKET_ROOT_PATH    = os.environ["CVE2STIX_BUCKET_ROOT_PATH"]
 # stixifier settings
 ARANGODB_DATABASE_VIEW = VIEW_NAME
 SRO_OBJECTS_ONLY_LATEST = os.getenv('SRO_OBJECTS_ONLY_LATEST', True)
-

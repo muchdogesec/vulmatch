@@ -1,10 +1,10 @@
 import re
 import textwrap
-from rest_framework import viewsets, decorators
+from rest_framework import viewsets, decorators, response
 
 from vulmatch.server.autoschema import DEFAULT_400_ERROR
 from dogesec_commons.utils import Pagination
-from vulmatch.server import serializers
+from vulmatch.server import serializers, statistics
 from django_filters.rest_framework import FilterSet, DjangoFilterBackend, ChoiceFilter, BaseCSVFilter, CharFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -93,11 +93,22 @@ class AttackView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>", detail=False)
     def retrieve_objects(self, request, *args, attack_id=None, **kwargs):
         return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', revokable=True)
-    
+
     @decorators.action(methods=['GET'], url_path="objects/<str:attack_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, attack_id=None, **kwargs):
         return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', bundle=True, revokable=True)
-    
+
+    @extend_schema(
+        summary="GET statistics", description="get statistics", filters=False
+    )
+    @decorators.action(
+        methods=["GET"],
+        detail=False,
+        serializer_class=statistics.AttackStatSerializer(many=True),
+        pagination_class=None,
+    )
+    def statistics(self, request, *args, **kwargs):
+        return response.Response(statistics.StatisticsHelper().get_attack_cwe_stats("attack"))
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -166,18 +177,30 @@ class CweView(viewsets.ViewSet):
         cwe_id = BaseCSVFilter(help_text='Filter the results by the CWE ID of the object. e.g. `CWE-242` `CWE-250`.')
         description = CharFilter(help_text='Filter the results by the `description` property of the object. Search is a wildcard, so `exploit` will return all descriptions that contain the string `exploit`.')
         name = CharFilter(help_text='Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`.')
-    
+
     @decorators.action(methods=['GET'], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_weakness_or_capec_objects('cve-cwe')
-    
+
     @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>", detail=False)
     def retrieve_objects(self, request, *args, cwe_id=None, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe')
-    
+
     @decorators.action(methods=['GET'], url_path="objects/<str:cwe_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, cwe_id=None, **kwargs):
-        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', bundle=True)     
+        return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', bundle=True)
+
+    @extend_schema(
+        summary="GET statistics", description="get statistics", filters=False
+    )
+    @decorators.action(
+        methods=["GET"],
+        detail=False,
+        serializer_class=statistics.CWEStatSerializer(many=True),
+        pagination_class=None,
+    )
+    def statistics(self, request, *args, **kwargs):
+        return response.Response(statistics.StatisticsHelper().get_attack_cwe_stats("cwe"))
 
 @extend_schema_view(
     list_objects=extend_schema(
@@ -261,4 +284,3 @@ class CapecView(viewsets.ViewSet):
     @decorators.action(methods=['GET'], url_path="objects/<str:capec_id>/bundle", detail=False)
     def retrieve_object_bundle(self, request, *args, capec_id=None, **kwargs):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(capec_id, 'cve-capec', bundle=True)
-       
