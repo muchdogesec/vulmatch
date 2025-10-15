@@ -4,6 +4,8 @@
 
 ## Before you begin...
 
+![](docs/vulmatch-web.png)
+
 We offer a fully hosted web version of Vulmatch which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.vulmatch.com/).
 
 ## Overview
@@ -20,12 +22,6 @@ Some common reasons people use Vulmatch include filtering CVEs by;
 * ATT&CK classification
 * Affected products
 * Know expliots
-
-## tl;dr
-
-[![Vulmatch](https://img.youtube.com/vi/2kFhXFEvCG8/0.jpg)](https://www.youtube.com/watch?v=2kFhXFEvCG8)
-
-[Watch the demo](https://www.youtube.com/watch?v=2kFhXFEvCG8).
 
 ## Install
 
