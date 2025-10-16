@@ -454,10 +454,10 @@ class CapecView(viewsets.ViewSet):
         ).get_object_by_external_id(capec_id, "cve-capec", bundle=True)
 
     @extend_schema(
-        summary="Get a CWE statistics",
+        summary="Get a CAPEC statistics",
         description=textwrap.dedent(
             """
-            Includes summary counts of weaknesses observed by year.
+            Includes summary counts of CAPEC observed by year.
             """
         ),
         filters=False,
