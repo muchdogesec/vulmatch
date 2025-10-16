@@ -112,6 +112,7 @@ class StatisticsSerializer(serializers.Serializer):
     kev = KEVStatSerializer()
     cwes = CWEStatSerializer(many=True)
     attacks = AttackStatSerializer(many=True)
+    capecs = CapecStatSerializer(many=True)
 
 
 def make_cache_key(date, revision, query, kwargs):
