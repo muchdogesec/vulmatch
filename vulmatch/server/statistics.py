@@ -95,6 +95,16 @@ class AttackStatSerializer(CWEStatSerializer):
     cwe_id = None
 
 
+
+class CapecStatSerializer(CWEStatSerializer):
+    capec_id = serializers.CharField()
+    total_cve_count = serializers.IntegerField(
+        help_text="total number of cves targeted using capec"
+    )
+    cwe_id = None
+
+
+
 @extend_schema_serializer(many=False)
 class StatisticsSerializer(serializers.Serializer):
     summary = SummarySerializer()
@@ -150,6 +160,9 @@ class StatisticsHelper:
             ),
             attacks=self.get_attack_cwe_stats(
                 "attack",
+            ),
+            capecs=self.get_attack_cwe_stats(
+                "capec",
             ),
         )
         return Response(retval)

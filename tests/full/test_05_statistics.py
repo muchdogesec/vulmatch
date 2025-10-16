@@ -55,6 +55,19 @@ def test_attack_stats(client, api_schema, patched_helper):
     assert len(data) >= 93
 
 
+
+def test_capec_stats(client, api_schema, patched_helper):
+    resp = client.get("/api/v1/capec/statistics/")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    api_schema["/api/v1/capec/statistics/"]["GET"].validate_response(
+        Transport.get_st_response(resp)
+    )
+    assert data[0] == {'capec_id': 'CAPEC-85', 'total_cve_count': 23, 'by_year': [{'year': '2024', 'cve_count': 23}]}
+    assert len(data) >= 170
+
+
 def test_cwe_stats(client, api_schema, patched_helper):
     resp = client.get("/api/v1/cwe/statistics/")
     assert resp.status_code == 200
