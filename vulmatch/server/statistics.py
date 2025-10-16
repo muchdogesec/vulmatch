@@ -291,7 +291,7 @@ RETURN { cve: d.name, created_at: d.created }
     ):
         query = """
         FOR d IN nvd_cve_vertex_collection
-            OPTIONS {indexHint: 'vulmatch_stats_epss'}
+            OPTIONS {indexHint: 'vulmatch_stats_epss_v2'}
         FILTER d.type == "vulnerability" 
             AND d._is_latest == TRUE 
         COLLECT group = d[@prop] != NULL ? FLOOR(d[@prop] * 10) / 10 : NULL WITH COUNT INTO cve_count
