@@ -470,7 +470,7 @@ class CveView(viewsets.ViewSet):
             Includes summary counts of CVEs by year, and CVSS scores bucketed by severity.
             """
         ),
-        filters=False
+        filters=False,
     )
     @decorators.action(
         methods=["GET"], detail=False, serializer_class=statistics.CVEStatSerializer
@@ -489,7 +489,7 @@ class CNAView(viewsets.ViewSet):
     class filterset_class(FilterSet):
         name = CharFilter(
             help_text=textwrap.dedent(
-            """
+                """
             Filter the results by the name of the source. Search is a wildcard, so `mit` will return all CNAs that contain the string `mit`, i.e `mitre`.
             """
             )
@@ -638,7 +638,7 @@ class KevView(KevEpssView):
             Includes summary counts of KEVs by year. Uses Vulncheck KEV data.
             """
         ),
-        filters=False
+        filters=False,
     )
     @decorators.action(
         methods=["GET"], detail=False, serializer_class=statistics.KEVStatSerializer
@@ -696,6 +696,7 @@ class EPSSView(KevView):
         )
 
     @extend_schema(
+        filters=False,
         summary="Get a summary of EPSS data",
         description=textwrap.dedent(
             """
