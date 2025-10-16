@@ -99,7 +99,13 @@ class AttackView(viewsets.ViewSet):
         return AttachedDBHelper(f'nvd_cve_vertex_collection', request).get_object_by_external_id(attack_id, 'cve-attack', bundle=True, revokable=True)
 
     @extend_schema(
-        summary="GET statistics", description="get statistics", filters=False
+        summary="Get a ATT&CK statistics",
+        description=textwrap.dedent(
+            """
+            Includes summary counts of ATT&CK techiques observed by year.
+            """
+        ),
+        filters=False
     )
     @decorators.action(
         methods=["GET"],
@@ -191,7 +197,13 @@ class CweView(viewsets.ViewSet):
         return AttachedDBHelper('nvd_cve_vertex_collection', request).get_object_by_external_id(cwe_id, 'cve-cwe', bundle=True)
 
     @extend_schema(
-        summary="GET statistics", description="get statistics", filters=False
+        summary="Get a CWE statistics",
+        description=textwrap.dedent(
+            """
+            Includes summary counts of weaknesses observed by year.
+            """
+        ),
+        filters=False
     )
     @decorators.action(
         methods=["GET"],
