@@ -186,7 +186,7 @@ def test_cve_stats(client, api_schema, patched_helper):
             {"range_group": "9.4 -  9.5", "count": 1},
             {"range_group": "9.6 -  9.7", "count": 2},
             {"range_group": "9.8 -  9.9", "count": 55},
-            {"range_group": "10.0 -  10.1", "count": 2},
+            {"range_group": "10", "count": 2},
         ],
         "cvss_v4": [
             {"range_group": "undefined", "count": 526},

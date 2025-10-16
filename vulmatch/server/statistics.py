@@ -304,6 +304,8 @@ RETURN { cve: d.name, created_at: d.created }
         for group, cve_count in self.execute_query(query, bind_vars=dict(prop=prop)):
             if group is None:
                 name = "undefined"
+            elif group == 10 or (group == 1 and prop == 'x_opencti_epss_score'):
+                name = str(int(group))
             else:
                 name = f"{group:.1f} - {group + 0.1: .1f}"
             groups.append(dict(range_group=name, count=cve_count))
