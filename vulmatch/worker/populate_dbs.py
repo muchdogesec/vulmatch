@@ -109,9 +109,14 @@ def create_indexes(db: StandardDatabase):
         dict(
             type="persistent",
             fields=["type", "_is_latest"],
-            storedValues=["x_opencti_epss_score"],
+            storedValues=[
+                "x_opencti_epss_score",
+                "x_opencti_cvss_v2_base_score",
+                "x_opencti_cvss_base_score",
+                "x_opencti_cvss_v4_base_score",
+            ],
             inBackground=True,
-            name=f"vulmatch_stats_epss",
+            name=f"vulmatch_stats_epss_v2",
         )
     )
     db.create_analyzer(
