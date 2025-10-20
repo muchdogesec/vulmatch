@@ -1,6 +1,8 @@
 import random
 import pytest
 
+from tests.full.utils import is_sorted
+
 
 @pytest.mark.parametrize(
     "path",
@@ -139,3 +141,37 @@ def test_bundle(client, path, path_id, expected):
     resp_data = resp.json()
     assert len(expected) == resp_data["total_results_count"]
     assert {obj["id"] for obj in resp_data["objects"]} == set(expected)
+
+def generate_paths(paths):
+    path_sorts = []
+    for path in paths:
+        for p in [
+                "created",
+                # "name", #accent causes problems
+                "modified", 
+                path+'_id'
+            ]:
+            path_sorts.append((path, p + "_ascending"))
+            path_sorts.append((path, p + "_descending"))
+    return path_sorts
+
+@pytest.mark.parametrize(
+    "path,sort",
+    generate_paths([
+        "attack",
+        "capec",
+        "cwe",
+    ]),
+
+)
+def test_sorts(client, path, sort):
+    url = f"/api/v1/{path}/objects/"
+    params = dict(sort=sort)
+    prop, _, direction = sort.rpartition('_')
+    fn = lambda x: x[prop]
+    if prop.endswith('_id'):
+        fn = lambda x: x['external_references'][0]['external_id']
+
+    resp = client.get(url, query_params=params)
+    objects = resp.json()['objects']
+    assert is_sorted(objects, key=fn, reverse=direction=='descending')
