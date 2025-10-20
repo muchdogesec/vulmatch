@@ -35,19 +35,11 @@ ATTACK_TYPES = set(
 )
 
 ATTACK_FORMS = {
-    "Tactic": [dict(type="x-mitre-tactic")],
     "Technique": [
         dict(type="attack-pattern", x_mitre_is_subtechnique=False),
         dict(type="attack-pattern", x_mitre_is_subtechnique=None),
     ],
     "Sub-technique": [dict(type="attack-pattern", x_mitre_is_subtechnique=True)],
-    "Mitigation": [dict(type="course-of-action")],
-    "Group": [dict(type="intrusion-set")],
-    "Software": [dict(type="malware"), dict(type="tool")],
-    "Campaign": [dict(type="campaign")],
-    "Data Source": [dict(type="x-mitre-data-source")],
-    "Data Component": [dict(type="x-mitre-data-component")],
-    "Asset": [dict(type="x-mitre-asset")],
 }
 
 
@@ -64,6 +56,15 @@ CWE_TYPES = set(
 CAPEC_TYPES = set(
     ["attack-pattern", "course-of-action", "identity", "marking-definition"]
 )
+
+SORT_PROPERTIES = [
+    "created_descending",
+    "created_ascending",
+    "name_descending",
+    "name_ascending",
+    "modified_descending",
+    "modified_ascending",
+]
 
 
 class AttachedDBHelper(DCHelper):
@@ -165,9 +166,27 @@ class AttachedDBHelper(DCHelper):
         query,
         bind_vars={},
         paginate=True,
-        relationship_mode=False,
         container=None,
     ):
+        query = query.replace(
+            "#sort_stmt",
+            self.get_sort_stmt(
+                SORT_PROPERTIES
+                + [
+                    "cwe_id_descending",
+                    "cwe_id_ascending",
+                    "capec_id_descending",
+                    "capec_id_ascending",
+                    "attack_id_descending",
+                    "attack_id_ascending",
+                ],
+                customs={
+                    k + "_id": "doc.external_references[0].external_id"
+                    for k in ["cwe", "capec", "attack"]
+                },
+            ),
+        )
+
         if paginate:
             bind_vars["offset"], bind_vars["count"] = self.get_offset_and_count(
                 self.count, self.page
@@ -231,10 +250,12 @@ class AttachedDBHelper(DCHelper):
             bind_vars["description"] = q.lower()
             filters.append("FILTER CONTAINS(LOWER(doc.description), @description)")
 
+
         query = """
             FOR doc in @@collection
             FILTER doc.type IN @types AND doc._arango_cve_processor_note == 'cve-attack'
             @filters
+            #sort_stmt
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
         """.replace(
@@ -343,6 +364,7 @@ class AttachedDBHelper(DCHelper):
         query = """
             FOR doc in @@collection FILTER doc.type IN @types AND doc._arango_cve_processor_note == @note
             @filters
+            #sort_stmt
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
         """.replace(

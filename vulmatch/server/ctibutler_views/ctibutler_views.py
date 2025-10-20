@@ -14,7 +14,7 @@ from django_filters.rest_framework import (
 )
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
-from .arango_helpers import AttachedDBHelper, ATTACK_TYPES, ATTACK_FORMS, CAPEC_TYPES
+from .arango_helpers import SORT_PROPERTIES, AttachedDBHelper, ATTACK_TYPES, ATTACK_FORMS, CAPEC_TYPES
 
 REVOKED_AND_DEPRECATED_PARAMS = [
     OpenApiParameter(
@@ -142,6 +142,7 @@ class AttackView(viewsets.ViewSet):
             choices=[(f, f) for f in ATTACK_FORMS],
             help_text="Filter the results by Attack Object type.",
         )
+        sort = ChoiceFilter(choices=[(f,f) for f in SORT_PROPERTIES+['attack_id_ascending', 'attack_id_descending']], help_text="sort by object property/field")
 
     @decorators.action(methods=["GET"], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
@@ -285,6 +286,7 @@ class CweView(viewsets.ViewSet):
         name = CharFilter(
             help_text="Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`."
         )
+        sort = ChoiceFilter(choices=[(f,f) for f in SORT_PROPERTIES+['cwe_id_ascending', 'cwe_id_descending']], help_text="sort by object property/field")
 
     @decorators.action(methods=["GET"], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
@@ -430,6 +432,7 @@ class CapecView(viewsets.ViewSet):
             choices=[(f, f) for f in CAPEC_TYPES],
             help_text="Filter the results by STIX Object type.",
         )
+        sort = ChoiceFilter(choices=[(f,f) for f in SORT_PROPERTIES+['capec_id_ascending', 'capec_id_descending']], help_text="sort by object property/field")
 
     @decorators.action(methods=["GET"], url_path="objects", detail=False)
     def list_objects(self, request, *args, **kwargs):
