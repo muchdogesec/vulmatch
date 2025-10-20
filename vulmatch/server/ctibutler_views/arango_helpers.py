@@ -35,19 +35,11 @@ ATTACK_TYPES = set(
 )
 
 ATTACK_FORMS = {
-    "Tactic": [dict(type="x-mitre-tactic")],
     "Technique": [
         dict(type="attack-pattern", x_mitre_is_subtechnique=False),
         dict(type="attack-pattern", x_mitre_is_subtechnique=None),
     ],
     "Sub-technique": [dict(type="attack-pattern", x_mitre_is_subtechnique=True)],
-    "Mitigation": [dict(type="course-of-action")],
-    "Group": [dict(type="intrusion-set")],
-    "Software": [dict(type="malware"), dict(type="tool")],
-    "Campaign": [dict(type="campaign")],
-    "Data Source": [dict(type="x-mitre-data-source")],
-    "Data Component": [dict(type="x-mitre-data-component")],
-    "Asset": [dict(type="x-mitre-asset")],
 }
 
 
