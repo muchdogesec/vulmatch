@@ -131,10 +131,6 @@ class AttackView(viewsets.ViewSet):
         name = CharFilter(
             help_text="Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`."
         )
-        type = ChoiceFilter(
-            choices=[(f, f) for f in ATTACK_TYPES],
-            help_text="Filter the results by STIX Object type.",
-        )
         alias = CharFilter(
             help_text="Filter the results by the `x_mitre_aliases` property of the object. Search is a wildcard, so `sun` will return all objects with x_mitre_aliases that contains the string `sun`, e.g `SUNBURST`."
         )
@@ -428,10 +424,6 @@ class CapecView(viewsets.ViewSet):
         name = CharFilter(
             help_text="Filter the results by the `name` property of the object. Search is a wildcard, so `exploit` will return all names that contain the string `exploit`."
         )
-        type = ChoiceFilter(
-            choices=[(f, f) for f in CAPEC_TYPES],
-            help_text="Filter the results by STIX Object type.",
-        )
         sort = ChoiceFilter(choices=[(f,f) for f in SORT_PROPERTIES+['capec_id_ascending', 'capec_id_descending']], help_text="sort by object property/field")
 
     @decorators.action(methods=["GET"], url_path="objects", detail=False)
@@ -439,7 +431,7 @@ class CapecView(viewsets.ViewSet):
         return AttachedDBHelper(
             "nvd_cve_vertex_collection", request
         ).get_weakness_or_capec_objects(
-            "cve-capec", types=CAPEC_TYPES, lookup_kwarg=self.lookup_url_kwarg
+            "cve-capec", stix_type='attack-pattern', lookup_kwarg=self.lookup_url_kwarg
         )
 
     @decorators.action(methods=["GET"], url_path="objects/<str:capec_id>", detail=False)
