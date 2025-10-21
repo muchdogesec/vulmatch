@@ -449,7 +449,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
         if not groupings:
             raise NotFound({"error": f"No grouping with criteria_id `{criteria_id}`"})
         return groupings
-    
+
     def get_extensions_and_refs(self, matched_pks, use_latest=False):
         if use_latest:
             filter = 'FILTER d.id IN @matched_pks AND d._is_latest == TRUE'
@@ -510,7 +510,6 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
             filters.append("FILTER @vuln_status IN doc.external_references")
 
-                
         if created_by_ref := self.query.get('created_by_ref'):
             binds['created_by_ref'] = created_by_ref
             filters.append('FILTER doc.created_by_ref == @created_by_ref')
@@ -527,18 +526,20 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             prefetched_matches.append(set(stix_ids))
 
         created_min, created_max = self.query.get("created_min", ""), self.query.get(
-            "created_max", "2099"
+            "created_max", ""
         )
         if created_min or created_max:
+            created_max = created_max or "2099"
             filters.append(
                 "FILTER IN_RANGE(doc.created, @created[0], @created[1], true, true)"
             )
             binds["created"] = created_min, created_max
 
         modified_min, modified_max = self.query.get("modified_min", ""), self.query.get(
-            "modified_max", "2099"
+            "modified_max", ""
         )
         if modified_min or modified_max:
+            modified_max = modified_max or "2099"
             filters.append(
                 "FILTER IN_RANGE(doc.modified, @modified[0], @modified[1], true, true)"
             )
@@ -945,7 +946,7 @@ RETURN KEEP(d, KEYS(d, TRUE))
                 relationship_id = "relationship--" + uuid_part
                 indicator_ids.extend((vuln_id, relationship_id))
             types.add(type_part)
-            
+
         indicator_ids.extend(self.get_extensions_and_refs([id for id in indicator_ids if not id.startswith('grouping--')], use_latest=True))
 
         if t := self.query_as_array("types"):
