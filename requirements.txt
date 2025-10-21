@@ -67,7 +67,7 @@ djangorestframework==3.16.0
     #   -r requirements.in
     #   dogesec-commons
     #   drf-spectacular
-dogesec-commons==1.1.15
+dogesec-commons==1.2.1
     # via -r requirements.in
 drf-spectacular==0.28.0
     # via
@@ -171,7 +171,7 @@ stix2arango==1.1.4
     # via
     #   -r requirements.in
     #   arango-cve-processor
-stix2extensions==1.1.13
+stix2extensions==1.2.0
     # via arango-cve-processor
 tqdm==4.67.1
     # via
