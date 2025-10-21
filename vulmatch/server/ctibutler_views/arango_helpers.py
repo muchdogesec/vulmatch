@@ -206,12 +206,9 @@ class AttachedDBHelper(DCHelper):
 
     def get_attack_objects(self, matrix):
         filters = []
-        types = ATTACK_TYPES
-        if new_types := self.query_as_array("type"):
-            types = types.intersection(new_types)
         bind_vars = {
             "@collection": f"nvd_cve_vertex_collection",
-            "types": list(types),
+            "types": ['attack-pattern'],
         }
 
         if attack_forms := self.query_as_array("attack_type"):
@@ -313,20 +310,16 @@ class AttachedDBHelper(DCHelper):
         self,
         note,
         cwe=True,
-        types=CWE_TYPES,
+        stix_type='weakness',
         lookup_kwarg="cwe_id",
         more_binds={},
         more_filters=[],
         forms={},
     ):
-        version_param = lookup_kwarg.replace("_id", "_version")
         filters = []
-        if new_types := self.query_as_array("type"):
-            types = types.intersection(new_types)
-
         bind_vars = {
             "@collection": self.collection,
-            "types": list(types),
+            "types": [stix_type],
             "note": note,
             **more_binds,
         }
