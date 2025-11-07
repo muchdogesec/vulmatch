@@ -54,7 +54,7 @@ jobs:
           echo POSTGRES_HOST="${{ steps.get_ip.outputs.IP_ADDRESS }}" >> tests/tests.env
           echo DJANGO_WWW_PATH=$PWD/django_www_path/ >> tests/tests.env
           echo PYTHONPATH=. >> tests/tests.env
-          echo "CTIBUTLER_BASE_URL=${{ secrets.CTIBUTLER_BASE_URL }}" >> tests/tests.env
+          echo "CTIBUTLER_BASE_URL=https://api.ctibutler.com/" >> tests/tests.env
           echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> tests/tests.env
           echo "VULNCHECK_API_KEY=${{ secrets.VULNCHECK_API_KEY }}" >> tests/tests.env
 
