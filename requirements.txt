@@ -171,7 +171,7 @@ stix2arango==1.1.6
     # via
     #   -r requirements.in
     #   arango-cve-processor
-stix2extensions==1.2.6
+stix2extensions==2.0.1
     # via arango-cve-processor
 tqdm==4.67.1
     # via
