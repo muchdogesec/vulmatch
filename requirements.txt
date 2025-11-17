@@ -6,33 +6,35 @@
 #
 amqp==5.3.1
     # via kombu
+annotated-types==0.7.0
+    # via pydantic
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango-cve-processor==1.4.2
+arango-cve-processor==1.4.3
     # via -r requirements.in
-asgiref==3.9.1
+asgiref==3.10.0
     # via
     #   django
     #   django-cors-headers
-attrs==25.3.0
+attrs==25.4.0
     # via
     #   jsonschema
     #   referencing
-billiard==4.2.1
+billiard==4.2.3
     # via celery
-boto3==1.39.7
+boto3==1.40.74
     # via django-storages
-botocore==1.39.7
+botocore==1.40.74
     # via
     #   boto3
     #   s3transfer
 celery==5.5.3 ; python_version >= "3.8"
     # via -r requirements.in
-certifi==2025.7.14
+certifi==2025.11.12
     # via requests
-charset-normalizer==3.4.2
+charset-normalizer==3.4.4
     # via requests
-click==8.2.1
+click==8.3.1
     # via
     #   celery
     #   click-didyoumean
@@ -54,22 +56,22 @@ django==5.2.8
     #   drf-spectacular
 django-cleanup==9.0.0
     # via -r requirements.in
-django-cors-headers==4.7.0
+django-cors-headers==4.9.0
     # via -r requirements.in
-django-filter==25.1
+django-filter==25.2
     # via
     #   -r requirements.in
     #   dogesec-commons
 django-storages[s3]==1.14.6
     # via -r requirements.in
-djangorestframework==3.16.0
+djangorestframework==3.16.1
     # via
     #   -r requirements.in
     #   dogesec-commons
     #   drf-spectacular
 dogesec-commons==1.2.8
     # via -r requirements.in
-drf-spectacular==0.28.0
+drf-spectacular==0.29.0
     # via
     #   -r requirements.in
     #   dogesec-commons
@@ -77,11 +79,11 @@ gunicorn==23.0.0
     # via -r requirements.in
 hyperlink==21.0.0
     # via -r requirements.in
-idna==3.10
+idna==3.11
     # via
     #   hyperlink
     #   requests
-ijson==3.4.0
+ijson==3.4.0.post0
     # via stix2arango
 importlib-metadata==8.7.0
     # via python-arango
@@ -91,12 +93,12 @@ jmespath==1.0.1
     # via
     #   boto3
     #   botocore
-jsonschema==4.24.0
+jsonschema==4.25.1
     # via
     #   arango-cve-processor
     #   drf-spectacular
     #   stix2arango
-jsonschema-specifications==2025.4.1
+jsonschema-specifications==2025.9.1
     # via jsonschema
 kombu==5.5.4
     # via celery
@@ -105,15 +107,19 @@ packaging==25.0
     #   gunicorn
     #   kombu
     #   python-arango
-prompt-toolkit==3.0.51
+prompt-toolkit==3.0.52
     # via click-repl
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.11
     # via
     #   -r requirements.in
     #   dogesec-commons
+pydantic==2.12.4
+    # via stix2extensions
+pydantic-core==2.41.5
+    # via pydantic
 pyjwt==2.10.1
     # via python-arango
-python-arango==8.2.1
+python-arango==8.2.3
     # via
     #   arango-cve-processor
     #   dogesec-commons
@@ -122,19 +128,19 @@ python-dateutil==2.9.0.post0
     # via
     #   botocore
     #   celery
-python-dotenv==1.1.1
+python-dotenv==1.2.1
     # via stix2arango
 pytz==2025.2
     # via stix2
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via drf-spectacular
-redis==6.2.0
+redis==7.0.1
     # via -r requirements.in
-referencing==0.36.2
+referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.32.4
+requests==2.32.5
     # via
     #   -r requirements.in
     #   arango-cve-processor
@@ -145,13 +151,13 @@ requests==2.32.4
     #   stix2extensions
 requests-toolbelt==1.0.0
     # via python-arango
-rpds-py==0.26.0
+rpds-py==0.29.0
     # via
     #   jsonschema
     #   referencing
-s3transfer==0.13.0
+s3transfer==0.14.0
     # via boto3
-simplejson==3.20.1
+simplejson==3.20.2
     # via stix2
 six==1.17.0
     # via
@@ -177,6 +183,13 @@ tqdm==4.67.1
     # via
     #   arango-cve-processor
     #   stix2arango
+typing-extensions==4.15.0
+    # via
+    #   pydantic
+    #   pydantic-core
+    #   typing-inspection
+typing-inspection==0.4.2
+    # via pydantic
 tzdata==2025.2
     # via kombu
 uritemplate==4.2.0
@@ -191,7 +204,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-wcwidth==0.2.13
+wcwidth==0.2.14
     # via prompt-toolkit
 zipp==3.23.0
     # via importlib-metadata
