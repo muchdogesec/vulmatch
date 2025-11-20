@@ -11,12 +11,9 @@ services:
             - DJANGO_SETTINGS_MODULE=vulmatch.settings
             - CELERY_BROKER_URL=redis://redis:6379/0
             - result_backend=redis://redis:6379/1
-            - POSTGRES_HOST=pgdb
             - DEBUG=1
         env_file:
             - ./.env
-    django:
-        extends: env_django
         command: >
                 bash -c "
                     python manage.py collectstatic --no-input &&
@@ -25,6 +22,9 @@ services:
                                 python -m vulmatch.worker.populate_dbs &&
                     gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
                     " 
+    django:
+        extends: env_django
+        command: gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
         ports:
             - 8005:8005
         depends_on:
@@ -32,28 +32,10 @@ services:
 
     celery:
         extends: env_django
-        command: >
-                bash -c "
-                  celery -A vulmatch.worker worker -l INFO
-                  "
+        command: celery -A vulmatch.worker worker -l INFO
         depends_on:
-            pgdb:
-                condition: service_healthy
             redis:
                 condition: service_started
-    pgdb:
-        image: postgres
-        env_file:
-          - ./.env
-
-        volumes:
-            - pgdata:/var/lib/postgresql/data/
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-            interval: 10s
-            retries: 5
-            start_period: 10s
-            timeout: 10s
     redis:
         image: "redis:alpine"
 
