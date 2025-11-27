@@ -15,16 +15,8 @@ CVE_SORT_FIELDS = [
     "modified_ascending",
     "created_ascending",
     "created_descending",
-    "name_ascending",
-    "name_descending",
-    "epss_score_ascending",
     "epss_score_descending",
-    "x_opencti_cvss_v2_base_score_ascending",
-    "x_opencti_cvss_v2_base_score_descending",
-    "x_opencti_cvss_base_score_ascending",
     "x_opencti_cvss_base_score_descending",
-    "x_opencti_cvss_v4_base_score_ascending",
-    "x_opencti_cvss_v4_base_score_descending",
 ]
 
 

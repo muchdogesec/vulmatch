@@ -45,6 +45,16 @@ def find_missing(collections_to_create):
     ]
 
 
+CVE_FILTER_SORT_INDEXES = {
+    "modified_descending": ("modified", "desc"),
+    "modified_ascending": ("modified", "asc"),
+    "created_descending": ("created", "desc"),
+    "created_ascending": ("created", "asc"),
+    "epss_score_descending": ("x_opencti_epss_score", "desc"),
+    "x_opencti_cvss_base_score_descending": ("x_opencti_cvss_base_score", "desc"),
+}
+
+
 def create_indexes(db: StandardDatabase):
     print(
         "creating vulmatch's indexes, this may take several minutes if creating for the first time depending on how much data on the server"
@@ -176,31 +186,41 @@ def create_indexes(db: StandardDatabase):
             "storedValues": [{"fields": ["_id"], "compression": "lz4"}],
         }
     )
-    vertex_collection.add_index(
-        dict(
-            type="inverted",
-            name="cve_search_inv_v3",
-            sparse=True,
-            fields=[
-                "name",
-                "id",
-                "modified",
-                "created",
-                dict(name="description", analyzer="norm_en"),
-                "type",
-                "_is_latest",
-                "created_by_ref",
-                "x_opencti_cvss_v2_base_score",
-                "x_opencti_cvss_base_score",
-                "x_opencti_cvss_v4_base_score",
-                "x_opencti_epss_score",
-                "x_opencti_epss_percentile",
-                "x_opencti_cisa_kev",
-            ],
-            inBackground=True,
-            storedValues=["external_references"],
+    for name, (sort_field, sort_direction) in CVE_FILTER_SORT_INDEXES.items():
+        vertex_collection.add_index(
+            dict(
+                type="inverted",
+                name=f"cve_search_inv_v3_{name}",
+                sparse=True,
+                fields=[
+                    "name",
+                    "id",
+                    "modified",
+                    "created",
+                    dict(name="description", analyzer="norm_en"),
+                    "type",
+                    "_is_latest",
+                    "created_by_ref",
+                    "x_opencti_cvss_v2_base_score",
+                    "x_opencti_cvss_base_score",
+                    "x_opencti_cvss_v4_base_score",
+                    "x_opencti_epss_score",
+                    "x_opencti_epss_percentile",
+                    "x_opencti_cisa_kev",
+                ],
+                inBackground=True,
+                storedValues=["external_references"],
+                primarySort={
+                    "fields": [
+                        {
+                            "field": sort_field,
+                            "direction": sort_direction.removesuffix("ending"),
+                        }
+                    ],
+                    "compression": "lz4",
+                },
+            )
         )
-    )
     edge_collection.add_index(
         dict(
             type="inverted",
