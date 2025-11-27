@@ -89,10 +89,6 @@ def test_epss_min_score(client, min_score):
         ["epss", "created_descending"],
         ["kev", "created_ascending"],
         ["epss", "created_ascending"],
-        ["kev", "name_descending"],
-        ["epss", "name_descending"],
-        ["kev", "name_ascending"],
-        ["epss", "name_ascending"],
         ["epss", "epss_score_ascending"],
         ["epss", "epss_score_descending"],
     ],
@@ -125,8 +121,6 @@ def test_sort(client, path, sort_param: str):
 @pytest.mark.parametrize(
     "sort_param",
     [
-        "name_ascending",
-        "name_descending",
         "modified_ascending",
         "modified_descending",
         "created_descending",

@@ -11,6 +11,8 @@ from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
 from arango_cve_processor.tools.cpe import generate_grouping_id
 
+from vulmatch.worker.populate_dbs import CVE_FILTER_SORT_INDEXES
+
 
 if typing.TYPE_CHECKING:
     from .. import settings
@@ -119,25 +121,24 @@ CAPEC_TYPES = set(
     ["attack-pattern", "course-of-action", "identity", "marking-definition"]
 )
 
-CVE_SORT_FIELDS = [
-    "modified_descending",
-    "modified_ascending",
-    "created_ascending",
-    "created_descending",
-    "name_ascending",
-    "name_descending",
-    "epss_score_ascending",
-    "epss_score_descending",
-    "x_opencti_cvss_v2_base_score_ascending",
-    "x_opencti_cvss_v2_base_score_descending",
-    "x_opencti_cvss_base_score_ascending",
-    "x_opencti_cvss_base_score_descending",
-    "x_opencti_cvss_v4_base_score_ascending",
-    "x_opencti_cvss_v4_base_score_descending",
-]
+# CVE_SORT_FIELDS = [
+#     "modified_descending",
+#     "modified_ascending",
+#     "created_ascending",
+#     "created_descending",
+#     # "epss_score_ascending",
+#     "epss_score_descending",
+#     # "x_opencti_cvss_v2_base_score_ascending",
+#     # "x_opencti_cvss_v2_base_score_descending",
+#     # "x_opencti_cvss_base_score_ascending",
+#     "x_opencti_cvss_base_score_descending",
+#     # "x_opencti_cvss_v4_base_score_ascending",
+#     # "x_opencti_cvss_v4_base_score_descending",
+# ]
+CVE_SORT_FIELDS = list(CVE_FILTER_SORT_INDEXES)
 EPSS_SORT_FIELDS = [
-    "name_descending",
-    "name_ascending",
+    # "name_descending",
+    # "name_ascending",
     "created_descending",
     "created_ascending",
     "modified_descending",
@@ -150,22 +151,6 @@ KEV_SORT_FIELDS = EPSS_SORT_FIELDS[:-2]
 OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
 CPE_RELATIONSHIP_TYPES = {"vulnerable-to": "exploits", "in-pattern": "relies-on"}
-CPE_REL_SORT_FIELDS = [
-    "modified_descending",
-    "modified_ascending",
-    "created_descending",
-    "created_ascending",
-]
-CPE_SORT_FIELDS = [
-    "part_descending",
-    "part_ascending",
-    "vendor_descending",
-    "vendor_ascending",
-    "product_ascending",
-    "product_descending",
-    "version_ascending",
-    "version_descending",
-]
 CVE_BUNDLE_TYPES = set(
     [
         "vulnerability",
@@ -225,10 +210,23 @@ def as_number(integer_string, min_value=0, max_value=None, default=1, type=int):
 
 class VulmatchDBHelper(DCHelper):
     NULL_LIST = ["NULL_LIST"]
+    
 
     @classmethod
     def like_string(cls, string: str):
         return "%" + cls.get_like_literal(string) + "%"
+    
+    def __init__(self, collection, request, result_key="objects"):
+        super().__init__(collection, request, result_key)
+        self.peak_memory_usage = 0
+        self.execution_time = 0
+
+    @staticmethod
+    def __get_presorted_index(index_prefix, sort_q, available_sorts=["modified_descending"]):
+        default_sort_q = available_sorts[0]
+        if sort_q not in available_sorts:
+            sort_q = default_sort_q
+        return index_prefix + '_' + sort_q
 
     @classmethod
     def get_paginated_response_schema(cls, result_key="objects", stix_type="identity"):
@@ -291,15 +289,21 @@ class VulmatchDBHelper(DCHelper):
             full_count=paginate,
             **aql_options,
         )
-        logging.info("AQL stat: %s", cursor.statistics())
+        statistics = cursor.statistics()
+        logging.info("AQL stat: %s", statistics)
+        self.peak_memory_usage = max(self.peak_memory_usage, statistics.get("peak_memory_usage", 0))
+        self.execution_time += statistics.get("execution_time", 0)
         if paginate:
-            return self.get_paginated_response(
+            r = self.get_paginated_response(
                 cursor,
                 self.page,
                 self.count,
-                cursor.statistics()["fullCount"],
+                statistics["fullCount"],
                 result_key=result_key or self.result_key,
             )
+            # r.headers["X-Arango-Peak-Memory-Usage"] = str(self.peak_memory_usage)
+            # r.headers["X-Arango-Execution-Time"] = self.execution_time
+            return r
         return list(cursor)
 
     def list_kev_or_epss_objects(self, label):
@@ -322,8 +326,10 @@ class VulmatchDBHelper(DCHelper):
                 "FILTER {source_name: 'known_ransomware', description: @known_ransomware} IN doc.external_references"
             )
 
+        binds["index"] = self.__get_cve_search_index()
+
         query = """
-FOR doc IN nvd_cve_vertex_collection
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: @index, forceIndexHint: true}
 FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
 FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
 //#filters
@@ -344,13 +350,31 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
         return self.execute_query(query, bind_vars=binds)
 
-    def retrieve_kev_or_epss_object(self, cve_id, label):
-        bind_vars = {"cve_id": cve_id, "label": label}
+    def __get_cve_search_index(self):
+        # return "cve_search_inv_v3_modified_descending"
+        sort_q = self.query.get("sort", "modified_descending")
+        index = self.__get_presorted_index("cve_search_inv_v3", sort_q, available_sorts=CVE_SORT_FIELDS)
+        print("index =", index, "sort =", sort_q)
+        return index
 
+    def retrieve_kev_or_epss_object(self, cve_id, label):
+        report_names = []
+        if label == "kev":
+            report_names = [
+                f"CISA KEV: {cve_id}",
+                f"VulnCheck KEV: {cve_id}",
+            ]
+        elif label == "epss":
+            report_names = [
+                f"EPSS Scores: {cve_id}",
+            ]
+        else:
+            raise NotImplementedError("Label must be 'kev' or 'epss'")
+
+        bind_vars = {"report_names": report_names}
         query = """
 FOR doc IN nvd_cve_vertex_collection
-FILTER doc.labels == [@label] AND doc._is_latest
-FILTER doc.external_references[0].external_id == @cve_id
+FILTER doc.name IN @report_names AND doc.type == 'report' AND doc._is_latest == TRUE
 LIMIT @offset, @count
 RETURN KEEP(doc, KEYS(doc, TRUE))
             """
@@ -367,8 +391,10 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             binds.update(exploit_types=exploit_types)
             filters.append("FILTER doc.exploit_type IN @exploit_types")
 
+        binds["index"] = self.__get_cve_search_index()
+
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: @index, forceIndexHint: true}
 FILTER doc.type == 'exploit' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -385,7 +411,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         return self.execute_query(
             query,
             bind_vars=binds,
-            aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
+            # aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
         )
 
     def list_groupings(self):
@@ -401,7 +427,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3_modified_descending", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -418,7 +444,7 @@ RETURN KEEP(doc, KEYS(doc, true))
         return self.execute_query(
             query,
             bind_vars=binds,
-            aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
+            # aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
         )
 
     def retrieve_grouping(self, criteria_id: str, hide_sys=True, get_all=False):
@@ -435,7 +461,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3_modified_descending", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
@@ -604,9 +630,11 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             filters.append(
                 "FILTER doc.x_opencti_epss_percentile >= @epss_percentile_min"
             )
+        
+        binds["index"] = self.__get_cve_search_index()
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: @index, forceIndexHint: true}
 FILTER doc.type == 'vulnerability' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -624,11 +652,11 @@ RETURN KEEP(doc, KEYS(doc, true))
                 },
             ),
         )
-        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
+        print(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(
             query,
             bind_vars=binds,
-            aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
+            # aql_options=dict(optimizer_rules=["-use-index-for-sort"]),
         )
 
     def cpes_to_vulnerability(self, not_vulnerable_cpes, vulnerable_cpes):

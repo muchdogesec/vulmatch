@@ -592,6 +592,7 @@ class KevEpssView(viewsets.ViewSet):
             This endpoint is useful to browse all Exploits (rather then retrieve them on a per KEV basis).
             """
         ),
+        filters=False,
         parameters=[
             OpenApiParameter(
                 "sort", enum=KEV_SORT_FIELDS, description="Sort results by"

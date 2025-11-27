@@ -36,6 +36,7 @@ import pytest
         pytest.param(
             "arango-cve-processor/cve-vulncheck-kev",
             dict(created_min="2024-01-12", modified_min="2024-12-31"),
+            id='cve-vulncheck-kev'
         ),
     ],
 )
