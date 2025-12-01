@@ -22,7 +22,7 @@ from datetime import datetime, date, timedelta
 import typing
 from django.conf import settings
 
-from vulmatch.worker.utils import add_cvss_score_to_cve_object
+from vulmatch.worker.utils import add_vulmatch_extras
 from .celery import app
 from stix2arango.stix2arango import Stix2Arango
 from arango_cve_processor.managers import RELATION_MANAGERS as CVE_RELATION_MANAGERS
@@ -154,7 +154,7 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
         create_db=False,
         **params
     )
-    s2a.add_object_alter_fn(add_cvss_score_to_cve_object)
+    s2a.add_object_alter_fn(add_vulmatch_extras)
     s2a.run()
 
 @app.task

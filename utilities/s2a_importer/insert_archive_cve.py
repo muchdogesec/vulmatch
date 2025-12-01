@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 print(Path(__file__).parent.parent)
-from vulmatch.worker.utils import add_cvss_score_to_cve_object
+from vulmatch.worker.utils import add_vulmatch_extras
 
 load_dotenv()
 
@@ -86,7 +86,7 @@ def run_command(command, root_path, ignore_embedded_relationships):
     try:
         print(f"Inserting {file_path} into database {command['database']}...")
         s2a = Stix2Arango(database=command["database"], collection=command["collection"], file=file_path, ignore_embedded_relationships=ignore_embedded_relationships, is_large_file=True, skip_default_indexes=True)
-        s2a.add_object_alter_fn(add_cvss_score_to_cve_object)
+        s2a.add_object_alter_fn(add_vulmatch_extras)
         s2a.run()
         manager.set_failed(command['version'], failed=False, reason="uploaded to arango")
         print(f"Successfully inserted {command['version']} into database.")
