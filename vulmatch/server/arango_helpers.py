@@ -312,7 +312,7 @@ class VulmatchDBHelper(DCHelper):
             for cve_id in names:
                 if label == "kev":
                     report_names.append(f"CISA KEV: {cve_id}")
-                    report_names.append(f"VulnCheck KEV: {cve_id}")
+                    report_names.append(f"Vulncheck KEV: {cve_id}")
                 elif label == "epss":
                     report_names.append(f"EPSS Scores: {cve_id}")
 
@@ -368,7 +368,7 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         if label == "kev":
             report_names = [
                 f"CISA KEV: {cve_id}",
-                f"VulnCheck KEV: {cve_id}",
+                f"Vulncheck KEV: {cve_id}",
             ]
         elif label == "epss":
             report_names = [
