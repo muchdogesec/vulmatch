@@ -5,6 +5,7 @@ import arango
 from django.conf import settings
 from arango.client import ArangoClient
 from arango.database import StandardDatabase
+from arango.collection import StandardCollection
 from arango.job import AsyncJob
 import arango.exceptions
 
@@ -45,6 +46,14 @@ def find_missing(collections_to_create):
     ]
 
 
+KEV_EPSS_SORT_INDEXES = {
+    "modified_descending": ("modified", "desc"),
+    "modified_ascending": ("modified", "asc"),
+    "created_descending": ("created", "desc"),
+    "created_ascending": ("created", "asc"),
+    "epss_score_descending": ("_epss_score", "desc"),
+}
+
 CVE_FILTER_SORT_INDEXES = {
     "modified_descending": ("modified", "desc"),
     "modified_ascending": ("modified", "asc"),
@@ -53,6 +62,31 @@ CVE_FILTER_SORT_INDEXES = {
     "epss_score_descending": ("x_opencti_epss_score", "desc"),
     "x_opencti_cvss_base_score_descending": ("x_opencti_cvss_base_score", "desc"),
 }
+
+
+def create_multisort_indexes(
+    collection: StandardCollection, prefix, sorts: dict, fields, storedValues
+):
+    for sort_name, (sort_field, sort_direction) in sorts.items():
+        collection.add_index(
+            dict(
+                type="inverted",
+                name=f"{prefix}_{sort_name}",
+                sparse=True,
+                fields=fields,
+                inBackground=True,
+                storedValues=storedValues,
+                primarySort={
+                    "fields": [
+                        {
+                            "field": sort_field,
+                            "direction": sort_direction.removesuffix("ending"),
+                        }
+                    ],
+                    "compression": "lz4",
+                },
+            )
+        )
 
 
 def create_indexes(db: StandardDatabase):
@@ -186,41 +220,43 @@ def create_indexes(db: StandardDatabase):
             "storedValues": [{"fields": ["_id"], "compression": "lz4"}],
         }
     )
-    for name, (sort_field, sort_direction) in CVE_FILTER_SORT_INDEXES.items():
-        vertex_collection.add_index(
-            dict(
-                type="inverted",
-                name=f"cve_search_inv_v3_{name}",
-                sparse=True,
-                fields=[
-                    "name",
-                    "id",
-                    "modified",
-                    "created",
-                    dict(name="description", analyzer="norm_en"),
-                    "type",
-                    "_is_latest",
-                    "created_by_ref",
-                    "x_opencti_cvss_v2_base_score",
-                    "x_opencti_cvss_base_score",
-                    "x_opencti_cvss_v4_base_score",
-                    "x_opencti_epss_score",
-                    "x_opencti_epss_percentile",
-                    "x_opencti_cisa_kev",
-                ],
-                inBackground=True,
-                storedValues=["external_references"],
-                primarySort={
-                    "fields": [
-                        {
-                            "field": sort_field,
-                            "direction": sort_direction.removesuffix("ending"),
-                        }
-                    ],
-                    "compression": "lz4",
-                },
-            )
-        )
+    create_multisort_indexes(
+        vertex_collection,
+        "cve_search_inv_v3",
+        CVE_FILTER_SORT_INDEXES,
+        fields=[
+            "name",
+            "id",
+            "modified",
+            "created",
+            dict(name="description", analyzer="norm_en"),
+            "type",
+            "_is_latest",
+            "created_by_ref",
+            "x_opencti_cvss_v2_base_score",
+            "x_opencti_cvss_base_score",
+            "x_opencti_cvss_v4_base_score",
+            "x_opencti_epss_score",
+            "x_opencti_epss_percentile",
+            "x_opencti_cisa_kev",
+        ],
+        storedValues=["external_references"],
+    )
+
+    create_multisort_indexes(
+        vertex_collection,
+        "kev_search_inv",
+        KEV_EPSS_SORT_INDEXES,
+        fields=[
+            "_arango_cve_processor_note",
+            "_epss_score",
+            "name",
+            "type",
+            "_is_latest",
+        ],
+        storedValues=[],
+    )
+
     edge_collection.add_index(
         dict(
             type="inverted",

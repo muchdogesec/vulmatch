@@ -74,7 +74,7 @@ def test_epss_min_score(client, min_score):
     ), "response contains duplicates"
     for obj in resp_data["objects"]:
         assert (
-            float(obj["x_epss"][-1]["epss"]) >= min_score
+            float(obj["x_epss"][0]["epss"]) >= min_score
         ), "score must be greater than epss_min_score param"
 
 
@@ -89,7 +89,6 @@ def test_epss_min_score(client, min_score):
         ["epss", "created_descending"],
         ["kev", "created_ascending"],
         ["epss", "created_ascending"],
-        ["epss", "epss_score_ascending"],
         ["epss", "epss_score_descending"],
     ],
 )
@@ -109,7 +108,7 @@ def test_sort(client, path, sort_param: str):
 
     def key_fn(obj):
         if param == "epss_score":
-            return float(obj["x_epss"][-1]["epss"])
+            return float(obj["x_epss"][0]["epss"])
         return obj[param]
 
     reversed = direction == "descending"

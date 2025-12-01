@@ -11,7 +11,7 @@ from dogesec_commons.objects.helpers import ArangoDBHelper as DCHelper
 from rest_framework.response import Response
 from arango_cve_processor.tools.cpe import generate_grouping_id
 
-from vulmatch.worker.populate_dbs import CVE_FILTER_SORT_INDEXES
+from vulmatch.worker.populate_dbs import CVE_FILTER_SORT_INDEXES, KEV_EPSS_SORT_INDEXES
 
 
 if typing.TYPE_CHECKING:
@@ -136,17 +136,8 @@ CAPEC_TYPES = set(
 #     # "x_opencti_cvss_v4_base_score_descending",
 # ]
 CVE_SORT_FIELDS = list(CVE_FILTER_SORT_INDEXES)
-EPSS_SORT_FIELDS = [
-    # "name_descending",
-    # "name_ascending",
-    "created_descending",
-    "created_ascending",
-    "modified_descending",
-    "modified_ascending",
-    "epss_score_descending",
-    "epss_score_ascending",
-]
-KEV_SORT_FIELDS = EPSS_SORT_FIELDS[:-2]
+EPSS_SORT_FIELDS = list(KEV_EPSS_SORT_INDEXES)
+KEV_SORT_FIELDS = EPSS_SORT_FIELDS[:-1]
 
 OBJECT_TYPES = SDO_TYPES.union(SCO_TYPES).union(["relationship"])
 
@@ -307,14 +298,30 @@ class VulmatchDBHelper(DCHelper):
         return list(cursor)
 
     def list_kev_or_epss_objects(self, label):
-        binds = {"label": label}
-        binds["cve_ids"] = [qq.upper() for qq in self.query_as_array("cve_id")] or None
+        binds = {}
+        if label == 'kev':
+            binds['note'] = KEV_CHOICES
+        elif label == 'epss':
+            binds['note'] = ['cve-epss']
+
+        
         filters = []
+        if names := self.query_as_array("cve_id"):
+            report_names = binds['report_names'] = []
+            filters.append("FILTER doc.name IN @report_names")
+            for cve_id in names:
+                if label == "kev":
+                    report_names.append(f"CISA KEV: {cve_id}")
+                    report_names.append(f"VulnCheck KEV: {cve_id}")
+                elif label == "epss":
+                    report_names.append(f"EPSS Scores: {cve_id}")
+
         if min_score := as_number(
             self.query.get("epss_min_score"), default=None, type=float
         ):
-            filters.append("FILTER TO_NUMBER(LAST(doc.x_epss).epss) >= @epss_min_score")
+            filters.append("FILTER doc._epss_score >= @epss_min_score")
             binds["epss_min_score"] = min_score
+
         if kev_source := self.query.get("source"):
             binds.update(kev_source=kev_source)
             filters.append(
@@ -326,12 +333,11 @@ class VulmatchDBHelper(DCHelper):
                 "FILTER {source_name: 'known_ransomware', description: @known_ransomware} IN doc.external_references"
             )
 
-        binds["index"] = self.__get_cve_search_index()
+        binds["index"] = self.__get_presorted_index("kev_search_inv", self.query.get("sort", "modified_descending"), available_sorts=EPSS_SORT_FIELDS)
 
         query = """
 FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: @index, forceIndexHint: true}
-FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc.labels[0] == @label
-FILTER (not @cve_ids) OR doc.external_references[0].external_id IN @cve_ids
+FILTER doc.type == 'report' AND doc._is_latest == TRUE AND doc._arango_cve_processor_note IN @note
 //#filters
 @sort_stmt
 LIMIT @offset, @count
@@ -341,13 +347,13 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
             self.get_sort_stmt(
                 EPSS_SORT_FIELDS,
                 {
-                    "epss_score": "TO_NUMBER(LAST(doc.x_epss).epss)",
+                    "epss_score": "doc._epss_score",
                 },
             ),
         ).replace(
             "//#filters", "\n".join(filters)
         )
-        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""")
+        # return HttpResponse(f"""{query}\n// {json.dumps(binds)}""".replace("@offset, @count", "100"))
         return self.execute_query(query, bind_vars=binds)
 
     def __get_cve_search_index(self):
