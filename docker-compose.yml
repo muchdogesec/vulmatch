@@ -19,8 +19,7 @@ services:
                     python manage.py collectstatic --no-input &&
                         python manage.py makemigrations &&
                             python manage.py migrate &&
-                                python -m vulmatch.worker.populate_dbs &&
-                    gunicorn vulmatch.wsgi:application  --reload --bind 0.0.0.0:8005
+                                python -m vulmatch.worker.populate_dbs
                     " 
     django:
         extends: env_django
@@ -36,6 +35,8 @@ services:
         depends_on:
             redis:
                 condition: service_started
+            env_django:
+                condition: service_completed_successfully
     redis:
         image: "redis:alpine"
 
