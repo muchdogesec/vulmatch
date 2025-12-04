@@ -10,7 +10,7 @@ annotated-types==0.7.0
     # via pydantic
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango-cve-processor==1.4.5
+arango-cve-processor==1.4.6
     # via -r requirements.in
 asgiref==3.10.0
     # via
@@ -46,7 +46,7 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
-django==5.2.8
+django==5.2.9
     # via
     #   -r requirements.in
     #   django-cors-headers
