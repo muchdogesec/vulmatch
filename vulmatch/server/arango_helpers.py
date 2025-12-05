@@ -357,9 +357,9 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
         return self.execute_query(query, bind_vars=binds)
 
     def __get_cve_search_index(self):
-        # return "cve_search_inv_v3_modified_descending"
+        # return "cve_search_inv_v4_modified_descending"
         sort_q = self.query.get("sort", "modified_descending")
-        index = self.__get_presorted_index("cve_search_inv_v3", sort_q, available_sorts=CVE_SORT_FIELDS)
+        index = self.__get_presorted_index("cve_search_inv_v4", sort_q, available_sorts=CVE_SORT_FIELDS)
         print("index =", index, "sort =", sort_q)
         return index
 
@@ -433,7 +433,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             binds["name"] = self.like_string(name).lower()
             filters.append("FILTER doc.name LIKE @name")
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3_modified_descending", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v4_modified_descending", forceIndexHint: true}
 FILTER doc.type == 'grouping' AND doc._is_latest == TRUE
 @filters
 @sort_stmt
@@ -467,7 +467,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             limit_statement = ""
 
         query = """
-FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v3_modified_descending", forceIndexHint: true}
+FOR doc IN nvd_cve_vertex_collection OPTIONS {indexHint: "cve_search_inv_v4_modified_descending", forceIndexHint: true}
 FILTER doc.id == @grouping_id
 #version_filter
 #limit_statement
@@ -539,8 +539,8 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
 
         prefetched_matches = []
         if q := self.query.get("vuln_status"):
-            binds["vuln_status"] = dict(source_name="vulnStatus", description=q.title())
-            filters.append("FILTER @vuln_status IN doc.external_references")
+            binds["vuln_status"] = q
+            filters.append("FILTER doc._vulmatch.vulnStatus == @vuln_status")
 
         if created_by_ref := self.query.get('created_by_ref'):
             binds['created_by_ref'] = created_by_ref
@@ -601,7 +601,7 @@ RETURN KEEP(doc, KEYS(doc, @hide_sys))
             binds["weakness_ids"] = [qq.upper() for qq in q]
             filters.append(
                 """
-                FILTER doc.external_references[? ANY FILTER CURRENT.source_name=='cwe' AND CURRENT.external_id IN @weakness_ids]
+                FILTER doc._vulmatch.weaknesses[*] IN @weakness_ids
                 """
             )
 
