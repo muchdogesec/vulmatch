@@ -3,6 +3,10 @@ def add_vulmatch_extras(obj):
         return
     extras: dict = obj.setdefault('_vulmatch', {})
     for ref in obj.get('external_references', []):
-        if ref['external_id'] == 'vulnStatus':
-            extras['vulnStatus'] = ref['description']
+        source_name = ref['source_name']
+        match source_name:
+            case 'vulnStatus':
+                extras['vulnStatus'] = ref['description']
+            case 'cwe':
+                extras.setdefault('weaknesses', []).append(ref['external_id'])
     return

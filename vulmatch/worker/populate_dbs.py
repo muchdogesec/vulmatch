@@ -222,7 +222,7 @@ def create_indexes(db: StandardDatabase):
     )
     create_multisort_indexes(
         vertex_collection,
-        "cve_search_inv_v3",
+        "cve_search_inv_v4",
         CVE_FILTER_SORT_INDEXES,
         fields=[
             "name",
@@ -239,8 +239,10 @@ def create_indexes(db: StandardDatabase):
             "x_opencti_epss_score",
             "x_opencti_epss_percentile",
             "x_opencti_cisa_kev",
+            "_vulmatch.vulnStatus",
+            "_vulmatch.weaknesses[*]",
         ],
-        storedValues=["external_references"],
+        storedValues=[],
     )
 
     create_multisort_indexes(
