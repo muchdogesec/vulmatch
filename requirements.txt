@@ -173,7 +173,7 @@ stix2==3.0.1
     #   stix2extensions
 stix2-patterns==2.0.0
     # via stix2
-stix2arango==1.1.7
+stix2arango==1.1.8
     # via
     #   -r requirements.in
     #   arango-cve-processor
