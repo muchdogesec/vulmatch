@@ -27,6 +27,7 @@ from .celery import app
 from stix2arango.stix2arango import Stix2Arango
 from arango_cve_processor.managers import RELATION_MANAGERS as CVE_RELATION_MANAGERS
 from arango_cve_processor.__main__ import run_all as run_task_with_acp
+import acvep
 import logging
 
 if typing.TYPE_CHECKING:

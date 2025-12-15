@@ -1,9 +1,13 @@
 from datetime import date, timedelta
 from enum import StrEnum, auto
+import typing
 from .models import Job
 from rest_framework import serializers, validators
-
 from vulmatch.server import models
+
+from django.conf import settings
+if typing.TYPE_CHECKING:
+    from vulmatch import settings
 
 
 ACP_MODES = {

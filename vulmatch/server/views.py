@@ -715,6 +715,16 @@ class EPSSView(KevView):
         return Response(
             statistics.StatisticsHelper().get_cve_numeric_stat("x_opencti_epss_score")
         )
+    
+    @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
+    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
+        resp = super().retrieve_objects(request, *args, cve_id=cve_id, **kwargs)
+        obj = resp.data['objects'][0]
+        obj['x_epss'] = [
+            d.dict() for d in models.EPSSScore.objects.filter(cve=cve_id)
+        ]
+        return resp
+        
 
 
 @extend_schema_view(
