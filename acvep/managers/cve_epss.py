@@ -90,17 +90,15 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
         )
         if cve_object["epss"]:
             latest_epss: dict = latest_report["x_epss"][0].copy()
-            self.update_objects.extend(
-                [
-                    {
-                        **cve_object["epss"],
-                        "x_epss": latest_report["x_epss"],
-                        "modified": latest_epss["date"] + "T00:00:00.000Z",
-                        "_arango_cve_processor_note": self.relationship_note,
-                        "_epss_score": latest_epss["epss"],
-                        "_epss_percentile": latest_epss["percentile"],
-                    },
-                ]
+            self.update_objects.append(
+                {
+                    **cve_object["epss"],
+                    "x_epss": latest_report["x_epss"],
+                    "modified": latest_epss["date"] + "T00:00:00.000Z",
+                    "_arango_cve_processor_note": self.relationship_note,
+                    "_epss_score": latest_epss["epss"],
+                    "_epss_percentile": latest_epss["percentile"],
+                }
             )
             return []
         else:
@@ -167,9 +165,7 @@ def parse_cve_epss_report(vulnerability: Vulnerability):
         modified=modified,
         published=vulnerability["created"],
         name=content,
-        x_epss=[
-            latest_epss_data.dict()
-        ],
+        x_epss=[latest_epss_data.dict()],
         object_refs=[
             vulnerability["id"],
         ],
