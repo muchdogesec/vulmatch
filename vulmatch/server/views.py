@@ -657,6 +657,8 @@ class KevView(KevEpssView):
 
             This endpoint returns `report` objects with the `labels` = `epss`.
 
+            Note, the Report objects returned will only show the last indexed EPSS date. If you want the entire EPSS history, you must request a specific CVE ID using the GET `epss/<CVE_ID>` endpoint
+
             **IMPORTANT:** You need to run Arango CVE Processor in `cve-epss` mode to generate these reports.
             """
         ),
@@ -715,6 +717,17 @@ class EPSSView(KevView):
         return Response(
             statistics.StatisticsHelper().get_cve_numeric_stat("x_opencti_epss_score")
         )
+    
+    @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
+    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
+        resp = super().retrieve_objects(request, *args, cve_id=cve_id, **kwargs)
+        if resp.data['objects']:
+            obj = resp.data['objects'][0]
+            obj['x_epss'] = [
+                d.dict() for d in models.EPSSScore.objects.filter(cve=cve_id)
+            ]
+        return resp
+        
 
 
 @extend_schema_view(

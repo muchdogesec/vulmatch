@@ -1,4 +1,6 @@
 import pytest
+from acvep.models import EPSSScore
+from datetime import date
 
 
 @pytest.mark.parametrize(
@@ -28,10 +30,6 @@ import pytest
         pytest.param("arango-cve-processor/cve-cwe", dict()),
         pytest.param("arango-cve-processor/cve-capec", dict(created_min="2024-12-31")),
         pytest.param("arango-cve-processor/cve-attack", dict(created_min="2024-12-31")),
-        pytest.param(
-            "arango-cve-processor/cve-epss",
-            dict(start_date="2025-09-01", end_date="2025-09-06"), id='cve-epss'
-        ),
         pytest.param("arango-cve-processor/cve-kev", dict()),
         pytest.param(
             "arango-cve-processor/cve-vulncheck-kev",
@@ -45,9 +43,36 @@ def test_task(db, client, path, payload):
         f"/api/v1/{path}/", data=payload, content_type="application/json"
     )
 
-    assert new_task_resp.status_code == 201
+    assert new_task_resp.status_code == 201, new_task_resp.content
     task_data = new_task_resp.json()
     job_id = task_data["id"]
     job_resp = client.get(f"/api/v1/jobs/{job_id}/")
     assert job_resp.status_code == 200
     assert job_resp.data["state"] == "completed"
+
+
+def test_cve_epss(db, client, subtests):
+    
+    new_task_resp = client.post(
+        f"/api/v1/arango-cve-processor/cve-epss/",
+        data=dict(start_date="2025-09-01", end_date="2025-09-03"),
+        content_type="application/json",
+    )
+
+    assert new_task_resp.status_code == 201, new_task_resp.content
+    task_data = new_task_resp.json()
+    job_id = task_data["id"]
+    job_resp = client.get(f"/api/v1/jobs/{job_id}/")
+    assert job_resp.status_code == 200
+    assert job_resp.data["state"] == "completed"
+    assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 3
+    assert EPSSScore.objects.get(cve="CVE-2023-7028", date=date(2025, 9, 3)).score == 0.93845
+
+    with subtests.test("Extend date range"):
+        new_task_resp = client.post(
+            f"/api/v1/arango-cve-processor/cve-epss/",
+            data=dict(start_date="2025-09-04", end_date="2025-09-06"),
+            content_type="application/json",
+        )
+        assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 6
+        assert EPSSScore.objects.get(cve="CVE-2023-7028", date=date(2025, 9, 6)).score == 0.93864

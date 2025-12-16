@@ -10,7 +10,7 @@ annotated-types==0.7.0
     # via pydantic
 antlr4-python3-runtime==4.9.3
     # via stix2-patterns
-arango-cve-processor==1.4.6
+arango-cve-processor==1.4.8
     # via -r requirements.in
 asgiref==3.10.0
     # via

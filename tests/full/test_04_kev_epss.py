@@ -110,7 +110,6 @@ def test_sort(client, path, sort_param: str):
         if param == "epss_score":
             return float(obj["x_epss"][0]["epss"])
         return obj[param]
-
     reversed = direction == "descending"
     assert is_sorted(
         resp_data["objects"], key=key_fn, reverse=reversed
@@ -172,12 +171,61 @@ def test_list_exploits(client, cve_ids, expected_ids):
     url = f"/api/v1/kev/exploits/"
     resp = client.get(url, query_params=dict(cve_id=",".join(cve_ids or [])))
     resp_data = resp.json()
-    print({obj["id"] for obj in resp_data["objects"]})
-    print({obj["name"] for obj in resp_data["objects"]})
     assert {obj["id"] for obj in resp_data["objects"]} == set(expected_ids)
 
 
-def test_epss_retrieve(client):
+@pytest.fixture
+def epss_scores(db):
+    from vulmatch.server.models import EPSSScore
+    return [
+        EPSSScore.objects.create(cve="CVE-2023-7028", score=0.5, percentile=0.5, date="2025-09-01", id='1'),
+        EPSSScore.objects.create(cve="CVE-2023-7028", score=0.6, percentile=0.6, date="2025-09-02", id='2'),
+        EPSSScore.objects.create(cve="CVE-2023-7028", score=0.7, percentile=0.7, date="2025-09-03", id='3'),
+        EPSSScore.objects.create(cve="CVE-2023-7028", score=0.8, percentile=0.8, date="2025-09-04", id='4'),
+        EPSSScore.objects.create(cve="CVE-2023-7028", score=0.9, percentile=0.9, date="2025-09-05", id='5'),
+    ]
+
+
+def test_epss_list_content(client, epss_scores):
+    cve_id = "CVE-2023-7028"
+    url = f"/api/v1/epss/objects/"
+    resp = client.get(url, query_params=dict(cve_id=cve_id))
+    resp_data = resp.json()
+    epss_obj = resp_data["objects"][0]
+    assert epss_obj == {
+        "created": "2024-01-12T14:15:49.420Z",
+        "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
+        "extensions": {
+            "extension-definition--efd26d23-d37d-5cf2-ac95-a101e46ce11d": {
+                "extension_type": "toplevel-property-extension"
+            }
+        },
+        "external_references": [
+            {
+                "source_name": "cve",
+                "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-7028",
+                "external_id": "CVE-2023-7028",
+            },
+            {"source_name": "arango_cve_processor", "external_id": "cve-epss"},
+        ],
+        "id": "report--fc6e3286-cff0-5f27-83b7-02f9f6fe25be",
+        "labels": ["epss"],
+        "modified": "2025-09-06T00:00:00.000Z",
+        "name": "EPSS Scores: CVE-2023-7028",
+        "object_marking_refs": [
+            "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+            "marking-definition--152ecfe1-5015-522b-97e4-86b60c57036d",
+        ],
+        "object_refs": ["vulnerability--8ca41376-d05c-5f2c-9a8a-9f7e62a5f81f"],
+        "published": "2024-01-12T14:15:49.42Z",
+        "spec_version": "2.1",
+        "type": "report",
+        "x_epss": [
+            {"date": "2025-09-06", "epss": 0.93864, "percentile": 0.99862},
+        ],
+    }
+
+def test_epss_retrieve(client, epss_scores):
     cve_id = "CVE-2023-7028"
     url = f"/api/v1/epss/objects/{cve_id}/"
     resp = client.get(url)
@@ -212,11 +260,10 @@ def test_epss_retrieve(client):
         "spec_version": "2.1",
         "type": "report",
         "x_epss": [
-            {"date": "2025-09-06", "epss": 0.93864, "percentile": 0.99862},
-            {"date": "2025-09-05", "epss": 0.93864, "percentile": 0.99862},
-            {"date": "2025-09-04", "epss": 0.93864, "percentile": 0.99862},
-            {"date": "2025-09-03", "epss": 0.93845, "percentile": 0.99863},
-            {"date": "2025-09-02", "epss": 0.93845, "percentile": 0.99863},
-            {"date": "2025-09-01", "epss": 0.93845, "percentile": 0.99864},
+            {"date": "2025-09-05", "epss": 0.9, "percentile": 0.9},
+            {"date": "2025-09-04", "epss": 0.8, "percentile": 0.8},
+            {"date": "2025-09-03", "epss": 0.7, "percentile": 0.7},
+            {"date": "2025-09-02", "epss": 0.6, "percentile": 0.6},
+            {"date": "2025-09-01", "epss": 0.5, "percentile": 0.5},
         ],
     }

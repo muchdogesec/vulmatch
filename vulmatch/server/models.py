@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import uuid
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
+from acvep.models import EPSSScore
 
 # Create your models here.
 
