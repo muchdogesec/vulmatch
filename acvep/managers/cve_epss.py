@@ -54,14 +54,14 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
   FILTER doc._arango_cve_processor_note == @relationship_note
   FILTER doc.name IN @cve_ids AND doc._is_latest == TRUE
   LET cve_name = doc.external_references[0].external_id
-  RETURN [cve_name, KEEP(doc, '_key', '_record_created')]
+  RETURN [cve_name, doc._key]
         """
             cve_query = """
   FOR doc IN @@collection OPTIONS {indexHint: "acvep_search_v2", forceIndexHint: true}
   FILTER doc.type == 'vulnerability'
   FILTER doc.name IN @cve_ids
   FILTER doc._is_latest == TRUE AND doc.created >= @created_min AND doc.modified >= @modified_min 
-  RETURN [doc.name, KEEP(doc, 'id', '_record_created', 'created', '_key')]
+  RETURN [doc.name, KEEP(doc, 'id', 'created', '_key')]
         """
             reports = dict(
                 self.get_objects_from_db(
@@ -78,7 +78,7 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
             )
             objects = []
             for cve_name, cve in cves:
-                cve.update(name=cve_name, epss=reports.get(cve_name))
+                cve.update(name=cve_name, epss_key=reports.get(cve_name))
                 objects.append(cve)
             yield objects
 
@@ -89,14 +89,13 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
         self.update_objects.append(
             self.make_opencti_properties(cve_object["_key"], latest_report["x_epss"][0])
         )
-        if cve_object["epss"]:
+        if cve_object["epss_key"]:
             latest_epss: dict = latest_report["x_epss"][0].copy()
             self.update_objects.append(
                 {
-                    **cve_object["epss"],
+                    "_key": cve_object["epss_key"],
                     "x_epss": latest_report["x_epss"],
                     "modified": latest_epss["date"] + "T00:00:00.000Z",
-                    "_arango_cve_processor_note": self.relationship_note,
                     "_epss_score": latest_epss["epss"],
                     "_epss_percentile": latest_epss["percentile"],
                 }
