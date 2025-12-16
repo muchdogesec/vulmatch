@@ -423,8 +423,10 @@ class CveView(viewsets.ViewSet):
         methods=["GET"], detail=False, url_path="objects/<str:cve_id>/bundle"
     )
     def bundle(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper("nvd_cve_vertex_collection", request).get_cve_bundle(
-            cve_id
+        return EPSSView.add_epss_entries_from_pgdb(
+            VulmatchDBHelper("nvd_cve_vertex_collection", request).get_cve_bundle(
+                cve_id
+            )
         )
 
     @extend_schema(
@@ -721,13 +723,21 @@ class EPSSView(KevView):
     @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
         resp = super().retrieve_objects(request, *args, cve_id=cve_id, **kwargs)
-        if resp.data['objects']:
-            obj = resp.data['objects'][0]
-            obj['x_epss'] = [
-                d.dict() for d in models.EPSSScore.objects.filter(cve=cve_id)
-            ]
-        return resp
+        return self.add_epss_entries_from_pgdb(resp)
         
+        
+    @staticmethod
+    def add_epss_entries_from_pgdb(response: Response, key: str = "objects") -> Response:
+        objects = response.data.get(key, [])
+        for obj in objects or []:
+            if obj['type'] != 'report' or 'epss' not in obj.get('labels', []):
+                continue
+            cve_name = obj['external_references'][0]['external_id']
+            new_epss_data = models.EPSSScore.objects.filter(cve=cve_name)
+            if not new_epss_data.exists():
+                continue
+            obj['x_epss'] = [d.dict() for d in new_epss_data]
+        return response
 
 
 @extend_schema_view(
