@@ -110,6 +110,8 @@ def test_sort(client, path, sort_param: str):
         if param == "epss_score":
             return float(obj["x_epss"][0]["epss"])
         return obj[param]
+    
+    print(resp_data["objects"])
 
     reversed = direction == "descending"
     assert is_sorted(
