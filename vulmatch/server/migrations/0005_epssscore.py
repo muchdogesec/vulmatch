@@ -21,6 +21,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'unique_together': {('cve', 'date')},
+                'ordering': ['cve', '-date'],
             },
         ),
     ]

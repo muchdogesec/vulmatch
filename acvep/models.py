@@ -1,7 +1,9 @@
+import logging
 from django.db import models
-from arango_cve_processor.tools.epss import EPSSManager
+from acvep.tools.epss import EPSSManager
 import datetime
 from vulmatch.server.apps import ServerConfig
+import concurrent.futures
 
 
 class EPSSScore(models.Model):
@@ -20,29 +22,46 @@ class EPSSScore(models.Model):
         return f"EPSS({self.cve}, score={self.score}, percentile={self.percentile}, date={self.date})"
 
     @staticmethod
-    def _sync_for_date(date):
-        if EPSSScore.objects.filter(date=date).exists():
-            return
-        manager = EPSSManager()
-        data = manager.get_epss_data(date)
+    def _sync_for_dates(*dates):
 
-        objs = [
-            EPSSScore(
-                id=f"{cve}+{item['date']}",
-                cve=cve,
-                score=item["epss"],
-                percentile=item["percentile"],
-                date=date,
+        dates = {d for d in dates if not EPSSScore.objects.filter(date=d).exists()}
+
+        def sync_task(date: datetime.date):
+            logging.info(f"Syncing CVE <-> EPSS Backfill for date: {date.isoformat()}")
+            logging.info("================================")
+            data = EPSSManager.get_epss_date(date)
+            return (
+                date,
+                [
+                    dict(
+                        id=f"{cve}+{item['date']}",
+                        cve=cve,
+                        score=item["epss"],
+                        percentile=item["percentile"],
+                        date=date,
+                    )
+                    for cve, item in data.items()
+                ],
             )
-            for cve, item in data.items()
-        ]
-        EPSSScore.objects.bulk_create(objs, ignore_conflicts=True, batch_size=5000)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(sync_task, d) for d in dates]
+            for future in concurrent.futures.as_completed(futures):
+                date, objs = future.result()
+                logging.info(
+                    f"Creating {len(objs)} EPSSScore entries for date: {date.isoformat()}"
+                )
+                objs = [EPSSScore(**obj) for obj in objs]
+                if objs:
+                    EPSSScore.objects.bulk_create(
+                        objs, ignore_conflicts=True, batch_size=30_000
+                    )
 
     @staticmethod
     def get_for_date(date=None):
         date = date or EPSSScore.datenow()
         if not EPSSScore.objects.filter(date=date).exists():
-            EPSSScore._sync_for_date(date)
+            EPSSScore._sync_for_dates(date)
         return EPSSScore.objects.filter(date=date)
 
     @classmethod

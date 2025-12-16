@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone, date
 import logging
 import time
 import uuid
+import concurrent.futures
 
 from arango_cve_processor import config
 from arango_cve_processor.tools.utils import chunked_tqdm, stix2python
@@ -53,7 +54,7 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
   FILTER doc._arango_cve_processor_note == @relationship_note
   FILTER doc.name IN @cve_ids AND doc._is_latest == TRUE
   LET cve_name = doc.external_references[0].external_id
-  RETURN [cve_name, KEEP(doc, '_key', 'x_epss', '_record_created')]
+  RETURN [cve_name, KEEP(doc, '_key', '_record_created')]
         """
             cve_query = """
   FOR doc IN @@collection OPTIONS {indexHint: "acvep_search_v2", forceIndexHint: true}
@@ -130,12 +131,7 @@ class CveEpssManager(_CveEpssWorker, relationship_note="cve-epss"):
     def process(self, **kwargs):
         start_date = self.start_date
         end_date = self.end_date
-        for day, date in date_range(start_date, end_date):
-            logging.info(
-                f"Running CVE <-> EPSS Backfill for day {day}, date: {date.isoformat()} of {end_date.isoformat()}"
-            )
-            logging.info("================================")
-            EPSSScore._sync_for_date(date)
+        EPSSScore._sync_for_dates(*date_range(start_date, end_date))
         date = EPSSScore.get_latest_date()
         rmanager = _CveEpssWorker(self.processor, date, **self.kwargs)
         rmanager.epss_date = date
@@ -146,7 +142,7 @@ def date_range(start_date: date, end_date: date):
     """Yield dates from start_date to end_date inclusive."""
     total_days = (end_date - start_date).days + 1
     for n in range(total_days):
-        yield f"{n+1} of {total_days}", (start_date + timedelta(days=n))
+        yield start_date + timedelta(days=n)
 
 
 def parse_cve_epss_report(vulnerability: Vulnerability):
