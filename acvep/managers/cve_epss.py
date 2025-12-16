@@ -89,20 +89,25 @@ class _CveEpssWorker(STIXRelationManager, relationship_note="cve-epss", register
         self.update_objects.append(
             self.make_opencti_properties(cve_object["_key"], latest_report["x_epss"][0])
         )
+        latest_epss: dict = latest_report["x_epss"][0].copy()
+        latest_epss_extras = dict(
+            _epss_score=latest_epss["epss"],
+            _epss_percentile=latest_epss["percentile"],
+        )
         if cve_object["epss_key"]:
-            latest_epss: dict = latest_report["x_epss"][0].copy()
             self.update_objects.append(
                 {
                     "_key": cve_object["epss_key"],
                     "x_epss": latest_report["x_epss"],
                     "modified": latest_epss["date"] + "T00:00:00.000Z",
-                    "_epss_score": latest_epss["epss"],
-                    "_epss_percentile": latest_epss["percentile"],
+                    **latest_epss_extras,
                 }
             )
             return []
         else:
-            return [stix2python(latest_report)]
+            stix_dict = stix2python(latest_report)
+            stix_dict.update(latest_epss_extras)
+            return [stix_dict]
 
     @staticmethod
     def make_opencti_properties(key: str, epss: dict):

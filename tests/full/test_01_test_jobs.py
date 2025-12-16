@@ -52,9 +52,10 @@ def test_task(db, client, path, payload):
 
 
 def test_cve_epss(db, client, subtests):
+    
     new_task_resp = client.post(
         f"/api/v1/arango-cve-processor/cve-epss/",
-        data=dict(start_date="2025-09-01", end_date="2025-09-06"),
+        data=dict(start_date="2025-09-01", end_date="2025-09-03"),
         content_type="application/json",
     )
 
@@ -64,5 +65,14 @@ def test_cve_epss(db, client, subtests):
     job_resp = client.get(f"/api/v1/jobs/{job_id}/")
     assert job_resp.status_code == 200
     assert job_resp.data["state"] == "completed"
-    assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 6
+    assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 3
     assert EPSSScore.objects.get(cve="CVE-2023-7028", date=date(2025, 9, 3)).score == 0.93845
+
+    with subtests.test("Extend date range"):
+        new_task_resp = client.post(
+            f"/api/v1/arango-cve-processor/cve-epss/",
+            data=dict(start_date="2025-09-04", end_date="2025-09-06"),
+            content_type="application/json",
+        )
+        assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 6
+        assert EPSSScore.objects.get(cve="CVE-2023-7028", date=date(2025, 9, 6)).score == 0.93864

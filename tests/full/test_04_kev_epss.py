@@ -110,9 +110,6 @@ def test_sort(client, path, sort_param: str):
         if param == "epss_score":
             return float(obj["x_epss"][0]["epss"])
         return obj[param]
-    
-    print(resp_data["objects"])
-
     reversed = direction == "descending"
     assert is_sorted(
         resp_data["objects"], key=key_fn, reverse=reversed
@@ -174,8 +171,6 @@ def test_list_exploits(client, cve_ids, expected_ids):
     url = f"/api/v1/kev/exploits/"
     resp = client.get(url, query_params=dict(cve_id=",".join(cve_ids or [])))
     resp_data = resp.json()
-    print({obj["id"] for obj in resp_data["objects"]})
-    print({obj["name"] for obj in resp_data["objects"]})
     assert {obj["id"] for obj in resp_data["objects"]} == set(expected_ids)
 
 
@@ -235,7 +230,6 @@ def test_epss_retrieve(client, epss_scores):
     url = f"/api/v1/epss/objects/{cve_id}/"
     resp = client.get(url)
     resp_data = resp.json()
-    print(resp_data)
     epss_obj = resp_data["objects"][0]
     assert epss_obj == {
         "created": "2024-01-12T14:15:49.420Z",
