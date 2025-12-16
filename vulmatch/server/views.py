@@ -657,6 +657,8 @@ class KevView(KevEpssView):
 
             This endpoint returns `report` objects with the `labels` = `epss`.
 
+            Note, the Report objects returned will only show the last indexed EPSS date. If you want the entire EPSS history, you must request a specific CVE ID using the GET `epss/<CVE_ID>` endpoint
+
             **IMPORTANT:** You need to run Arango CVE Processor in `cve-epss` mode to generate these reports.
             """
         ),
