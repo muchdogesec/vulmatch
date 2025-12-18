@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 import shutil
+import time
 from types import SimpleNamespace
 from urllib.parse import urljoin
 
@@ -111,8 +112,37 @@ class CustomTask(Task):
             raise Exception("rejected: `job_id` not in kwargs")
         return super().before_start(task_id, args, kwargs)
     
+class DownloadTimeoutError(Exception):
+    def __init__(self, downloaded_bytes, total_bytes=None):
+        self.downloaded_bytes = downloaded_bytes
+        self.total_bytes = total_bytes
+        super().__init__(f"Download timed out after downloading {downloaded_bytes} bytes" + (f" out of {total_bytes} bytes." if total_bytes else "."))
 
-@app.task(base=CustomTask)
+def read_into(streamed_resp: requests.Response, fp, chunk_size=1024*1024, read_timeout=300):
+    """
+    Read from a streamed requests response into a file-like object with total timeout.
+
+    :param streamed_request: requests.Response object with stream=True
+    :param fp: file-like object to write into
+    :param chunk_size: bytes per chunk
+    :param read_timeout: total download timeout in seconds
+    :raises DownloadTimeoutError: if total read exceeds read_timeout
+    """
+    start_time = time.time()
+    downloaded = 0
+    total = streamed_resp.headers.get('content-length')
+    total = int(total) if total else None
+
+    for chunk in streamed_resp.iter_content(chunk_size=chunk_size):
+        if chunk:
+            fp.write(chunk)
+            downloaded += len(chunk)
+            elapsed = time.time() - start_time
+            if elapsed > read_timeout:
+                raise DownloadTimeoutError(downloaded, total)
+    return downloaded
+
+@app.task(base=CustomTask, max_retries=3, default_retry_delay=5, autoretry_for=(requests.exceptions.RequestException, DownloadTimeoutError))
 def download_file(urlpath, tempdir, job_id=None):
     Path(tempdir).mkdir(parents=True, exist_ok=True)
     logging.info('downloading bundle at `%s`', urlpath)
@@ -120,10 +150,12 @@ def download_file(urlpath, tempdir, job_id=None):
     if job.state == models.JobState.PENDING:
         job.state = models.JobState.PROCESSING
         job.save()
-    resp = requests.get(urlpath)
+    resp = requests.get(urlpath, stream=True, timeout=10)
     if resp.status_code == 200:
         filename = Path(tempdir)/resp.url.split('/')[-1]
-        filename.write_bytes(resp.content)
+        with filename.open('wb') as f:
+            total_bytes = read_into(resp, f, read_timeout=settings.DOWNLOAD_TIMEOUT_SECONDS)
+            logging.info(f'downloaded {total_bytes} bytes into {filename}')
         return str(filename)
     elif resp.status_code == 404:
         job.errors.append(f'{resp.url} not found')
