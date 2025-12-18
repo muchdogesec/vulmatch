@@ -224,4 +224,11 @@ def test_download_file_max_retries_exceeded(mock_get, job, tmp_path, eager_celer
     # Should have been called 4 times (1 initial + 3 retries as per max_retries=3)
     assert mock_get.call_count == 4
     assert r.failed()
+    
+    job.refresh_from_db()
+    print(job.errors)
+    assert len(job.errors) == 2
+    assert 'Failed to download' in job.errors[0]
+    assert 'after 3 retries' in job.errors[0]
+    assert 'Network error' in job.errors[0]
 

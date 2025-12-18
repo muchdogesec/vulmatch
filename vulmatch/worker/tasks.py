@@ -94,7 +94,7 @@ class CustomTask(Task):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         job = Job.objects.get(pk=kwargs['job_id'])
         job.state = models.JobState.FAILED
-        job.errors.append(f"celery task {self.name} failed with: {exc}")
+        job.errors.append(f"celery task {self.name} failed with: {exc}; {args=}, {kwargs=}")
         logging.exception(exc, exc_info=True)
         job.save()
         try:
@@ -142,27 +142,33 @@ def read_into(streamed_resp: requests.Response, fp, chunk_size=1024*1024, read_t
                 raise DownloadTimeoutError(downloaded, total)
     return downloaded
 
-@app.task(base=CustomTask, max_retries=3, default_retry_delay=5, autoretry_for=(requests.exceptions.RequestException, DownloadTimeoutError))
-def download_file(urlpath, tempdir, job_id=None):
+@app.task(bind=True, base=CustomTask, max_retries=3, default_retry_delay=5, autoretry_for=(requests.exceptions.RequestException, DownloadTimeoutError))
+def download_file(self, urlpath, tempdir, job_id=None):
     Path(tempdir).mkdir(parents=True, exist_ok=True)
     logging.info('downloading bundle at `%s`', urlpath)
     job = Job.objects.get(pk=job_id)
     if job.state == models.JobState.PENDING:
         job.state = models.JobState.PROCESSING
         job.save()
-    resp = requests.get(urlpath, stream=True, timeout=10)
-    if resp.status_code == 200:
-        filename = Path(tempdir)/resp.url.split('/')[-1]
-        with filename.open('wb') as f:
-            total_bytes = read_into(resp, f, read_timeout=settings.DOWNLOAD_TIMEOUT_SECONDS)
-            logging.info(f'downloaded {total_bytes} bytes into {filename}')
-        return str(filename)
-    elif resp.status_code == 404:
-        job.errors.append(f'{resp.url} not found')
-    else:
-        job.errors.append(f'{resp.url} failed with status code: {resp.status_code}')
-    job.save()
-    logging.info('error occured: %d', resp.status_code)
+    try:
+        resp = requests.get(urlpath, stream=True, timeout=10)
+        if resp.status_code == 200:
+            filename = Path(tempdir)/resp.url.split('/')[-1]
+            with filename.open('wb') as f:
+                total_bytes = read_into(resp, f, read_timeout=settings.DOWNLOAD_TIMEOUT_SECONDS)
+                logging.info(f'downloaded {total_bytes} bytes into {filename}')
+            return str(filename)
+        elif resp.status_code == 404:
+            job.errors.append(f'{resp.url} not found')
+        else:
+            job.errors.append(f'{resp.url} failed with status code: {resp.status_code}')
+        job.save()
+        logging.info('error occured: %d', resp.status_code)
+    except (requests.exceptions.RequestException, DownloadTimeoutError) as exc:
+        if self.request.retries >= self.max_retries:
+            job.errors.append(f'Failed to download {urlpath} after {self.max_retries} retries: {str(exc)}')
+            job.save()
+        raise
 
 
 @app.task(base=CustomTask)
