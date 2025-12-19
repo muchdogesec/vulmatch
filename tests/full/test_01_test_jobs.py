@@ -1,3 +1,4 @@
+import time
 import pytest
 from acvep.models import EPSSScore
 from datetime import date
@@ -76,3 +77,8 @@ def test_cve_epss(db, client, subtests):
         )
         assert EPSSScore.objects.filter(cve="CVE-2023-7028").count() == 6
         assert EPSSScore.objects.get(cve="CVE-2023-7028", date=date(2025, 9, 6)).score == 0.93864
+
+
+def test_nothing__sleeps(db):
+    # wait for above tasks objects to sync to ArangoSearch view
+    time.sleep(15)
