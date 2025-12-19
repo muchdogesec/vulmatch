@@ -226,7 +226,6 @@ def test_download_file_max_retries_exceeded(mock_get, job, tmp_path, eager_celer
     assert r.failed()
     
     job.refresh_from_db()
-    print(job.errors)
     assert len(job.errors) == 2
     assert 'Failed to download' in job.errors[0]
     assert 'after 3 retries' in job.errors[0]
