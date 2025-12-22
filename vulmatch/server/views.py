@@ -552,9 +552,11 @@ class KevEpssView(viewsets.ViewSet):
 
     @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
     def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        return VulmatchDBHelper(
-            "nvd_cve_vertex_collection", request
-        ).retrieve_kev_or_epss_object(cve_id, self.label)
+        return EPSSView.add_epss_entries_from_pgdb(
+            VulmatchDBHelper(
+                "nvd_cve_vertex_collection", request
+            ).retrieve_kev_or_epss_object(cve_id, self.label)
+        )
 
 
 @extend_schema_view(
@@ -719,11 +721,6 @@ class EPSSView(KevView):
         return Response(
             statistics.StatisticsHelper().get_cve_numeric_stat("x_opencti_epss_score")
         )
-    
-    @decorators.action(methods=["GET"], url_path="objects/<str:cve_id>", detail=False)
-    def retrieve_objects(self, request, *args, cve_id=None, **kwargs):
-        resp = super().retrieve_objects(request, *args, cve_id=cve_id, **kwargs)
-        return self.add_epss_entries_from_pgdb(resp)
         
         
     @staticmethod
