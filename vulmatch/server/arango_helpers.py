@@ -834,9 +834,9 @@ RETURN KEEP(doc, KEYS(doc, true))
         grouping_ids = set()
         generate_id = lambda c: generate_grouping_id(c["matchCriteriaId"])
         if include_x_cpes_not_vulnerable:
-            grouping_ids.update(map(generate_id, indicator["x_cpes"]["not_vulnerable"]))
+            grouping_ids.update(map(generate_id, indicator["x_cpes"].get("not_vulnerable", [])))
         if include_x_cpes_vulnerable:
-            grouping_ids.update(map(generate_id, indicator["x_cpes"]["vulnerable"]))
+            grouping_ids.update(map(generate_id, indicator["x_cpes"].get("vulnerable", [])))
         all_ids = self.execute_query(
             """
         FOR doc IN nvd_cve_vertex_collection
