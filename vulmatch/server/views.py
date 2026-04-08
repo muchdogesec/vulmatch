@@ -1168,7 +1168,7 @@ class JobView(viewsets.ModelViewSet):
             choices=get_type_choices(),
             method="filter_type",
         )
-        state = Filter(help_text="Filter the results by the state of the Job")
+        state = BaseCSVFilter(help_text="Filter the results by the state of the Job", lookup_expr="in")
 
         def filter_type(self, qs, field_name, value: str):
             query = {field_name: value}
