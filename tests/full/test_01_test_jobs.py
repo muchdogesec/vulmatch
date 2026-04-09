@@ -82,3 +82,4 @@ def test_cve_epss(db, client, subtests):
 def test_nothing__sleeps(db):
     # wait for above tasks objects to sync to ArangoSearch view
     time.sleep(15)
+    
