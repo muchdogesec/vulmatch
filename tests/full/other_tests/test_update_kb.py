@@ -56,6 +56,7 @@ class TestKBSyncView:
         job_data = resp.json()
         job = models.Job.objects.get(pk=job_data["id"])
         assert job.state == models.JobState.COMPLETED, job_data
+        assert job.completion_time != None
         assert job.parameters["processed_items"] == 150
         assert job.parameters["updated_items"] == 25
         assert not job.errors
@@ -75,3 +76,4 @@ class TestKBSyncView:
         assert job.state == models.JobState.FAILED
         assert len(job.errors) == 1
         assert "Simulated KB sync failure" in job.errors[0]
+        assert job.completion_time != None
