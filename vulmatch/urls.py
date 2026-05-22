@@ -49,6 +49,7 @@ router.register("kev", views.KevView, "kev-view")
 router.register("epss", views.EPSSView, "epss-view")
 
 ### more views
+router.register('tasks', views.KBSyncView, 'tasks-view')
 router.register("cwe", ctibutler_views.CweView, "cwe-view")
 router.register("capec", ctibutler_views.CapecView, "capec-view")
 router.register("attack", ctibutler_views.AttackView, "attack-view")

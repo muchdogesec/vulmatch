@@ -11,9 +11,11 @@ class JobState(models.TextChoices):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
 class JobType(models.TextChoices):
     CVE_UPDATE    = "cve-update"
     CVE_PROCESSOR = "arango-cve-processor"
+    SYNC_KNOWLEDGEBASE = 'sync-knowledgebase'
 
 class Job(models.Model):
     # file = models.OneToOneField(File, on_delete=models.CASCADE)

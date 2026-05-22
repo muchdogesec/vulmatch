@@ -1,8 +1,9 @@
 import logging
 import os
 from urllib.parse import urljoin
+import uuid
 import requests
-from rest_framework import viewsets, status, decorators, mixins
+from rest_framework import exceptions, viewsets, status, decorators, mixins
 from vulmatch.server import statistics
 
 from vulmatch.server.arango_helpers import (
@@ -16,7 +17,7 @@ from vulmatch.server.arango_helpers import (
     VulmatchDBHelper,
 )
 from dogesec_commons.utils import Pagination, Ordering
-from vulmatch.worker.tasks import new_task
+from vulmatch.worker.tasks import create_celery_task_from_job, new_task
 from vulmatch.server import models
 from vulmatch.server import serializers
 from django_filters.rest_framework import (
@@ -32,6 +33,7 @@ from django_filters.rest_framework import (
     DateTimeFilter,
 )
 from drf_spectacular.utils import (
+    OpenApiExample,
     extend_schema,
     extend_schema_view,
     OpenApiParameter,
@@ -39,6 +41,7 @@ from drf_spectacular.utils import (
     OpenApiExample,
 )
 from drf_spectacular.types import OpenApiTypes
+from dogesec_commons.utils.schemas import DEFAULT_404_RESPONSE
 from dogesec_commons.utils.schemas import DEFAULT_400_RESPONSE
 
 
@@ -1453,3 +1456,63 @@ class HealthCheck(viewsets.ViewSet):
         except BaseException as e:
             logging.exception(e)
             return "unknown"
+
+
+@extend_schema_view(
+    update_any=extend_schema(
+        summary="Update local knowledgebases",
+        description=textwrap.dedent(
+            """
+            Connect to remote CTIBUTLER server and update all values from specified knowledgebase.
+            """
+        ),
+        request=None,
+        responses={
+            201: serializers.JobSerializer,
+            404: DEFAULT_404_RESPONSE,
+        },
+    ),
+)
+class KBSyncView(viewsets.GenericViewSet):
+    serializer_class = serializers.JobSerializer
+    openapi_tags = ["Tasks"]
+    lookup_url_kwarg = "task_id"
+    filter_backends = [DjangoFilterBackend, Ordering]
+    ordering_fields = ["run_datetime"]
+    ordering = "run_datetime_descending"
+    pagination_class = Pagination("jobs")
+    valid_knowledge_bases = [
+        "capec",
+        "cwe",
+        "attack-enterprise",
+    ]
+    openapi_path_params = [
+        OpenApiParameter(
+            name="knowledgebase",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            enum=valid_knowledge_bases,
+            required=True,
+        )
+    ]
+    
+    @decorators.action(
+        methods=["PATCH"],
+        detail=False,
+        url_path=r"sync-knowledgebases/<knowledgebase>",
+    )
+    def update_any(self, request, *args, knowledgebase=None, **kwargs):
+        return self._sync_kb(knowledgebase)
+
+    def _sync_kb(self, kb):
+        if kb not in self.valid_knowledge_bases:
+            raise exceptions.NotFound({"error": "unknown knowledgebase"})
+        
+        job = models.Job.objects.create(
+            type=models.JobType.SYNC_KNOWLEDGEBASE,
+            parameters=dict(knowledgebase=kb)
+        )
+        # Use create_celery_task_from_job to create and apply_async the celery task
+        create_celery_task_from_job(job).apply_async()
+        job_s = serializers.JobSerializer(instance=job)
+        return Response(job_s.data, status=status.HTTP_201_CREATED)

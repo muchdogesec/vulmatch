@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch, Mock, call
+from unittest.mock import patch, Mock
 from io import BytesIO
 import time
 import requests
