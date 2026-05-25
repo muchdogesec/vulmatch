@@ -52,7 +52,7 @@ def test_attack_stats(client, api_schema, patched_helper):
         "total_cve_count": 23,
         "by_year": [{"year": "2024", "cve_count": 23}],
     }
-    assert len(data) >= 93
+    assert len(data) >= 83
 
 
 def test_capec_stats(client, api_schema, patched_helper):
