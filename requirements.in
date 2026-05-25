@@ -14,7 +14,7 @@ django-storages[s3]
 django-cleanup
 
 ## dogesec
-dogesec-commons
+dogesec-commons>=1.4.8
 stix2arango
 arango-cve-processor>=1.4.3
 

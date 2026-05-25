@@ -19,7 +19,7 @@ import tempfile
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.storage import default_storage
 import stix2
-from datetime import datetime, date, timedelta
+from datetime import UTC, datetime, date, timedelta
 import typing
 from django.conf import settings
 
@@ -27,6 +27,7 @@ from vulmatch.worker.utils import add_vulmatch_extras
 from .celery import app
 from stix2arango.stix2arango import Stix2Arango
 from arango_cve_processor.managers import RELATION_MANAGERS as CVE_RELATION_MANAGERS
+from dogesec_commons.objects import kb_sync
 from arango_cve_processor.__main__ import run_all as run_task_with_acp
 import acvep
 import logging
@@ -43,6 +44,8 @@ def create_celery_task_from_job(job: Job):
             task = run_nvd_task(data, job, 'cve')
         case models.JobType.CVE_PROCESSOR:
             task = run_acp_task(data, job)
+        case models.JobType.SYNC_KNOWLEDGEBASE:
+            task = update_knowledgebase.si(job_id=job.id) | remove_temp_and_set_completed.si(None, job_id=job.id)
     task.set_immutable(True)
     return task
 
@@ -250,3 +253,26 @@ from celery import signals
 def mark_old_jobs_as_failed_and_rebuild_cache(**kwargs):
     Job.objects.filter(state=models.JobState.PENDING).update(state = models.JobState.FAILED, errors=["marked as failed on startup"])
     refresh_products_cache() # build cache on program start
+
+
+@app.task(base=CustomTask, bind=True)
+def update_knowledgebase(self, job_id=None):
+    job = Job.objects.get(pk=job_id)
+    job.parameters.update(
+        processed_items=0,
+        updated_items=0,
+    )
+    job.state = models.JobState.PROCESSING
+    job.save(update_fields=["parameters", "state"])
+    try:
+        # In vulmatch, the main collection for STIX objects is 'nvd_cve_vertex_collection'
+        collection_name = "nvd_cve_vertex_collection"
+        logging.info(f"Processing {collection_name} for knowledgebase {job.parameters['knowledgebase']}")
+        update_time = datetime.now(UTC).isoformat()
+        # kb_sync.run_on_kb_and_collection expects the collection name and knowledgebase name
+        processed_count, updated_count = kb_sync.run_on_kb_and_collection(collection_name, job.parameters['knowledgebase'], update_time=update_time)
+        job.parameters['processed_items'] = processed_count
+        job.parameters['updated_items'] = updated_count
+        job.save(update_fields=["parameters"])
+    except Exception as e:
+        raise
