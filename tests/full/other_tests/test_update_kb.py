@@ -23,12 +23,12 @@ class TestKBSyncView:
         assert data["type"] == "sync-knowledgebase"
         assert data["parameters"]["knowledgebase"] == "cwe"
 
-        # Test for attack-enterprise
-        resp = client.patch("/api/v1/tasks/sync-knowledgebases/attack-enterprise/")
+        # Test for enterprise-attack
+        resp = client.patch("/api/v1/tasks/sync-knowledgebases/enterprise-attack/")
         assert resp.status_code == 201
         data = resp.json()
         assert data["type"] == "sync-knowledgebase"
-        assert data["parameters"]["knowledgebase"] == "attack-enterprise"
+        assert data["parameters"]["knowledgebase"] == "enterprise-attack"
 
     @pytest.mark.parametrize(
         "kb",
@@ -65,11 +65,11 @@ class TestKBSyncView:
     def test_update_kb_calls_kbsync_fails(self, mock_kbsync, client):
         mock_kbsync.side_effect = ValueError("Simulated KB sync failure")
         with pytest.raises(ValueError):
-            client.patch("/api/v1/tasks/sync-knowledgebases/attack-enterprise/")
+            client.patch("/api/v1/tasks/sync-knowledgebases/enterprise-attack/")
 
         mock_kbsync.assert_called_once()
         args, kwargs = mock_kbsync.call_args
-        assert args == ("nvd_cve_vertex_collection", "attack-enterprise")
+        assert args == ("nvd_cve_vertex_collection", "enterprise-attack")
         assert "update_time" in kwargs
 
         job = models.Job.objects.all().last()
