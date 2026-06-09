@@ -1484,7 +1484,7 @@ class KBSyncView(viewsets.GenericViewSet):
     valid_knowledge_bases = [
         "capec",
         "cwe",
-        "attack-enterprise",
+        "enterprise-attack",
     ]
     openapi_path_params = [
         OpenApiParameter(
