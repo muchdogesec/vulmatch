@@ -70,6 +70,9 @@ def create_directory(path):
 def download_file(url, destination):
     response = requests.get(url)
     if response.status_code == 200:
+        if response.content == "{}":
+            print(f"No STIX objects created for date")
+            return True
         with open(destination, 'wb') as file:
             file.write(response.content)
         print(f"Downloaded file: {destination}")
