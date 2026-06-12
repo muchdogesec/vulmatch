@@ -69,7 +69,7 @@ def run_nvd_task(data, job: Job, nvd_type='cve'):
     tasks = []
     for d in dates:
         url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
-        task = download_file.si(url, temp_dir, job_id=job.id)
+        task = download_file.si(url, temp_dir, job_id=job.id, file_date=d)
         task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id, params=job.parameters)
         task.set_immutable(True)
         tasks.append(task)
@@ -145,8 +145,11 @@ def read_into(streamed_resp: requests.Response, fp, chunk_size=1024*1024, read_t
                 raise DownloadTimeoutError(downloaded, total)
     return downloaded
 
+class MissingFileError(Exception):
+    pass
+
 @app.task(bind=True, base=CustomTask, max_retries=3, default_retry_delay=5, autoretry_for=(requests.exceptions.RequestException, DownloadTimeoutError))
-def download_file(self, urlpath, tempdir, job_id=None):
+def download_file(self, urlpath, tempdir, job_id=None, file_date: date=None):
     Path(tempdir).mkdir(parents=True, exist_ok=True)
     logging.info('downloading bundle at `%s`', urlpath)
     job = Job.objects.get(pk=job_id)
@@ -159,9 +162,14 @@ def download_file(self, urlpath, tempdir, job_id=None):
             filename = Path(tempdir)/resp.url.split('/')[-1]
             with filename.open('wb') as f:
                 total_bytes = read_into(resp, f, read_timeout=settings.DOWNLOAD_TIMEOUT_SECONDS)
+                if total_bytes == 2: # see https://github.com/muchdogesec/cve2stix/issues/128 [body is {}]
+                    logging.info("found an empty bundle, skipping...")
+                    return ""
                 logging.info(f'downloaded {total_bytes} bytes into {filename}')
             return str(filename)
         elif resp.status_code == 404:
+            if file_date and file_date > date(2026, 6, 11): # see https://github.com/muchdogesec/vulmatch/issues/352
+                raise MissingFileError(f"file does not exist on remote server: {urlpath}")
             job.errors.append(f'{resp.url} not found')
         else:
             job.errors.append(f'{resp.url} failed with status code: {resp.status_code}')

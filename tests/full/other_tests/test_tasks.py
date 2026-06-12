@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import patch, Mock
 from io import BytesIO
 import time
@@ -210,6 +211,19 @@ def test_download_file_retries_on_download_timeout(mock_read_into, mock_path, mo
     # Should have been called 3 times (2 failures + 1 success)
     assert mock_read_into.call_count == 3
 
+@patch('vulmatch.worker.tasks.requests.get')
+@patch('vulmatch.worker.tasks.read_into')
+def test_download_file_handles_empty_bundle_correctly(mock_read_into, mock_get, job, tmp_path, eager_celery):
+    mock_read_into.return_value = 2
+    tempdir = str(tmp_path)
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.url = 'https://example.com/file.json'
+    mock_get.return_value = mock_response
+    result = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id)
+    assert result.get() == ""
+
+
 
 @patch('vulmatch.worker.tasks.requests.get')
 def test_download_file_max_retries_exceeded(mock_get, job, tmp_path, eager_celery):
@@ -230,4 +244,36 @@ def test_download_file_max_retries_exceeded(mock_get, job, tmp_path, eager_celer
     assert 'Failed to download' in job.errors[0]
     assert 'after 3 retries' in job.errors[0]
     assert 'Network error' in job.errors[0]
+
+
+@pytest.mark.parametrize(
+    "d,should_fail",
+    [
+        (date(2027, 1, 1), True),
+        (date(2025, 1, 1), False),
+        (date(2026, 10, 11), True),
+        (date(2026, 6, 10), False),
+    ]
+)
+@patch('vulmatch.worker.tasks.requests.get')
+def test_download_file__fails_on_404(mock_get, job, tmp_path, d, should_fail, eager_celery):
+    """Test download_file fails after max retries"""
+    from requests.models import Response 
+    r = Response()
+    r.status_code = 404
+    mock_get.return_value = r
+    tempdir = str(tmp_path)
+    
+    # with pytest.raises(requests.exceptions.RequestException):
+    r = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id, file_date=d)
+    
+    # Should have been called 4 times (1 initial + 3 retries as per max_retries=3)
+    assert mock_get.call_count == 1
+    assert r.failed() == should_fail
+    
+    job.refresh_from_db()
+    assert len(job.errors) == 1
+    if should_fail:
+        assert "file does not exist on remote server: https://example.com/file.json" in job.errors[0]
+
 
