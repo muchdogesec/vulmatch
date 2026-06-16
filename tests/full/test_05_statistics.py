@@ -111,7 +111,6 @@ def test_epss_stats(client, api_schema, patched_helper):
     )
     print(data)
     assert data == [
-        {"range_group": "undefined", "count": 3},
         {"range_group": "0.0 -  0.1", "count": 552},
         {"range_group": "0.2 -  0.3", "count": 3},
         {"range_group": "0.3 -  0.4", "count": 1},
@@ -137,7 +136,6 @@ def test_cve_stats(client, api_schema, patched_helper):
         "created_since": {"d1": 103, "d7": 438, "d30": 438, "d365": 567},
         "by_year": [{"year": "2024", "count": 567}],
         "cvss_v2": [
-            {"range_group": "undefined", "count": 512},
             {"range_group": "2.7 -  2.8", "count": 2},
             {"range_group": "3.3 -  3.4", "count": 2},
             {"range_group": "4.0 -  4.1", "count": 15},
@@ -148,7 +146,6 @@ def test_cve_stats(client, api_schema, patched_helper):
             {"range_group": "7.5 -  7.6", "count": 7},
         ],
         "cvss_v3": [
-            {"range_group": "undefined", "count": 7},
             {"range_group": "2.4 -  2.5", "count": 1},
             {"range_group": "3.3 -  3.4", "count": 1},
             {"range_group": "3.5 -  3.6", "count": 3},
@@ -192,7 +189,6 @@ def test_cve_stats(client, api_schema, patched_helper):
             {"range_group": "10", "count": 1},
         ],
         "cvss_v4": [
-            {"range_group": "undefined", "count": 526},
             {"range_group": "2.1 -  2.2", "count": 1},
             {"range_group": "5.1 -  5.2", "count": 4},
             {"range_group": "5.3 -  5.4", "count": 20},
