@@ -303,7 +303,7 @@ RETURN { cve: d.name, created_at: d.created }
         groups = []
         for group, cve_count in self.execute_query(query, bind_vars=dict(prop=prop)):
             if group is None:
-                name = "undefined"
+                continue
             elif group == 10 or (group == 1 and prop == 'x_opencti_epss_score'):
                 name = str(int(group))
             else:
