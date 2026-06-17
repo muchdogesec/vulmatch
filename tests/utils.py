@@ -43,8 +43,11 @@ class Transport(WSGITransport):
     def send(self, case: schemathesis.Case, *args, **kwargs):
         t = time.time()
         serialized_request = WSGI_TRANSPORT.serialize_case(case)
+        query_string = serialized_request["query_string"]
+        if isinstance(query_string, dict):
+            query_string = urlencode(query_string)
         serialized_request.update(
-            QUERY_STRING=urlencode(serialized_request["query_string"]),
+            QUERY_STRING=query_string,
         )
         if json_data := serialized_request.pop("json", None):
             serialized_request.update(data=json.dumps(json_data))
