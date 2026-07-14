@@ -2,7 +2,6 @@ from datetime import date
 from unittest.mock import patch, Mock
 from io import BytesIO
 import time
-import requests
 
 import pytest
 from vulmatch.server import models
@@ -35,245 +34,227 @@ def test_cache_refreshed_on_task_failure(job, eager_celery):
         mock_referesh_cache.assert_called_once()
 
 
-def test_read_into_success():
-    """Test successful file reading from streamed response"""
-    mock_response = Mock()
-    mock_response.headers.get.return_value = '1024'
-    mock_response.iter_content.return_value = [b'chunk1', b'chunk2', b'chunk3']
-    
-    fp = BytesIO()
-    downloaded = tasks.read_into(mock_response, fp, chunk_size=1024, read_timeout=10)
-    
-    assert downloaded == 18  # len('chunk1') + len('chunk2') + len('chunk3')
-    assert fp.getvalue() == b'chunk1chunk2chunk3'
-
-
-def test_read_into_timeout():
-    """Test that read_into raises DownloadTimeoutError on timeout"""
-    mock_response = Mock()
-    mock_response.headers.get.return_value = '10000'
-    
-    # Simulate slow chunks that cause timeout
-    def slow_chunks():
-        time.sleep(0.1)
-        yield b'chunk1'
-        time.sleep(0.1)
-        yield b'chunk2'
-    
-    mock_response.iter_content.return_value = slow_chunks()
-    
-    fp = BytesIO()
-    with pytest.raises(tasks.DownloadTimeoutError) as exc_info:
-        tasks.read_into(mock_response, fp, chunk_size=1024, read_timeout=0.05)
-    
-    assert exc_info.value.downloaded_bytes > 0
-    assert exc_info.value.total_bytes == 10000
-
-
-def test_read_into_no_content_length():
-    """Test read_into works without content-length header"""
-    mock_response = Mock()
-    mock_response.headers.get.return_value = None
-    mock_response.iter_content.return_value = [b'data']
-    
-    fp = BytesIO()
-    downloaded = tasks.read_into(mock_response, fp)
-    
-    assert downloaded == 4
-    assert fp.getvalue() == b'data'
-
-
-@patch('vulmatch.worker.tasks.requests.get')
-@patch('vulmatch.worker.tasks.Path')
-def test_download_file_success(mock_path, mock_get, job, tmp_path):
-    """Test successful file download"""
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.url = 'https://example.com/file.json'
-    mock_response.headers.get.return_value = '100'
-    mock_response.iter_content.return_value = [b'test data']
-    mock_get.return_value = mock_response
-    
-    # Setup mock path
-    mock_file = Mock()
-    mock_path_instance = Mock()
-    mock_path_instance.__truediv__ = Mock(return_value=mock_file)
-    mock_path_instance.mkdir = Mock()
-    mock_path.return_value = mock_path_instance
-    mock_file.open.return_value.__enter__ = Mock(return_value=Mock())
-    mock_file.open.return_value.__exit__ = Mock(return_value=False)
-    
+@patch('vulmatch.worker.tasks.pypdl.Pypdl')
+def test_download_file_success(mock_pypdl, job, tmp_path):
+    """Test successful file download delegates to pypdl with expected args."""
     tempdir = str(tmp_path)
-    result = tasks.download_file('https://example.com/file.json', tempdir, job_id=job.id)
-    
-    mock_get.assert_called_once_with('https://example.com/file.json', stream=True, timeout=10)
+    result = tasks.download_file.run('https://example.com/file.json', tempdir, job_id=job.id)
+
+    expected_file = str(tmp_path / 'file.json')
+    mock_pypdl.assert_called_once_with(max_concurrent=10)
+    mock_pypdl.return_value.start.assert_called_once_with(
+        url='https://example.com/file.json',
+        file_path=expected_file,
+        retries=5,
+        block=True,
+        display=False,
+    )
+    assert result == expected_file
     job.refresh_from_db()
     assert job.state == models.JobState.PROCESSING
 
 
-@patch('vulmatch.worker.tasks.requests.get')
-def test_download_file_404(mock_get, job, tmp_path):
-    """Test download_file handles 404 errors"""
-    mock_response = Mock()
-    mock_response.status_code = 404
-    mock_response.url = 'https://example.com/missing.json'
-    mock_get.return_value = mock_response
-    
+@patch('vulmatch.worker.tasks.pypdl.Pypdl')
+def test_download_file_keeps_processing_when_already_started(mock_pypdl, job, tmp_path):
+    """Test that non-pending jobs are not state-reset by download_file."""
+    job.state = models.JobState.PROCESSING
+    job.save(update_fields=['state'])
+
     tempdir = str(tmp_path)
-    result = tasks.download_file('https://example.com/missing.json', tempdir, job_id=job.id)
-    
+    tasks.download_file.run('https://example.com/file.json', tempdir, job_id=job.id)
+
+    mock_pypdl.return_value.start.assert_called_once()
     job.refresh_from_db()
-    assert 'not found' in job.errors[0]
-    assert result is None
+    assert job.state == models.JobState.PROCESSING
 
 
-@patch('vulmatch.worker.tasks.requests.get')
-def test_download_file_server_error(mock_get, job, tmp_path):
-    """Test download_file handles server errors"""
-    mock_response = Mock()
-    mock_response.status_code = 500
-    mock_response.url = 'https://example.com/error.json'
-    mock_get.return_value = mock_response
-    
-    tempdir = str(tmp_path)
-    result = tasks.download_file('https://example.com/error.json', tempdir, job_id=job.id)
-    
-    job.refresh_from_db()
-    assert 'failed with status code: 500' in job.errors[0]
-    assert result is None
+@patch('vulmatch.worker.tasks.pypdl.Pypdl')
+def test_download_file_pypdl_error_fails_task(mock_pypdl, job, tmp_path, eager_celery):
+    """Test download_file surfaces pypdl failures and does not implement local retry logic."""
+    mock_pypdl.return_value.start.side_effect = RuntimeError('download failed')
 
-
-@patch('vulmatch.worker.tasks.requests.get')
-@patch('vulmatch.worker.tasks.Path')
-def test_download_file_retries_on_request_exception(mock_path, mock_get, job, tmp_path, eager_celery):
-    """Test download_file retries on RequestException"""
-    # Setup mock path
-    mock_file = Mock()
-    mock_path_instance = Mock()
-    mock_path_instance.__truediv__ = Mock(return_value=mock_file)
-    mock_path_instance.mkdir = Mock()
-    mock_path.return_value = mock_path_instance
-    
-    # First two calls raise RequestException, third succeeds
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.url = 'https://example.com/file.json'
-    mock_response.headers.get.return_value = '100'
-    mock_response.iter_content.return_value = [b'test data']
-    
-    mock_get.side_effect = [
-        requests.exceptions.RequestException("Network error"),
-        requests.exceptions.RequestException("Network error"),
-        mock_response
-    ]
-    
-    mock_file.open.return_value.__enter__ = Mock(return_value=Mock())
-    mock_file.open.return_value.__exit__ = Mock(return_value=False)
-    
     tempdir = str(tmp_path)
     result = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id)
-    
-    # Should have been called 3 times (2 failures + 1 success)
-    assert mock_get.call_count == 3
-    assert result.get() == str(mock_file)
 
-
-@patch('vulmatch.worker.tasks.requests.get')
-@patch('vulmatch.worker.tasks.Path')
-@patch('vulmatch.worker.tasks.read_into')
-def test_download_file_retries_on_download_timeout(mock_read_into, mock_path, mock_get, job, tmp_path, eager_celery):
-    """Test download_file retries on DownloadTimeoutError"""
-    # Setup mock path
-    mock_file = Mock()
-    mock_path_instance = Mock()
-    mock_path_instance.__truediv__ = Mock(return_value=mock_file)
-    mock_path_instance.mkdir = Mock()
-    mock_path.return_value = mock_path_instance
-    
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.url = 'https://example.com/file.json'
-    mock_get.return_value = mock_response
-    
-    # First two calls timeout, third succeeds
-    mock_read_into.side_effect = [
-        tasks.DownloadTimeoutError(1000, 10000),
-        tasks.DownloadTimeoutError(2000, 10000),
-        5000  # Success
-    ]
-    
-    mock_file.open.return_value.__enter__ = Mock(return_value=Mock())
-    mock_file.open.return_value.__exit__ = Mock(return_value=False)
-    
-    tempdir = str(tmp_path)
-    result = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id)
-    
-    # Should have been called 3 times (2 failures + 1 success)
-    assert mock_read_into.call_count == 3
-
-@patch('vulmatch.worker.tasks.requests.get')
-@patch('vulmatch.worker.tasks.read_into')
-def test_download_file_handles_empty_bundle_correctly(mock_read_into, mock_get, job, tmp_path, eager_celery):
-    mock_read_into.return_value = 2
-    tempdir = str(tmp_path)
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.url = 'https://example.com/file.json'
-    mock_get.return_value = mock_response
-    result = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id)
-    assert result.get() == ""
-
-
-
-@patch('vulmatch.worker.tasks.requests.get')
-def test_download_file_max_retries_exceeded(mock_get, job, tmp_path, eager_celery):
-    """Test download_file fails after max retries"""
-    mock_get.side_effect = requests.exceptions.RequestException("Network error")
-    
-    tempdir = str(tmp_path)
-    
-    # with pytest.raises(requests.exceptions.RequestException):
-    r = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id)
-    
-    # Should have been called 4 times (1 initial + 3 retries as per max_retries=3)
-    assert mock_get.call_count == 4
-    assert r.failed()
-    
+    assert result.failed()
+    assert mock_pypdl.return_value.start.call_count == 1
     job.refresh_from_db()
-    assert len(job.errors) == 2
-    assert 'Failed to download' in job.errors[0]
-    assert 'after 3 retries' in job.errors[0]
-    assert 'Network error' in job.errors[0]
+    assert job.state == models.JobState.FAILED
 
 
-@pytest.mark.parametrize(
-    "d,should_fail",
-    [
-        (date(2027, 1, 1), True),
-        (date(2025, 1, 1), False),
-        (date(2026, 10, 11), True),
-        (date(2026, 6, 10), False),
+def test_run_nvd_task_meta_then_process_then_cleanup():
+    job = models.Job.objects.create(
+        type=models.JobType.CVE_UPDATE,
+        parameters={
+            "last_modified_earliest": "2026-07-01",
+            "last_modified_latest": "2026-07-02",
+        },
+    )
+
+    task_chain = tasks.run_nvd_task(job.parameters, job, "cve")
+
+    assert len(task_chain.tasks) == 3
+    assert task_chain.tasks[0].task == "vulmatch.worker.tasks.resolve_meta_for_job"
+    assert task_chain.tasks[1].task == "vulmatch.worker.tasks.process_resolved_bundles"
+    assert task_chain.tasks[2].task == "vulmatch.worker.tasks.remove_temp_and_set_completed"
+    assert task_chain.tasks[2].args[0] == tasks.get_temp_dir_for_job(job.id)
+
+
+def test_resolve_meta_for_job_uses_date_range():
+    job = models.Job.objects.create(
+        parameters={
+            "last_modified_earliest": "2026-07-01",
+            "last_modified_latest": "2026-07-03",
+        }
+    )
+
+    with patch("vulmatch.worker.tasks.resolve_meta", return_value=[]) as mock_resolve_meta:
+        result = tasks.resolve_meta_for_job(job_id=job.id)
+
+    assert result == []
+    mock_resolve_meta.assert_called_once()
+    called_job, called_dates = mock_resolve_meta.call_args.args
+    assert called_job.id == job.id
+    assert called_dates == [date(2026, 7, 1), date(2026, 7, 2), date(2026, 7, 3)]
+
+
+def test_process_resolved_bundles_replaces_with_built_chain():
+    job = models.Job.objects.create(
+        parameters={
+            "process": {
+                "bundles": [
+                    {"date": "2026-07-01", "url": "https://example.com/a.json"},
+                ],
+                "processed_bundles": 0,
+                "total_bundles": 1,
+            }
+        }
+    )
+
+    built_chain = Mock(name="built_chain")
+    with patch("vulmatch.worker.tasks.build_download_upload_chain", return_value=built_chain) as mock_builder:
+        with patch.object(tasks.process_resolved_bundles, "replace", return_value="replaced") as mock_replace:
+            result = tasks.process_resolved_bundles.run(temp_dir="/tmp/vulmatch", nvd_type="cve", job_id=job.id)
+
+    assert result == "replaced"
+    mock_builder.assert_called_once()
+    mock_replace.assert_called_once_with(built_chain)
+
+
+@patch("vulmatch.worker.tasks.Stix2Arango")
+def test_upload_file_updates_process(mock_stix2arango, job):
+    job.parameters = {
+        "process": {
+            "processed_bundles": 0,
+            "total_bundles": 2,
+        }
+    }
+    job.save(update_fields=["parameters"])
+
+    bundle = {"date": "2026-07-01", "url": "https://example.com/a.json"}
+    tasks.upload_file.run(
+        filename="/tmp/file.json",
+        collection_name="nvd_cve",
+        job_id=job.id,
+        params={},
+        bundle=bundle,
+    )
+
+    job.refresh_from_db()
+    assert "uploaded" not in job.parameters
+    assert job.parameters["process"]["processed_bundles"] == 1
+    assert job.parameters["process"]["total_bundles"] == 2
+    assert "bundles" not in job.parameters["process"]
+
+
+@patch("vulmatch.worker.tasks.requests.head")
+def test_resolve_meta_populates_process_for_daily_bundles(mock_head, job):
+    mock_head.return_value = Mock(status_code=200, headers={"content-length": "42"})
+
+    dates = [date(2026, 7, 10)]
+    bundles = tasks.resolve_meta(job, dates)
+
+    assert len(bundles) == 1
+    assert bundles[0]["date"] == "2026-07-10"
+    assert bundles[0]["size"] == 42
+    assert bundles[0]["url"].endswith("/2026-07/cve-bundle-2026_07_10-00_00_00-2026_07_10-23_59_59.json")
+
+    job.refresh_from_db()
+    process = job.parameters["process"]
+    assert process["processed_bundles"] == 0
+    assert process["total_bundles"] == 1
+    assert process["bundles"] == bundles
+
+
+@patch("vulmatch.worker.tasks.get_bundles_for_meta")
+def test_resolve_meta_uses_v2_meta_bundles(mock_get_bundles_for_meta, job):
+    mock_get_bundles_for_meta.return_value = [
+        {"date": "2026-07-11", "url": "https://example.com/a.json", "total_objects": 3},
+        {"date": "2026-07-11", "url": "https://example.com/b.json", "total_objects": 7},
     ]
-)
-@patch('vulmatch.worker.tasks.requests.get')
-def test_download_file__fails_on_404(mock_get, job, tmp_path, d, should_fail, eager_celery):
-    """Test download_file fails after max retries"""
-    from requests.models import Response 
-    r = Response()
-    r.status_code = 404
-    mock_get.return_value = r
-    tempdir = str(tmp_path)
-    
-    # with pytest.raises(requests.exceptions.RequestException):
-    r = tasks.download_file.delay('https://example.com/file.json', tempdir, job_id=job.id, file_date=d)
-    
-    # Should have been called 4 times (1 initial + 3 retries as per max_retries=3)
-    assert mock_get.call_count == 1
-    assert r.failed() == should_fail
-    
+
+    bundles = tasks.resolve_meta(job, [date(2026, 7, 11)])
+
+    assert len(bundles) == 2
+    mock_get_bundles_for_meta.assert_called_once_with(date(2026, 7, 11))
+    job.refresh_from_db()
+    assert job.parameters["process"]["bundles"] == bundles
+    assert job.parameters["process"]["total_bundles"] == 2
+
+
+@patch("vulmatch.worker.tasks.requests.head")
+def test_resolve_meta_appends_error_for_old_404(mock_head, job):
+    mock_head.return_value = Mock(status_code=404, headers={"content-length": "0"})
+
+    bundles = tasks.resolve_meta(job, [date(2026, 6, 10)])
+
+    assert bundles == []
     job.refresh_from_db()
     assert len(job.errors) == 1
-    if should_fail:
-        assert "file does not exist on remote server: https://example.com/file.json" in job.errors[0]
+    assert "File not found for" in job.errors[0]
+    assert job.parameters["process"]["total_bundles"] == 0
 
+
+@patch("vulmatch.worker.tasks.requests.get")
+def test_get_bundles_for_meta_parses_meta_response(mock_get):
+    mock_get.return_value = Mock(
+        status_code=200,
+        json=Mock(
+            return_value={
+                "bundles": [
+                    {
+                        "name": "bundle-a.json",
+                        "object_counts": {"vulnerability": 2, "software": 3},
+                    },
+                    {
+                        "name": "bundle-b.json",
+                        "object_counts": {"vulnerability": 1},
+                    },
+                ]
+            }
+        ),
+    )
+
+    bundles = tasks.get_bundles_for_meta(date(2026, 7, 11))
+
+    assert bundles == [
+        {
+            "date": "2026-07-11",
+            "url": "https://cve2stix.vulmatch.com/v2/2026-07/cves-20260711/bundle-a.json",
+            "total_objects": 5,
+        },
+        {
+            "date": "2026-07-11",
+            "url": "https://cve2stix.vulmatch.com/v2/2026-07/cves-20260711/bundle-b.json",
+            "total_objects": 1,
+        },
+    ]
+
+
+@patch("vulmatch.worker.tasks.requests.get")
+def test_get_bundles_for_meta_raises_on_non_200(mock_get):
+    mock_get.return_value = Mock(status_code=500)
+
+    with pytest.raises(Exception, match="Failed to fetch meta.json"):
+        tasks.get_bundles_for_meta(date(2026, 7, 11))
 

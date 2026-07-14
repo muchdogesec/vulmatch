@@ -6,6 +6,7 @@ import shutil
 import time
 from types import SimpleNamespace
 from urllib.parse import urljoin
+import pypdl
 
 import requests
 from vulmatch.server.arango_helpers import VulmatchDBHelper
@@ -62,19 +63,93 @@ def run_acp_task(data: dict, job: Job):
     task =  acp_task.s(options, job_id=job.id)
     return (task | remove_temp_and_set_completed.si(None, job_id=job.id))
 
-    
 def run_nvd_task(data, job: Job, nvd_type='cve'):
-    dates = date_range(data['last_modified_earliest'], data['last_modified_latest'])
     temp_dir = get_temp_dir_for_job(job.id)
-    tasks = []
-    for d in dates:
-        url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, daily_url(d, nvd_type))
-        task = download_file.si(url, temp_dir, job_id=job.id, file_date=d)
-        task |= upload_file.s(f'nvd_{nvd_type}', stix2arango_note=f"vulmatch-{nvd_type}-date={d.strftime('%Y-%m-%d')}", job_id=job.id, params=job.parameters)
+    task = resolve_meta_for_job.si(job_id=job.id)
+    task |= process_resolved_bundles.si(temp_dir=temp_dir, nvd_type=nvd_type, job_id=job.id)
+    task |= remove_temp_and_set_completed.si(temp_dir, job_id=job.id)
+    return task
+
+def resolve_meta(job: Job, dates: list[date]):
+    bundles = []
+    try:
+        for d in dates:
+            if is_v2_date(d):
+                bundles.extend(get_bundles_for_meta(d))
+                continue
+            day_url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, daily_url(d))
+            resp = requests.head(day_url, timeout=10)
+            content_length = int(resp.headers.get("content-length", 0))
+            if content_length and content_length == 2:
+                continue
+            if resp.status_code == 200:
+                bundles.append(
+                    {
+                        "date": d.strftime("%Y-%m-%d"),
+                        "url": day_url,
+                        "size": content_length or None,
+                    }
+                )
+            elif resp.status_code == 404: 
+                if d >= date(2026, 6, 11): # see https://github.com/muchdogesec/vulmatch/issues/352:
+                    raise MissingFileError(f"File not found for {day_url}")
+                else:
+                    job.errors.append(f"File not found for {day_url}")
+            else:
+                raise Exception(f"Fetch failed for {day_url}: {resp.status_code}")
+    finally:
+        job.parameters = job.parameters or {}
+        process = job.parameters.get('process') or {}
+        process['processed_bundles'] = 0
+        process['total_bundles'] = len(bundles)
+        process['bundles'] = bundles
+        job.parameters['process'] = process
+        job.save(update_fields=["parameters", "errors"])
+    return bundles
+
+
+def get_upload_params(job: Job):
+    params = (job.parameters or {}).copy()
+    params.pop('process', None)
+    return params
+
+
+def build_download_upload_chain(bundles: list[dict], temp_dir: str, job: Job, nvd_type: str = 'cve'):
+    task_chain = []
+    upload_params = get_upload_params(job)
+    for bundle in bundles:
+        bundle_date = datetime.strptime(bundle['date'], '%Y-%m-%d').date()
+        task = download_file.si(bundle['url'], temp_dir, job_id=job.id, file_date=bundle_date)
+        task |= upload_file.s(
+            f'nvd_{nvd_type}',
+            stix2arango_note=f"vulmatch-{nvd_type}-date={bundle['date']}",
+            job_id=job.id,
+            params=upload_params,
+            bundle=bundle,
+        )
         task.set_immutable(True)
-        tasks.append(task)
-    tasks = chain(tasks)
-    return (tasks | remove_temp_and_set_completed.si(temp_dir, job_id=job.id))
+        task_chain.append(task)
+    return chain(task_chain)
+
+def get_bundles_for_meta(d: date):
+    day_url = urljoin(settings.CVE2STIX_BUCKET_ROOT_PATH, v2_url(d))
+    bundles = []
+    meta_url = day_url + "/meta.json"
+    resp = requests.get(meta_url, timeout=10)
+    if resp.status_code == 200:
+        meta = resp.json()
+        for bundle in meta["bundles"]:
+            bundles.append(
+                {
+                    "date": d.isoformat(),
+                    "url": urljoin(meta_url, bundle["name"]),
+                    "total_objects": sum(bundle["object_counts"].values()),
+                }
+            )
+    else:
+        raise Exception(f"Failed to fetch meta.json for {d}: {resp.status_code}")
+    return bundles
+
 
 def get_temp_dir_for_job(job_id):
     return str(Path(tempfile.gettempdir())/f"vulmatch/nvd-cve--{str(job_id)}")
@@ -91,6 +166,12 @@ def date_range(start_date: date, end_date: date):
 def daily_url(d: date, type='cve'):
     dstr = d.strftime('%Y_%m_%d')
     return f"{d.strftime('%Y-%m')}/{type}-bundle-{dstr}-00_00_00-{dstr}-23_59_59.json"
+
+def v2_url(d: date):
+    return f"v2/{d.strftime('%Y-%m')}/cves-{d.strftime('%Y%m%d')}"
+
+def is_v2_date(d: date):
+    return d >= date(2026, 7, 11) or d == date(2026, 6, 17)
 
 
 class CustomTask(Task):
@@ -114,76 +195,34 @@ class CustomTask(Task):
         if not kwargs.get('job_id'):
             raise Exception("rejected: `job_id` not in kwargs")
         return super().before_start(task_id, args, kwargs)
-    
-class DownloadTimeoutError(Exception):
-    def __init__(self, downloaded_bytes, total_bytes=None):
-        self.downloaded_bytes = downloaded_bytes
-        self.total_bytes = total_bytes
-        super().__init__(f"Download timed out after downloading {downloaded_bytes} bytes" + (f" out of {total_bytes} bytes." if total_bytes else "."))
-
-def read_into(streamed_resp: requests.Response, fp, chunk_size=1024*1024, read_timeout=300):
-    """
-    Read from a streamed requests response into a file-like object with total timeout.
-
-    :param streamed_request: requests.Response object with stream=True
-    :param fp: file-like object to write into
-    :param chunk_size: bytes per chunk
-    :param read_timeout: total download timeout in seconds
-    :raises DownloadTimeoutError: if total read exceeds read_timeout
-    """
-    start_time = time.time()
-    downloaded = 0
-    total = streamed_resp.headers.get('content-length')
-    total = int(total) if total else None
-
-    for chunk in streamed_resp.iter_content(chunk_size=chunk_size):
-        if chunk:
-            fp.write(chunk)
-            downloaded += len(chunk)
-            elapsed = time.time() - start_time
-            if elapsed > read_timeout:
-                raise DownloadTimeoutError(downloaded, total)
-    return downloaded
 
 class MissingFileError(Exception):
     pass
 
-@app.task(bind=True, base=CustomTask, max_retries=3, default_retry_delay=5, autoretry_for=(requests.exceptions.RequestException, DownloadTimeoutError))
-def download_file(self, urlpath, tempdir, job_id=None, file_date: date=None):
-    Path(tempdir).mkdir(parents=True, exist_ok=True)
-    logging.info('downloading bundle at `%s`', urlpath)
+
+@app.task(bind=True, base=CustomTask)
+def download_file(self, urlpath, tempdir, job_id=None, file_date: date = None):
+    tempdir = Path(tempdir)
+    tempdir.mkdir(parents=True, exist_ok=True)
+    logging.info("downloading bundle at `%s`", urlpath)
     job = Job.objects.get(pk=job_id)
     if job.state == models.JobState.PENDING:
         job.state = models.JobState.PROCESSING
         job.save()
-    try:
-        resp = requests.get(urlpath, stream=True, timeout=10)
-        if resp.status_code == 200:
-            filename = Path(tempdir)/resp.url.split('/')[-1]
-            with filename.open('wb') as f:
-                total_bytes = read_into(resp, f, read_timeout=settings.DOWNLOAD_TIMEOUT_SECONDS)
-                if total_bytes == 2: # see https://github.com/muchdogesec/cve2stix/issues/128 [body is {}]
-                    logging.info("found an empty bundle, skipping...")
-                    return ""
-                logging.info(f'downloaded {total_bytes} bytes into {filename}')
-            return str(filename)
-        elif resp.status_code == 404:
-            if file_date and file_date > date(2026, 6, 11): # see https://github.com/muchdogesec/vulmatch/issues/352
-                raise MissingFileError(f"file does not exist on remote server: {urlpath}")
-            job.errors.append(f'{resp.url} not found')
-        else:
-            job.errors.append(f'{resp.url} failed with status code: {resp.status_code}')
-        job.save()
-        logging.info('error occured: %d', resp.status_code)
-    except (requests.exceptions.RequestException, DownloadTimeoutError) as exc:
-        if self.request.retries >= self.max_retries:
-            job.errors.append(f'Failed to download {urlpath} after {self.max_retries} retries: {str(exc)}')
-            job.save()
-        raise
+    dl = pypdl.Pypdl(max_concurrent=10)
+    filename = str(tempdir / urlpath.split("/")[-1])
+    dl.start(
+        url=urlpath,
+        file_path=filename,
+        retries=5,
+        block=True,
+        display=False,
+    )
+    return filename
 
 
 @app.task(base=CustomTask)
-def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, params=dict()):
+def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, params=dict(), bundle=None):
     if not filename:
         return
     if not stix2arango_note:
@@ -206,6 +245,13 @@ def upload_file(filename, collection_name, stix2arango_note=None, job_id=None, p
     )
     s2a.add_object_alter_fn(add_vulmatch_extras)
     s2a.run()
+
+    job = Job.objects.get(pk=job_id)
+    job.parameters = job.parameters or {}
+    process = job.parameters.get('process') or {}
+    process['processed_bundles'] = process.get('processed_bundles', 0) + 1
+    job.parameters['process'] = process
+    job.save(update_fields=["parameters"])
 
 @app.task
 def refresh_products_cache():
@@ -244,6 +290,23 @@ def acp_task(options, job_id=None):
             options[k] = datetime.strptime(options[k], '%Y-%m-%d').date()
     run_task_with_acp(**options)
 
+
+@app.task(base=CustomTask)
+def resolve_meta_for_job(job_id=None):
+    job = Job.objects.get(pk=job_id)
+    dates = list(date_range(job.parameters['last_modified_earliest'], job.parameters['last_modified_latest']))
+    return resolve_meta(job, dates)
+
+
+@app.task(bind=True, base=CustomTask)
+def process_resolved_bundles(self, temp_dir: str, nvd_type: str = 'cve', job_id=None):
+    job = Job.objects.get(pk=job_id)
+    process = (job.parameters or {}).get('process') or {}
+    bundles = process.get('bundles', [])
+    if not bundles:
+        return None
+    return self.replace(build_download_upload_chain(bundles, temp_dir, job, nvd_type=nvd_type))
+
 @app.task(base=CustomTask)
 def remove_temp_and_set_completed(path: str, job_id: str=None):
     if path:
@@ -253,7 +316,6 @@ def remove_temp_and_set_completed(path: str, job_id: str=None):
     job.state = models.JobState.COMPLETED
     job.save()
     refresh_products_cache() # build cache after task completion
-
 
 
 from celery import signals

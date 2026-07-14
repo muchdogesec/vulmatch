@@ -12,11 +12,12 @@ django-filter>=24.2
 django-cors-headers
 django-storages[s3]
 django-cleanup
+pypdl
 
 ## dogesec
 dogesec-commons>=1.4.8
 stix2arango
-arango-cve-processor>=1.4.3
+arango-cve-processor>=1.4.12
 
 ## production
 gunicorn==23.0.0
