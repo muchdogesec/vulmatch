@@ -171,7 +171,7 @@ def v2_url(d: date):
     return f"v2/{d.strftime('%Y-%m')}/cves-{d.strftime('%Y%m%d')}"
 
 def is_v2_date(d: date):
-    return d >= date(2026, 7, 14) or d == date(2026, 6, 17)
+    return d >= date(2026, 7, 11) or d == date(2026, 6, 17)
 
 
 class CustomTask(Task):

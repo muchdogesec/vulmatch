@@ -166,3 +166,95 @@ def test_upload_file_updates_process(mock_stix2arango, job):
     assert job.parameters["process"]["total_bundles"] == 2
     assert "bundles" not in job.parameters["process"]
 
+
+@patch("vulmatch.worker.tasks.requests.head")
+def test_resolve_meta_populates_process_for_daily_bundles(mock_head, job):
+    mock_head.return_value = Mock(status_code=200, headers={"content-length": "42"})
+
+    dates = [date(2026, 7, 10)]
+    bundles = tasks.resolve_meta(job, dates)
+
+    assert len(bundles) == 1
+    assert bundles[0]["date"] == "2026-07-10"
+    assert bundles[0]["size"] == 42
+    assert bundles[0]["url"].endswith("/2026-07/cve-bundle-2026_07_10-00_00_00-2026_07_10-23_59_59.json")
+
+    job.refresh_from_db()
+    process = job.parameters["process"]
+    assert process["processed_bundles"] == 0
+    assert process["total_bundles"] == 1
+    assert process["bundles"] == bundles
+
+
+@patch("vulmatch.worker.tasks.get_bundles_for_meta")
+def test_resolve_meta_uses_v2_meta_bundles(mock_get_bundles_for_meta, job):
+    mock_get_bundles_for_meta.return_value = [
+        {"date": "2026-07-11", "url": "https://example.com/a.json", "total_objects": 3},
+        {"date": "2026-07-11", "url": "https://example.com/b.json", "total_objects": 7},
+    ]
+
+    bundles = tasks.resolve_meta(job, [date(2026, 7, 11)])
+
+    assert len(bundles) == 2
+    mock_get_bundles_for_meta.assert_called_once_with(date(2026, 7, 11))
+    job.refresh_from_db()
+    assert job.parameters["process"]["bundles"] == bundles
+    assert job.parameters["process"]["total_bundles"] == 2
+
+
+@patch("vulmatch.worker.tasks.requests.head")
+def test_resolve_meta_appends_error_for_old_404(mock_head, job):
+    mock_head.return_value = Mock(status_code=404, headers={"content-length": "0"})
+
+    bundles = tasks.resolve_meta(job, [date(2026, 6, 10)])
+
+    assert bundles == []
+    job.refresh_from_db()
+    assert len(job.errors) == 1
+    assert "File not found for" in job.errors[0]
+    assert job.parameters["process"]["total_bundles"] == 0
+
+
+@patch("vulmatch.worker.tasks.requests.get")
+def test_get_bundles_for_meta_parses_meta_response(mock_get):
+    mock_get.return_value = Mock(
+        status_code=200,
+        json=Mock(
+            return_value={
+                "bundles": [
+                    {
+                        "name": "bundle-a.json",
+                        "object_counts": {"vulnerability": 2, "software": 3},
+                    },
+                    {
+                        "name": "bundle-b.json",
+                        "object_counts": {"vulnerability": 1},
+                    },
+                ]
+            }
+        ),
+    )
+
+    bundles = tasks.get_bundles_for_meta(date(2026, 7, 11))
+
+    assert bundles == [
+        {
+            "date": "2026-07-11",
+            "url": "https://cve2stix.vulmatch.com/v2/2026-07/cves-20260711/bundle-a.json",
+            "total_objects": 5,
+        },
+        {
+            "date": "2026-07-11",
+            "url": "https://cve2stix.vulmatch.com/v2/2026-07/cves-20260711/bundle-b.json",
+            "total_objects": 1,
+        },
+    ]
+
+
+@patch("vulmatch.worker.tasks.requests.get")
+def test_get_bundles_for_meta_raises_on_non_200(mock_get):
+    mock_get.return_value = Mock(status_code=500)
+
+    with pytest.raises(Exception, match="Failed to fetch meta.json"):
+        tasks.get_bundles_for_meta(date(2026, 7, 11))
+
