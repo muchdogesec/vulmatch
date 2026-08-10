@@ -16,7 +16,7 @@ pypdl>=1.5.7
 
 ## dogesec
 dogesec-commons>=1.4.8
-stix2arango
+stix2arango>=2.0.0
 arango-cve-processor>=1.4.12
 
 ## production
