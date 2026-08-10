@@ -55,7 +55,7 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
-django==5.2.15
+django==5.2.16
     # via
     #   -r requirements.in
     #   django-cors-headers
@@ -241,4 +241,4 @@ zipp==3.23.0
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
-# setuptools 
+# setuptools
