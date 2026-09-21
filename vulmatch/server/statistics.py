@@ -230,8 +230,8 @@ class StatisticsHelper:
         query = """
 FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: 'vulmatch_stats_attack_cwe'}
 FILTER d._arango_cve_processor_note == @note AND d._is_latest == TRUE
-COLLECT name = d.external_references[1].external_id, year = LEFT(d.created, 4) WITH COUNT INTO cve_count
-RETURN {name, year, cve_count}
+COLLECT ext_id = d.external_references[1].external_id, year = LEFT(d.created, 4), name = d.name WITH COUNT INTO cve_count
+RETURN {ext_id, year, cve_count, name}
 """
         stat = self.execute_query(
             query,
@@ -240,9 +240,10 @@ RETURN {name, year, cve_count}
         retval = dict()
         for attack in stat:
             attack = attack.copy()
-            attack_id = attack.pop("name")
+            attack_id = attack.pop("ext_id")
+            attack_name = attack.pop("name")
             lst: list = retval.setdefault(
-                attack_id, {id_name: attack_id, "total_cve_count": 0, "by_year": []}
+                attack_id, {id_name: attack_id, "name": attack_name, "total_cve_count": 0, "by_year": []}
             )["by_year"]
             lst.append(attack)
             retval[attack_id]["total_cve_count"] += attack["cve_count"]
