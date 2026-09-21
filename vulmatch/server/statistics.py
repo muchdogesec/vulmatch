@@ -230,7 +230,7 @@ class StatisticsHelper:
         query = """
 FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: 'vulmatch_stats_attack_cwe'}
 FILTER d._arango_cve_processor_note == @note AND d._is_latest == TRUE
-COLLECT ext_id = d.external_references[1].external_id, year = LEFT(d.created, 4), stix_id = d.id WITH COUNT INTO cve_count
+COLLECT ext_id = d.external_references[1].external_id, year = LEFT(d.created, 4), stix_id = STARTS_WITH(d.source_ref, "vulnerability") ? d.target_ref : d.source_ref WITH COUNT INTO cve_count
 RETURN {ext_id, year, cve_count, stix_id}
 """
         stat = self.execute_query(
