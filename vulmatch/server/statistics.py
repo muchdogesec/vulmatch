@@ -230,23 +230,37 @@ class StatisticsHelper:
         query = """
 FOR d IN nvd_cve_edge_collection OPTIONS {indexHint: 'vulmatch_stats_attack_cwe'}
 FILTER d._arango_cve_processor_note == @note AND d._is_latest == TRUE
-COLLECT name = d.external_references[1].external_id, year = LEFT(d.created, 4) WITH COUNT INTO cve_count
-RETURN {name, year, cve_count}
+COLLECT ext_id = d.external_references[1].external_id, year = LEFT(d.created, 4), stix_id = STARTS_WITH(d.source_ref, "vulnerability") ? d.target_ref : d.source_ref WITH COUNT INTO cve_count
+RETURN {ext_id, year, cve_count, stix_id}
 """
         stat = self.execute_query(
             query,
             bind_vars=dict(note="cve-" + _type),
         )
         retval = dict()
+        stix_ids = {attack["stix_id"] for attack in stat}
+        stix_id_name_map = dict(self.get_names(stix_ids))
         for attack in stat:
             attack = attack.copy()
-            attack_id = attack.pop("name")
+            attack_id = attack.pop("ext_id")
+            stix_id = attack.pop("stix_id")
             lst: list = retval.setdefault(
-                attack_id, {id_name: attack_id, "total_cve_count": 0, "by_year": []}
+                attack_id, {id_name: attack_id, "name": stix_id_name_map.get(stix_id, "-"), "total_cve_count": 0, "by_year": []}
             )["by_year"]
             lst.append(attack)
             retval[attack_id]["total_cve_count"] += attack["cve_count"]
         return sorted(retval.values(), key=lambda x: (x['total_cve_count'], x[id_name]), reverse=True)
+
+    def get_names(self, stix_ids):
+        query = """
+        FOR d IN nvd_cve_vertex_collection
+        FILTER d.id IN @stix_ids
+        RETURN [d.id, d.name]
+        """
+        return self.execute_query(
+            query,
+            bind_vars=dict(stix_ids=list(stix_ids)),
+        )
 
     def _vulnerabilities_by_year(self):
         query = """
