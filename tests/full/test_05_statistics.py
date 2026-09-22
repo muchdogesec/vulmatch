@@ -49,6 +49,7 @@ def test_attack_stats(client, api_schema, patched_helper):
     )
     assert data[0] == {
         "attack_id": "T1556",
+        "name": "Modify Authentication Process",
         "total_cve_count": 23,
         "by_year": [{"year": "2024", "cve_count": 23}],
     }
@@ -65,6 +66,7 @@ def test_capec_stats(client, api_schema, patched_helper):
     )
     assert data[0] == {
         "capec_id": "CAPEC-85",
+        "name": "AJAX Footprinting",
         "total_cve_count": 23,
         "by_year": [{"year": "2024", "cve_count": 23}],
     }
@@ -81,6 +83,7 @@ def test_cwe_stats(client, api_schema, patched_helper):
     )
     assert data[0] == {
         "cwe_id": "CWE-476",
+        "name": "NULL Pointer Dereference",
         "total_cve_count": 65,
         "by_year": [{"year": "2024", "cve_count": 65}],
     }
