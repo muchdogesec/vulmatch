@@ -39,7 +39,7 @@ botocore==1.40.74
     #   s3transfer
 celery==5.5.3 ; python_version >= "3.8"
     # via -r requirements.in
-certifi==2025.11.12
+certifi==2026.10.19
     # via requests
 charset-normalizer==3.4.4
     # via requests
