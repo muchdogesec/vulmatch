@@ -8,7 +8,7 @@ aiofiles==25.1.0
     # via pypdl
 aiohappyeyeballs==2.7.1
     # via aiohttp
-aiohttp==3.14.3
+aiohttp==3.14.4
     # via pypdl
 aiosignal==1.4.0
     # via aiohttp
@@ -235,7 +235,7 @@ vine==5.1.0
     #   kombu
 wcwidth==0.2.14
     # via prompt-toolkit
-yarl==1.24.2
+yarl==1.25.1
     # via aiohttp
 zipp==3.23.0
     # via importlib-metadata
